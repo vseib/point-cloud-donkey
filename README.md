@@ -1,9 +1,7 @@
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
-![alt text][logo]
-
-[logo]: https://github.com/vseib/PointCloudDonkey/tree/master/images/complete_pipeline.png "Visualization of the Pipeline"
+![alt text](https://github.com/vseib/PointCloudDonkey/tree/master/images/complete_pipeline.png "Visualization of the Pipeline")
 
 
 ## Description
