@@ -3,13 +3,13 @@ A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Cloud
 
 ![alt text](https://github.com/vseib/PointCloudDonkey/tree/master/images/complete_pipeline.png "Visualization of the Pipeline")
 
-(tree/master/images/complete_pipeline.png "Visualization of the Pipeline")
+![alt text](tree/master/images/complete_pipeline.png "Visualization of the Pipeline")
 
 
-(images/complete_pipeline.png "Visualization of the Pipeline")
+![alt text](images/complete_pipeline.png "Visualization of the Pipeline")
 
 
-(complete_pipeline.png)
+![alt text](complete_pipeline.png)
 
 ## Description
 
