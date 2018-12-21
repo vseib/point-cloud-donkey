@@ -42,4 +42,4 @@ PointCloudDonkey also includes some 3rd party code which might be subject to oth
 
 ## References
 
-[1] Maneki-neko (lucky cat) mesh model: https://www.thingiverse.com/thing:923097
+[1]: Maneki-neko (lucky cat) mesh model: https://www.thingiverse.com/thing:923097
