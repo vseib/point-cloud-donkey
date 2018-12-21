@@ -1,14 +1,16 @@
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
-<image>
+![alt text][logo]
+
+[logo]: https://github.com/vseib/PointCloudDonkey/images/complete_pipeline.png "Logo Title Text 2"
+
 
 ## Description
 
-* include paper to cite
 * include table with classification results
 
-## Attribution
+## Acknowledgments
 
 * link to Norman's repo
 * thanks to 3rd party libs (also with links?)
@@ -27,3 +29,12 @@ A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Cloud
 
 * how to convert datasets to point clouds (include script)
 * extensive config file documentation
+
+## Citing
+
+* include papers to cite
+
+## License
+
+PointCloudDonkey is released under the BSD-3-Clause license. See [LICENSE](LICENSE) for details.
+PointCloudDonkey also includes some 3rd party code which might be subject to other licenses. Please see TODO for details.
