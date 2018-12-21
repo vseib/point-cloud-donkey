@@ -5,7 +5,7 @@ A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Cloud
 
 The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (downloaded from [1] and converted to a point cloud).
 
-[1] https://www.thingiverse.com/thing:923097
+[1] Maneki-neko (lucky cat) mesh model: https://www.thingiverse.com/thing:923097
 
 ---
 
