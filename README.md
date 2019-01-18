@@ -34,8 +34,22 @@ Further, I would like to thank the developers of third party libraries used in t
 
 ## Installation
 
-* mention required libs
-* what to do on ubuntu 14 / 16 / 18 (all lts)
+This framework was tested with Ubuntu 14.04 LTS and Ubuntu 16.04 LTS.
+
+### Ubuntu 14.04
+
+TODO: add commit ID or branch for Ubuntu 14
+
+#### Install Dependencies
+
+    sudo apt install libeigen3-dev libboost-all-dev qt5-default libvtk5.8 \
+         libvtk5-dev libvtk5.8-qt4 libvtk5-qt4-dev libgomp1 libopencv-core-dev \
+         libopencv-dev zlib1g zlib1g-dev libblitz0-dev libjsoncpp0 libjsoncpp-dev \
+         liblog4cxx10 liblog4cxx10-dev
+
+#### Install PCL
+
+
 
 ## Quick Start
 
