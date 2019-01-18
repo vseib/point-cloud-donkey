@@ -73,8 +73,32 @@ Execute the following commands to compile the framework:
     cmake ../src
     make -j4
 ```
+The binaries will be placed in the folder `PointCloudDonkey/build/bin`.
 
 ## Quick Start
+This guide shows how to use the software with a prepared example.
+* Download example point cloud objects from the [PCL repository](https://github.com/PointCloudLibrary/data/tree/master/tutorials) <br> (five files for training `ism_train_*.pcd` and five files for testing `ism_test_*.pcd`)
+* in the following steps I will assume that these files are downloaded and placed in the folder `PointCloudDonkey/example_clouds`
+
+### Using the Command Line
+For this example I will use the executable `eval_tool` which is build from the code located in `PointCloudDonkey/src/eval_tool`. The `eval_tool` provides two interfaces: one that allows to specify the input data _as arguments_ on the command line and one that allows to specify _a file_ with input data.
+#### Training
+1. Data as arguments
+    * Run the following commands from the `PointCloudDonkey` folder for training
+    ```
+        ./build/bin/eval_tool -t ../configs/qs_input_config.ism -o output_config.ism \ 
+        -m example_clouds/ism_train_cat.pcd example_clouds/ism_train_horse.pcd example_clouds/ism_train_lioness.pcd \ 
+        example_clouds/ism_train_michael.pcd example_clouds/ism_train_wolf.pcd \
+        -c 0 1 2 3 4
+      ```
+      * The executable takes an input config file for training (`-t`), a name for the output config file (`-o`), a list of point clouds (`-m`) and a list of class labels in the same order as the provided point clouds (`-c`).
+      
+2. Data in a file (recommended interface)
+    *  Run the following commands from the `PointCloudDonkey` folder for training
+    ```
+        ./build/bin/eval_tool -t ../config/qs_input_config.ism -o output_config.ism -f qs_train_list.txt
+      ```
+   * As before, the executable takes an input config file for training (`-t`) and a name for the output config file (`-o`). However, the objects and corresponding classes are specified inside a text file (`-f`).
 
 * some examples with provided config files
 * maybe include some point clouds? or just link to clouds from pcl
