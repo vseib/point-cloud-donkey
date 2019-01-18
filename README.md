@@ -8,6 +8,9 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 
 ---
 
+[Description](#Description)
+[Acknowledgments](#Acknowledgments)
+
 ## Description
 
 PointCloudDonkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. There are still many references to ISM in the code. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
@@ -15,7 +18,6 @@ PointCloudDonkey is a customizable pipeline based on the <a href="http://pointcl
 The following table summarizes classification results on some datasets.
 * TODO include table
 
-__TOC__
 
 ## Acknowledgments
 
