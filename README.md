@@ -1,3 +1,4 @@
+
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
@@ -16,8 +17,13 @@ The following table summarizes classification results on some datasets.
 
 ## Acknowledgments
 
-* link to Norman's repo
-* thanks to 3rd party libs (also with links?)
+The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub in [Norman's repository](https://github.com/Norman0406).
+
+Further, I would like to thank the developers of third party libraries used in this project:
+* [Compact Geometric Features](https://marckhoury.github.io/CGF/)
+* [cnpy Library](https://github.com/rogersce/cnpy)
+* [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
+* [lzf Library](http://oldhome.schmorp.de/marc/liblzf.html)
 
 ## News
 
@@ -49,6 +55,7 @@ PointCloudDonkey also includes some 3rd party code which might be subject to oth
 
 ## References
 
-```
-[1] Leibe, Bastian and Leonardis, Ales and Schiele, Bernt, Combined Object Categorization and Segmentation with an Implicit Shape Model, Workshop on statistical learning in computer vision, ECCV, 2004
-```
+[1] Leibe, Bastian and Leonardis, Ales and Schiele, Bernt; 
+"Combined Object Categorization and Segmentation with an Implicit Shape Model",
+    Workshop on statistical learning in computer vision, ECCV, 2004
+
