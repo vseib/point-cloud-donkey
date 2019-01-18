@@ -15,6 +15,8 @@ PointCloudDonkey is a customizable pipeline based on the <a href="http://pointcl
 The following table summarizes classification results on some datasets.
 * TODO include table
 
+__TOC__
+
 ## Acknowledgments
 
 The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub in [Norman's repository](https://github.com/Norman0406).
