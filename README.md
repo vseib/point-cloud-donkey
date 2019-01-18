@@ -9,7 +9,6 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 ---
 ## Content
 
-[Content](#Content) <br>
 [Description](#Description) <br>
 [Acknowledgments](#Acknowledgments) <br>
 [News](#News) <br>
@@ -115,9 +114,9 @@ For this example I will use the executable `eval_tool` which is build from the c
 1. Data as arguments
     * Run the following command from the `PointCloudDonkey` folder for testing (classification)
     ```
-        ./build/bin/eval_tool -d output_config.ism -p example_clouds/ism_test_cat.pcd example_clouds/ism_test_horse.pcd \
-        example_clouds/ism_test_lioness.pcd example_clouds/ism_test_michael.pcd example_clouds/ism_test_wolf.pcd \
-        -g 0 1 2 3 4 -o output_folder
+        ./build/bin/eval_tool -d output_config.ism -o output_folder -p example_clouds/ism_test_cat.pcd \ 
+        example_clouds/ism_test_horse.pcd example_clouds/ism_test_lioness.pcd example_clouds/ism_test_michael.pcd \
+        example_clouds/ism_test_wolf.pcd -g 0 1 2 3 4
       ```
       * The executable takes an input config file for testing (`-d`), a name for the output folder for logging (`-o`), a list of point clouds (`-p`) and a list of ground truth class labels in the same order as the provided point clouds (`-g`).
       
