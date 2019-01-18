@@ -10,7 +10,7 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 
 ## Description
 
-PointCloudDonkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
+PointCloudDonkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. There are still many references to ISM in the code. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
 
 The following table summarizes classification results on some datasets.
 * TODO include table
@@ -41,8 +41,8 @@ TODO: add commit ID or branch for Ubuntu 14
 #### Install Dependencies
 
     sudo apt install libeigen3-dev libboost-all-dev qt5-default libvtk5.8 libvtk5-dev libvtk5.8-qt4 \
-    libvtk5-qt4-dev libgomp1 libopencv-core-dev libopencv-dev zlib1g zlib1g-dev libblitz0-dev \
-    libjsoncpp0 libjsoncpp-dev liblog4cxx10 liblog4cxx10-dev
+         libvtk5-qt4-dev libgomp1 libopencv-core-dev libopencv-dev zlib1g zlib1g-dev libblitz0-dev \
+         libjsoncpp0 libjsoncpp-dev liblog4cxx10 liblog4cxx10-dev
 
 #### Install PCL
 PointCloudDonkey requires at least PCL version 1.8.0. However, only PCL 1.7.2 is available in Ubuntu packages for 14.04. Therefore, PCL version 1.8.0 must be installed from source.
@@ -62,7 +62,17 @@ See the [official PCL instructions](http://www.pointclouds.org/documentation/tut
     make -j4
     sudo make -j4 install
 ```
-#### Optionally: Install XY
+#### Optionally: Install VCG Library
+You can find instructions for installation on the [VCG Library webpage](http://vcg.isti.cnr.it/vcglib/). To include VCG in the compilation process
+* open the file `PointCloudDonkey/src/implicit_shape_model/CMakeLists.txt`
+* go to line 8 and set the `USE_VCG` flag to `true`
+#### Compiling
+Execute the following commands to compile the framework:
+``` 
+    cd PointCloudDonkey && mkdir build && cd build
+    cmake ../src
+    make -j4
+```
 
 ## Quick Start
 
