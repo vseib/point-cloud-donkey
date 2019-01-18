@@ -19,7 +19,7 @@ The following table summarizes classification results on some datasets.
 
 The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub in [Norman's repository](https://github.com/Norman0406).
 
-Further, I would like to thank the developers of third party libraries used in this project:
+Further, I would like to thank the developers of third party libraries used in this project: 
 * [Compact Geometric Features](https://marckhoury.github.io/CGF/)
 * [cnpy Library](https://github.com/rogersce/cnpy)
 * [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
@@ -27,7 +27,10 @@ Further, I would like to thank the developers of third party libraries used in t
 
 ## News
 
-* todo
+| Date | Update |
+| ---  | ---    |
+| 2019-01-xx | Initial code commit, ReadMe added |
+
 
 ## Installation
 
