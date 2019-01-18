@@ -26,7 +26,6 @@ PointCloudDonkey is a customizable pipeline based on the <a href="http://pointcl
 The following table summarizes classification results on some datasets.
 * TODO include table
 
-
 ## Acknowledgments
 
 The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub in [Norman's repository](https://github.com/Norman0406).
@@ -111,14 +110,33 @@ For this example I will use the executable `eval_tool` which is build from the c
         ./build/bin/eval_tool -t ../config/qs_input_config.ism -o output_config.ism -f qs_train_list.txt
       ```
    * As before, the executable takes an input config file for training (`-t`) and a name for the output config file (`-o`). However, the objects and corresponding classes are specified inside a text file (`-f`).
+#### Testing
 
-* some examples with provided config files
-* maybe include some point clouds? or just link to clouds from pcl
+1. Data as arguments
+    * Run the following commands from the `PointCloudDonkey` folder for testing (classification)
+    ```
+        ./build/bin/eval_tool -d output_config.ism -p example_clouds/ism_test_cat.pcd example_clouds/ism_test_horse.pcd \
+        example_clouds/ism_test_lioness.pcd example_clouds/ism_test_michael.pcd example_clouds/ism_test_wolf.pcd \
+        -g 0 1 2 3 4 -o output_folder
+      ```
+      * The executable takes an input config file for testing (`-d`), a name for the output folder for statistics (`-o`), a list of point clouds (`-p`) and a list of ground truth class labels in the same order as the provided point clouds (`-g`).
+      
+2. Data in a file (recommended interface)
+    *  Run the following commands from the `PointCloudDonkey` folder for testing (classification)
+    ```
+        ./build/bin/eval_tool -d ../config/qs_input_config.ism -o output_folder -f qs_test_list.txt
+      ```
+   * As before, the executable takes an input config file for testing (`-d`) and a name for the output folder (`-o`). However, the objects and corresponding ground truth labels are specified inside a text file (`-f`).
+
+### Using the GUI
+TODO
 
 ## Documentation
 
-* how to convert datasets to point clouds (include script)
-* extensive config file documentation
+### Preparing Point Clouds
+### Preparing a File List
+### Preparing a Config File
+### Detailed Config File Documentation
 
 ## Citing
 
