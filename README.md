@@ -98,7 +98,7 @@ For this example I will use the executable `eval_tool` which is build from the c
 1. Data as arguments
     * Run the following command from the `PointCloudDonkey` folder for training
     ```
-        ./build/bin/eval_tool -t ../configs/qs_input_config.ism -o output_config.ism \ 
+        ./build/bin/eval_tool -t config/qs_input_config.ism -o output_config.ism \ 
         -m example_clouds/ism_train_cat.pcd example_clouds/ism_train_horse.pcd example_clouds/ism_train_lioness.pcd \ 
         example_clouds/ism_train_michael.pcd example_clouds/ism_train_wolf.pcd -c 0 1 2 3 4
       ```
@@ -107,7 +107,7 @@ For this example I will use the executable `eval_tool` which is build from the c
 2. Data in a file (recommended interface)
     *  Run the following command from the `PointCloudDonkey` folder for training
     ```
-        ./build/bin/eval_tool -t ../config/qs_input_config.ism -o output_config.ism -f qs_train_list.txt
+        ./build/bin/eval_tool -t config/qs_input_config.ism -o output_config.ism -f qs_train_list.txt
       ```
    * As before, the executable takes an input config file for training (`-t`) and a name for the output config file (`-o`). However, the objects and corresponding class labels are specified inside a text file (`-f`).
 #### Testing
@@ -124,7 +124,7 @@ For this example I will use the executable `eval_tool` which is build from the c
 2. Data in a file (recommended interface)
     *  Run the following command from the `PointCloudDonkey` folder for testing (classification)
     ```
-        ./build/bin/eval_tool -d ../config/qs_input_config.ism -o output_folder -f qs_test_list.txt
+        ./build/bin/eval_tool -d output_config.ism -o output_folder -f qs_test_list.txt
       ```
    * As before, the executable takes an input config file for testing (`-d`) and a name for the output folder (`-o`). However, the objects and corresponding ground truth labels are specified inside a text file (`-f`).
 
