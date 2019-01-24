@@ -1,0 +1,142 @@
+{
+   "ObjectConfig" : {
+      "Children" : {
+         "Clustering" : {
+            "Parameters" : {
+               "_____comment_params_for_____" : "Agglomerative",
+               "Threshold" : 1.20,
+               "_____comment_params_for_____" : "ALL based on KMeans",
+               "Iterations" : 1000,
+               "CentersInit" : "FLANN_CENTERS_KMEANSPP",
+               "__comment_possible_CentersInit" : "FLANN_CENTERS_KMEANSPP, FLANN_CENTERS_GONZALES, FLANN_CENTERS_RANDOM",
+               "CbIndex" : 0.5,
+               "_____comment_params_for_____" : "KMeansCount",
+               "ClusterCount" : 10,
+               "_____comment_params_for_____" : "KMeansFactor",
+               "ClusterFactor" : 1,
+               "_____comment_params_for_____" : "KMeansHartigan",
+               "MaxK" : 10
+            },
+            "Type" : "None",
+            "_____comment_possible_Types_are_____" : "None, Agglomerative, KMeansCount, KMeansFactor, KMeansHartigan, KMeansThumbRule"
+         },
+         "Codebook" : {
+            "Children" : {
+               "ActivationStrategy" : {
+                  "Parameters" : {
+                     "_____comment_params_for_____" : "KNN",
+                     "K" : 1,
+                     "_____comment_params_for_____" : "Threshold",
+                     "Threshold" : 1.0
+                  },
+                  "Type" : "KNN",
+                  "_____comment_possible_Types_are_____" : "Best, KNN, Threshold"
+               }
+            },
+            "Parameters" : {
+               "DetectionBestStrategy" : false,
+               "UseClassWeight" : false,
+               "UseMatchingWeight" : false,
+               "UseVoteWeight" : false,
+               "UsePartialShot" : false,
+               "PartialShotType" : "front"
+            }
+         },
+         "Features" : {
+            "Parameters" : {
+               "Radius" : 0.40,
+               "ReferenceFrameRadius" : 0.30,
+               "ReferenceFrameType" : "SHOT",
+               "OverwriteUSCFrameType" : false,
+               "UseFullRSDHistogram" : false,
+               "__comment_ReferenceFrameType_can_be__" : "SHOTNA, SHOT"
+            },
+            "Type" : "CSHOT",
+            "_____comment_possible_Types_all_use_same_params_except_where_otherwise_noted____" : "CSHOT, SHOT, FPFH, PFH, RIFT, 3DSC, SpinImage, RoPS, USC, RSD, PPF"
+         },
+         "GlobalFeatures" : {
+            "Parameters" : {
+               "_____comment_dummy_params_to_avoid_warnings_____" : "0",
+               "ReferenceFrameRadius" : 0.30,
+               "ReferenceFrameType" : "SHOT",
+               "_____comment_param_Radius_only_for_____" : "GRSD",
+               "Radius" : 0.30
+            },
+            "Type" : "CSHOT_GLOBAL",
+            "_____comment_possible_Types_all_use_same_params_except_where_otherwise_noted____" : "CSHOT_GLOBAL, SHOT_GLOBAL, USC_GLOBAL, GRSD, ESF, VFH, CVFH, OURCVFH"
+         },
+         "Keypoints" : {
+            "Parameters" : {
+               "_____comment_params_for_____" : "VoxelGrid",
+               "LeafSize" : 0.20,
+               "_____comment_params_for_____" : "Harris3D",
+               "NonMaxSupression" : true,
+               "Radius" : 0.05,
+               "Refine" : true,
+               "ResponseMethod" : "HARRIS",
+               "__comment_ResponseMethod_can_be__" : "HARRIS, NOBLE, LOWE, TOMASI, CURVATURE",
+               "Threshold" : 0.0001,
+               "_____comment_params_for_____" : "ISS3D",
+               "SalientRadius" : 0.1,
+               "Gamma21" : 0.975,
+               "Gamma32" : 0.975,
+               "NonMaxRadius" : 0.05,
+               "MinNeighbors" : 5
+            },
+            "Type" : "VoxelGrid",
+            "_____comment_possible_Types_are_____" : "VoxelGrid, Harris3D, ISS3D, SIFT3D"
+         },
+         "Voting" : {
+            "Parameters" : {
+               "_____comment_params_for_____" : "ALL voting methods",
+               "UseGlobalFeatures" : true,
+               "GlobalFeaturesStrategy" : "SVM",
+               "__comment_GlobalFeaturesStrategy_can_be__" : "KNN or SVM",
+               "GlobalFeaturesK" : 1,
+               "AverageRotation" : true,
+               "BestK" : -1,
+               "MinThreshold" : 0.0,
+               "__comment_BinOrBandwidthType_can_be__" : "Config: use value from config, FirstDim/SecondDim: use average size of first/second bounding dimension from training",
+               "BinOrBandwidthType" : "Config",
+               "__comment_BinOrBandwidthFactor__" : "only applied if BinOrBandwidthType is NOT Config",
+               "BinOrBandwidthFactor" : 1.0,
+               "_____comment_params_for_____" : "MeanShift",
+               "Bandwidth" : 0.60,
+               "Threshold" : 0.001,
+               "Kernel" : "Gaussian",
+               "__comment_possible_kernels__" : "Gaussian, Uniform",
+               "MaxIter" : 1000,
+               "_____comment_params_for_____" : "Hough3D",
+               "MinCoord" : [-5, -5, -5],
+               "MaxCoord" : [5, 5, 5],
+               "BinSize" : [0.2, 0.2, 0.2],
+               "UseInterpolation" : true,
+               "RelThreshold" : 0.8
+            },
+            "Type" : "MeanShift",
+            "_____comment_possible_Types_are_____" : "MeanShift, Hough3D"
+         }
+      },
+      "Parameters" : {
+         "BoundingBoxType" : "MVBB",
+         "__comment_BoundingBoxType_can_be__" : "MVBB, AABB",
+         "ConsistentNormals" : true,
+         "ConsistentNormalsK" : 10,
+         "ConsistentNormalsMethod" : 2,
+         "_____comment_ConsistentNormalsMethod_can_be__" : "0: disabled, 1: orient toward viewpoint - use this for data from RGBD-cameras, 2: normals from SHOT LRF, 3: standard with region growing, 4: Euclidean Minimal Spanning Tree",
+         "DistanceType" : "Euclidean",
+         "_____comment_DistanceType_can_be__" : "Euclidean, (EMD), (WEMD), ChiSquared, (Bhattacharyya), Hellinger, HistIntersection, KLDivergence",
+         "NormalRadius" : 0.05,
+         "NumThreads" : 0,
+         "UseVoxelFiltering" : false,
+         "VoxelLeafSize" : 0.01,
+         "SetColorToZero" : false,
+         "EnableVotingAnalysis" : false,
+         "VotingAnalysisOutputPath" : "/home/vseib/Desktop/",
+         "UseSvmTraining": true,
+         "SvmAutoTrain" : true,
+         "SvmParamC" : 7.41,
+         "SvmParamGamma" : 2.96
+      }
+   }
+}

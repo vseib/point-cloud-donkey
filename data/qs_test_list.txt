@@ -1,0 +1,6 @@
+# test
+example_clouds/ism_test_cat.pcd 0
+example_clouds/ism_test_horse.pcd 1
+example_clouds/ism_test_lioness.pcd 2
+example_clouds/ism_test_michael.pcd 3
+example_clouds/ism_test_wolf.pcd 4

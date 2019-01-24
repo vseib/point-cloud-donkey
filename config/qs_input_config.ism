@@ -1,0 +1,110 @@
+{
+   "ObjectConfig" : {
+      "Children" : {
+         "Clustering" : {
+            "Type" : "None"
+         },
+         "Codebook" : {
+            "Children" : {
+               "ActivationStrategy" : {
+                  "Parameters" : {
+                     "K" : 1
+                  },
+                  "Type" : "KNN"
+               }
+            },
+            "Parameters" : {
+               "PartialShotType" : "front",
+               "RandomCodebookFactor" : 1.0,
+               "UseClassWeight" : false,
+               "UseCodewordWeight" : false,
+               "UseMatchingWeight" : false,
+               "UsePartialShot" : false,
+               "UseRandomCodebook" : false,
+               "UseVoteWeight" : false,
+               "DirectlyAssignCodewords": false
+            }
+         },
+         "FeatureWeighting" : {
+            "Parameters" : {
+               "DistanceThreshold" : 0.05,
+               "ExtractFromList" : "center",
+               "Factor" : 0.75,
+               "KSearch" : 10,
+               "UseIterativeRanking" : false,
+               "UseFeaturePosition" : false,
+               "ScoreIncrementType" : 0               
+            },
+            "Type" : "Uniform"
+         },
+         "Features" : {
+            "Parameters" : {
+               "Radius" : 60,
+               "ReferenceFrameRadius" : 50,
+               "ReferenceFrameType" : "SHOT"
+            },
+            "Type" : "SHOT"
+         },
+         "GlobalFeatures" : {
+            "Parameters" : {
+               "ReferenceFrameRadius" : 0.3000000119209290,
+               "ReferenceFrameType" : "SHOT"
+            },
+            "Type" : "Dummy"
+         },
+         "Keypoints" : {
+            "Parameters" : {
+               "LeafSize" : 50
+            },
+            "Type" : "VoxelGrid"
+         },
+         "Voting" : {
+            "Parameters" : {
+               "AverageRotation" : true,
+               "Bandwidth" : 50,
+               "BestK" : -1,
+               "BinOrBandwidthFactor" : 1.0,
+               "BinOrBandwidthType" : "Config",
+               "GlobalFeatureInfluenceType" : 4,
+               "GlobalFeaturesK" : 1,
+               "GlobalFeaturesStrategy" : "SVM",
+               "GlobalParamMinSvmScore" : 0.6999999880790710,
+               "GlobalParamRateLimit" : 0.6000000238418579,
+               "GlobalParamWeightFactor" : 2.0,
+               "Kernel" : "Gaussian",
+               "MaxFilterType" : "None",
+               "MaxIter" : 1000,
+               "MaximaSuppression" : "Average",
+               "MinThreshold" : 0.0,
+               "MinVotesThreshold" : 1,
+               "SingleObjectMaxType" : "None",
+               "Threshold" : 0.001000000047497451,
+               "UseGlobalFeatures" : false
+            },
+            "Type" : "MeanShift"
+         }
+      },
+      "Parameters" : {
+         "BoundingBoxType" : "MVBB",
+         "ConsistentNormalsK" : 10,
+         "ConsistentNormalsMethod" : 2,
+         "DistanceType" : "ChiSquared",
+         "EnableVotingAnalysis" : false,
+         "FLANNExactMatch" : false,
+         "FLANNNumKDTrees" : 4,
+         "NormalRadius" : 10,
+         "NumThreads" : 0,
+         "SetColorToZero" : true,
+         "SingleObjectMode" : true,
+         "SvmAutoTrain" : true,
+         "SvmOneVsAllTraining" : true,
+         "SvmParamC" : 7.410,
+         "SvmParamGamma" : 2.960,
+         "SvmParamKfold" : 10,
+         "UseSvmTraining" : false,
+         "UseVoxelFiltering" : false,
+         "VotingAnalysisOutputPath" : "/home/vseib/Desktop/",
+         "VoxelLeafSize" : 0.009999999776482582
+      }
+   }
+}

@@ -1,0 +1,6 @@
+# train
+example_clouds/ism_train_cat.pcd 0
+example_clouds/ism_train_horse.pcd 1
+example_clouds/ism_train_lioness.pcd 2
+example_clouds/ism_train_michael.pcd 3
+example_clouds/ism_train_wolf.pcd 4
