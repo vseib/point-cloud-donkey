@@ -13,7 +13,7 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 [Acknowledgments](#Acknowledgments) <br>
 [News](#News) <br>
 [Installation](#Installation) <br>
-[Quick Start] (#Quick Start) <br>
+[Quick Start](#Quick Start) <br>
 [Documentation](#Documentation) <br>
 [Citing](#Citing) <br>
 [License](#License) <br>
