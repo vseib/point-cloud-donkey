@@ -52,7 +52,7 @@ This framework was tested with Ubuntu 14.04 LTS and Ubuntu 16.04 LTS.
 ### Ubuntu 14.04 
 TODO: add commit ID or branch for Ubuntu 14
 
-Note: You need to have OpenCV 2.4 installed to be able to use this code in Ubuntu 14. If you have different versions installed, make sure that `cmake` finds the OpenCV version 2.4.
+Note: You need to have OpenCV 2.4 installed to be able to use this code in Ubuntu 14. If you have different versions installed, make sure that `cmake` finds the OpenCV version 2.4 (I recommend using `ccmake` to configure paths).
 
 #### Install Dependencies
 
