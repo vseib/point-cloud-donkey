@@ -1,0 +1,467 @@
+/*
+ * BSD 3-Clause License
+ *
+ * Full text: https://opensource.org/licenses/BSD-3-Clause
+ *
+ * Copyright (c) 2018, Viktor Seib
+ * All rights reserved.
+ *
+ */
+
+#include "feature_ranking.h"
+#include "ranking_factory.h"
+#include "../utils/utils.h"
+#include "../utils/distance.h"
+#include "../utils/debug_utils.h"
+
+#include <fstream>
+
+namespace ism3d
+{
+FeatureRanking::FeatureRanking()
+    : m_numThreads(1)
+{
+    addParameter(m_k_search, "KSearch", 10);
+    addParameter(m_dist_thresh, "DistanceThreshold", 0.1f);
+    addParameter(m_factor, "Factor", 0.75f);
+    addParameter(m_extractList, "ExtractFromList", std::string("front"));
+    addParameter(m_iterative_ranking, "UseIterativeRanking", false);
+    addParameter(m_score_threshold, "ScoreThreshold", 0.0f);
+}
+
+FeatureRanking::~FeatureRanking()
+{
+}
+
+bool FeatureRanking::keepFeatureWithScore(float score)
+{
+    if(m_iterative_ranking)
+        return score < m_score_threshold;
+    else
+        return score != 0;
+}
+
+std::tuple<std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>>, pcl::PointCloud<ISMFeature>::Ptr,
+std::vector<unsigned>>
+FeatureRanking::operator()(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features, int num_kd_trees, bool flann_exact_match)
+{
+    // iterative ranking is only defined properly if using "front"
+    if(m_iterative_ranking)
+    {
+        m_extractList = "front";
+    }
+
+    m_num_kd_trees = num_kd_trees;
+    m_flann_exact_match = flann_exact_match;
+    int num_input_features = countFeatures(features);
+
+    bool terminate_selection;
+    // variables to hold the result
+    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> features_reduced;
+    pcl::PointCloud<ISMFeature>::Ptr all_features_reduced(new pcl::PointCloud<ISMFeature>());
+    std::vector<unsigned> all_feature_classes_reduced;
+
+    // remove features with low scores
+    int iter_cnt = 0;
+    do
+    {
+        // init values for next loop
+        LOG_INFO("feature ranking iteration " << iter_cnt);
+        terminate_selection = true;
+        features_reduced.clear();
+        all_features_reduced->clear();
+        all_feature_classes_reduced.clear();
+
+        // compute scores
+        std::map<unsigned, std::vector<float>> scores = iComputeScores(features);
+        std::map<unsigned, std::vector<std::pair<int, float>>> index_score_map;
+
+        if(getType() != "Uniform")
+        {
+            // rank with scores
+            index_score_map = rankFeaturesWithScores(scores);
+            scores = extractSubsetFromRankedList(index_score_map, scores);
+
+            // debug output: enable / disable inside method
+            DebugUtils::writeOutForDebug(index_score_map, getType());
+        }
+
+        std::map<unsigned, std::vector<std::vector<float>>> feature_scores = unflatten_list(scores, features);
+
+        // NOTE: this is only for debug to write out the indices selected by a feature ranking algorithm; check absolute path below
+        // NOTE: to write out additional information about selected features by a feature ranking algorithm check same flag farther down in this file
+        // NOTE: to write out indices randomly selected during recognition, check the same debug flag in codebook.cpp
+        // NOTE: to write out the actual feature vectors see below the next for loop
+        bool debug_flag_write_out = false;
+        int temp_idx = 0;
+        std::ofstream ofs;
+        if(debug_flag_write_out) ofs.open("/home/vseib/Desktop/cwids/selected_idxs.txt", std::ofstream::out);
+
+        // compute score threshold on the first iteration in case of iterative feature ranking
+        if(iter_cnt++ == 0 && m_iterative_ranking)
+        {
+            computeScoreThreshold(index_score_map);
+        }
+
+        // remove features with score zero
+        for(auto it : feature_scores)
+        {
+            unsigned class_id = it.first;
+            std::vector<std::vector<float> > scores_doublelist = it.second;
+            features_reduced.insert({class_id, std::vector<pcl::PointCloud<ISMFeature>::Ptr>()});
+            for(int i = 0; i < scores_doublelist.size(); i++)
+            {
+                pcl::PointCloud<ISMFeature>::Ptr cloud(new pcl::PointCloud<ISMFeature>());
+                features_reduced.at(class_id).push_back(cloud);
+            }
+
+            for(int first_idx = 0; first_idx < scores_doublelist.size(); first_idx++)
+            {
+                for(int second_idx = 0; second_idx < scores_doublelist.at(first_idx).size(); second_idx++)
+                {
+                    float score = scores_doublelist.at(first_idx).at(second_idx);
+
+                    if(keepFeatureWithScore(score))
+                    {
+                        ISMFeature current_feature = features.at(class_id).at(first_idx)->at(second_idx);
+                        features_reduced.at(class_id).at(first_idx)->push_back(current_feature);
+                        all_features_reduced->push_back(current_feature);
+                        all_feature_classes_reduced.push_back(class_id);
+
+                        if(debug_flag_write_out) ofs << temp_idx << std::endl;
+                    }
+                    else
+                    {
+                        terminate_selection = false;
+                    }
+                    if(debug_flag_write_out) temp_idx++;
+                }
+            }
+        }
+        if(debug_flag_write_out) ofs.close();
+
+        // NOTE: for debug only - write features to file before and after reduction
+        //DebugUtils::writeToFile(features, "features_all");
+        //DebugUtils::writeToFile(features_reduced, "features_reduced");
+
+        if(m_iterative_ranking)
+        {
+            // check whether each class still has features
+            if(isClassDeleted(features_reduced))
+            {
+                LOG_WARN("score threshold " << m_score_threshold << " too low - removes at least 1 class completely!");
+                m_score_threshold *= 1.5;
+                LOG_INFO("repeating with new threshold: " << m_score_threshold);
+            }
+            else
+            {
+                int num_reduced = countFeatures(features_reduced);
+                int num_before = countFeatures(features);
+                float ratio_left = ((float) num_reduced) / ((float) num_before);
+
+                LOG_INFO("number of features after iteration " << iter_cnt-1 << ": " << num_reduced);
+                features = features_reduced;
+
+                // abort early: don't wait hundreds of iterations where only 1 or 2 features get removed per iteration
+                if(ratio_left > 0.95)
+                {
+                    terminate_selection = true;
+                    LOG_INFO("aborting iterations due to low number of removed features in last iteration");
+                }
+            }
+        }
+    }
+    while(m_iterative_ranking && !terminate_selection);
+
+    int num_output_features = countFeatures(features_reduced);
+    LOG_INFO("input features: " << num_input_features << ", output features: " << num_output_features << ", output ratio: "
+              << (((float)num_output_features)/(num_input_features)));
+
+    return std::make_tuple(features_reduced, all_features_reduced, all_feature_classes_reduced);
+}
+
+
+std::map<unsigned, std::vector<std::pair<int, float>>> FeatureRanking::rankFeaturesWithScores(std::map<unsigned, std::vector<float>> &temp_scores)
+{
+    // for each class: list of pairs (first: index in class list, second: num of activations)
+    std::map<unsigned, std::vector<std::pair<int, float>>> index_score_map;
+    for(int i = 0; i < temp_scores.size(); i++)
+    {
+        index_score_map.insert({i, std::vector<std::pair<int, float>>()});
+        for(int j = 0; j < temp_scores.at(i).size(); j++)
+        {
+            float score = temp_scores.at(i).at(j);
+            index_score_map.at(i).push_back({j,score});
+        }
+    }
+    // sort count index map
+    for(auto &i : index_score_map)
+    {
+        if(m_extractList == "front")
+            std::sort(i.second.begin(), i.second.end(), [](const std::pair<int,float> &a, const std::pair<int,float> &b){return a.second < b.second;});
+        else
+            std::sort(i.second.begin(), i.second.end(), [](const std::pair<int,float> &a, const std::pair<int,float> &b){return a.second > b.second;});
+    }
+    return index_score_map;
+}
+
+
+std::map<unsigned, std::vector<float>> FeatureRanking::extractSubsetFromRankedList(
+                                           const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map,
+                                           const std::map<unsigned, std::vector<float>> &scores)
+{
+    // init scores map
+    std::map<unsigned, std::vector<float>> scores_clean; // this will hold a subset of the ranked scores
+    for(int i = 0; i < scores.size(); i++)
+    {
+        scores_clean.insert({i, std::vector<float>(scores.at(i).size(), 0)});
+    }
+
+    // assign scores subset
+    for(int class_idx = 0; class_idx < index_score_map.size(); class_idx++)
+    {
+        float min_index, max_index;
+        if(m_extractList == "center" || m_extractList == "middle")
+        {
+            float start = 0.5 * (1-m_factor);
+            min_index = index_score_map.at(class_idx).size() * start;
+            max_index = index_score_map.at(class_idx).size() * (m_factor+start);
+        }
+        else
+        {
+            min_index = 0;
+            max_index = index_score_map.at(class_idx).size() * m_factor;
+        }
+
+        for(int j = 0; j < index_score_map.at(class_idx).size(); j++)
+        {
+            std::pair<int, float> temp = index_score_map.at(class_idx).at(j);
+            if(j >= min_index && j < max_index)
+            {
+                if(m_iterative_ranking)
+                {
+                    scores_clean.at(class_idx).at(temp.first) = temp.second;
+                }
+                else
+                {
+                    scores_clean.at(class_idx).at(temp.first) = 1;
+                }
+            }
+            else
+            {
+                if(m_iterative_ranking)
+                {
+                    scores_clean.at(class_idx).at(temp.first) = temp.second;
+                }
+                // else: remains zero as in initialization of scores_clean
+            }
+        }
+    }
+    return scores_clean;
+}
+
+
+void FeatureRanking::computeScoreThreshold(const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map)
+{
+    std::vector<float> temp;
+
+    float thresh_sum = 0;
+    for(int class_idx = 0; class_idx < index_score_map.size(); class_idx++)
+    {
+        int cutoff_pos = (unsigned)(m_factor * index_score_map.at(class_idx).size());
+        float score_at_cutoff = index_score_map.at(class_idx).at(cutoff_pos).second;
+        // use score at cutoff position of this class as this class' score threshold
+        thresh_sum += score_at_cutoff;
+        temp.push_back(score_at_cutoff);
+    }
+
+    if(m_score_threshold == 0.0f)
+    {
+        float avg_threshold = thresh_sum / index_score_map.size();
+        float maxelem = *std::max_element(temp.begin(), temp.end());
+        m_score_threshold = 0.5 * (avg_threshold + maxelem); // impirically found to be a good threshold
+        LOG_INFO("automatically choosing score threshold value " << m_score_threshold);
+    }
+    else
+    {
+        LOG_INFO("using score threshold value from config: " << m_score_threshold);
+    }
+}
+
+
+bool FeatureRanking::isClassDeleted(const FeatureMapT& features_reduced)
+{
+    bool class_deleted = false;
+    for(auto class_features : features_reduced)
+    {
+        int num_features = countFeatures(class_features.second);
+        if(num_features == 0)
+        {
+            class_deleted = true;
+            break;
+        }
+    }
+    return class_deleted;
+}
+
+
+std::map<unsigned, std::vector<std::vector<float>>> FeatureRanking::unflatten_list(std::map<unsigned, std::vector<float> > &scores_flat_list,
+                                                                                FeatureMapT &features)
+{
+    // unflatten scores list
+    std::map<unsigned, std::vector<std::vector<float> > > scores;
+    for(int class_id = 0; class_id < features.size(); class_id++)
+    {
+        int object_index = 0;
+        scores.insert({class_id, std::vector<std::vector<float>>(features.at(class_id).size())});
+        for(int i = 0; i < scores_flat_list.at(class_id).size(); i++)
+        {
+            if(scores.at(class_id).at(object_index).size() == features.at(class_id).at(object_index)->size())
+            {
+                do
+                {
+                    object_index++;
+                }
+                while(features.at(class_id).at(object_index)->size() == 0);
+            }
+
+            float next_score = scores_flat_list.at(class_id).at(i);
+            scores.at(class_id).at(object_index).push_back(next_score);
+        }
+    }
+    return scores;
+}
+
+
+void FeatureRanking::setNumThreads(int numThreads)
+{
+    m_numThreads = numThreads;
+}
+
+int FeatureRanking::getNumThreads() const
+{
+    return m_numThreads;
+}
+
+int FeatureRanking::countFeatures(const FeatureMapT &features)
+{
+    int num = 0;
+    for(auto it : features)
+    {
+        num += countFeatures(it.second);
+    }
+    return num;
+}
+
+int FeatureRanking::countFeatures(const std::vector<pcl::PointCloud<ISMFeature>::Ptr> &features)
+{
+    int num = 0;
+    for(auto it : features)
+    {
+        num += it->size();
+    }
+    return num;
+}
+
+pcl::PointCloud<ISMFeature>::Ptr FeatureRanking::createCloudWithClassIds(const FeatureRanking::FeatureMapT &features,
+                                                                    bool filter, unsigned filter_class, bool inverse)
+{
+    pcl::PointCloud<ISMFeature>::Ptr result(new pcl::PointCloud<ISMFeature>());
+    for(auto it : features) // loop over pairs in map
+    {
+        for(auto it2 : it.second) // loop over vector elements
+        {
+            for(ISMFeature f : it2->points) // loop over points
+            {
+                f.classId = it.first;
+                if(filter)
+                {
+                    if(inverse && filter_class != it.first)
+                    {
+                        result->push_back(f);
+                    }
+                    else if(!inverse && filter_class == it.first)
+                    {
+                        result->push_back(f);
+                    }
+                }
+                else
+                    result->push_back(f);
+            }
+        }
+    }
+    result->height = 1;
+    result->width = result->points.size();
+    result->is_dense = false;
+    return result;
+}
+
+std::vector<int> FeatureRanking::findSimilarFeatures(pcl::KdTreeFLANN<ISMFeature> &kdtree, ISMFeature &feature)
+{
+    std::vector<int> pointIdNNSearch(m_k_search);
+    std::vector<float> pointNNSquaredDistance(m_k_search);
+    if(!kdtree.nearestKSearch(feature, m_k_search, pointIdNNSearch, pointNNSquaredDistance) > 0)
+        LOG_WARN("Error during nearest neighbor search.");
+
+    // use distance threshold to define equal features
+    std::vector<int> result;
+    for(int i = 0; i < pointIdNNSearch.size(); i++)
+    {
+        if(pointNNSquaredDistance.at(i) < m_dist_thresh)
+            result.push_back(pointIdNNSearch.at(i));
+    }
+    return result;
+}
+
+flann::Matrix<float> FeatureRanking::createFlannDataset(pcl::PointCloud<ISMFeature>::Ptr &class_features)
+{
+    // create a dataset with all features for matching / activation
+    int descriptor_size = class_features->at(0).descriptor.size();
+    flann::Matrix<float> dataset(new float[class_features->size() * descriptor_size],
+            class_features->size(), descriptor_size);
+
+    // build dataset
+    for(int i = 0; i < class_features->size(); i++)
+    {
+        ISMFeature ism_feat = class_features->at(i);
+        std::vector<float> descriptor = ism_feat.descriptor;
+        for(int j = 0; j < (int)descriptor.size(); j++)
+        {
+            dataset[i][j] = descriptor.at(j);
+        }
+    }
+
+    return dataset;
+}
+
+
+std::vector<float> FeatureRanking::findNeighborsDistances(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query)
+{
+    std::vector<std::vector<int> > indices;
+    std::vector<std::vector<float> > distances;
+    flann::SearchParams params = m_flann_exact_match ? flann::SearchParams(-1) : flann::SearchParams(128);
+    index.knnSearch(query, indices, distances, m_k_search, params);
+    return distances.at(0);
+}
+
+
+std::vector<int> FeatureRanking::findSimilarFeaturesFlann(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query)
+{
+    std::vector<std::vector<int> > indices;
+    std::vector<std::vector<float> > distances;
+    flann::SearchParams params = m_flann_exact_match ? flann::SearchParams(-1) : flann::SearchParams(128);
+    index.knnSearch(query, indices, distances, m_k_search, params);
+    // use distance threshold to define equal features
+    std::vector<int> result;
+    if(indices.size() > 0)
+    {
+        for(int i = 0; i < indices.at(0).size(); i++)
+        {
+            if(distances.at(0).at(i) < m_dist_thresh)
+                result.push_back(indices.at(0).at(i));
+        }
+    }
+    return result;
+}
+
+}
