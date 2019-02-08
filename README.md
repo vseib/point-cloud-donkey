@@ -187,7 +187,18 @@ This descriptor is a modification to the original SHOT descriptor [2]. In short:
 
 #### A LOW-DIMENSIONAL FEATURE TRANSFORM FOR KEYPOINT MATCHING AND CLASSIFICATION OF POINT CLOUDS WITHOUT NORMAL COMPUTATION
 * Paper introducing and evaluating the short version of the SHOT descriptor
-* PDF: [Seib2018ALD](http://www.uni-koblenz.de/~agas/Documents/Seib2018ALD.pdf)
+* PDF: [Seib2018ALF](http://www.uni-koblenz.de/~agas/Documents/Seib2018ALF.pdf)
+```
+@inproceedings{Seib2018ALF,
+   author = {Seib, Viktor and Paulus, Dietrich},
+   title = {A Low-Dimensional Feature Transform for Keypoint Matching and Classification of Point Clouds without Normal Computation},
+   booktitle = {2018 25th IEEE International Conference on Image Processing (ICIP)},
+   pages = {2949-2953},
+   month = {10},
+   year = {2018},
+   isbn = {978-1-4799-7061-2}
+}
+```
 
 ### Base Pipeline
 The base pipeline is the generic point cloud processing pipeline depicted in the image on top of this page excluding all steps marked with a red star.
