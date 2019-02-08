@@ -37,10 +37,10 @@ The following table summarizes classification results on some datasets.
 | [ModelNet 10](http://modelnet.cs.princeton.edu/) | - | 62.4 | 83.8 |
 | [ModelNet 40](http://modelnet.cs.princeton.edu/) | - |71.9 | 75.4 |
 
-<a name="fnaim">1</a>: Dataset no longer online
-<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above
-<a name="fnbasep">3</a>: Optimized parameters in training
-<a name="fnbasep">4</a>: Pipeline **including** steps marked with a red star in the image above
+<a name="fnaim">1</a>: Dataset no longer online <br>
+<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above <br>
+<a name="fnbasep">3</a>: Optimized parameters in training <br>
+<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above <br>
 
 ## Acknowledgments
 
