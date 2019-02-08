@@ -1,5 +1,6 @@
 
 
+
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
@@ -26,7 +27,19 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 PointCloudDonkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. There are still many references to ISM in the code. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
 
 The following table summarizes classification results on some datasets.
-* TODO include table
+| Dataset | Base Pipeline<sup>[2](#fnbasep)</sup> | Base Pipeline<sup>[3](#fnbasep2)</sup> | Extended Pipeline<sup>[4](#fnbasepext)</sup> |
+| ---  | ---    | --- | --- |
+| Aim@Shape<sup>[1](#fnaim)</sup> | 85.0 | 90.0 | 93.5 |
+| [McGill 3D Shape Benchmark](http://www.cim.mcgill.ca/~shape/benchMark/) | - |85.2 | 86.6 |
+| [Princeton Shape Benchmark](http://shape.cs.princeton.edu/benchmark/) | 61.7 | 67.0 | 68.4 |
+| [Shrec 2012](https://www.itl.nist.gov/iad/vug/sharp/contest/2012/Generic3D/) | -| 70.2 | 74.5
+| [ModelNet 10](http://modelnet.cs.princeton.edu/) | - | 62.4 | 83.8 |
+| [ModelNet 40](http://modelnet.cs.princeton.edu/) | - |71.9 | 75.4 |
+
+<a name="fnaim">1</a>: Dataset no longer online
+<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above
+<a name="fnbasep">3</a>: Optimized parameters in training
+<a name="fnbasep">4</a>: Pipeline **including** steps marked with a red star in the image above
 
 ## Acknowledgments
 
