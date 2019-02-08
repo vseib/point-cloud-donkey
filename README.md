@@ -1,6 +1,7 @@
 
 
 
+
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
@@ -105,6 +106,10 @@ Execute the following commands to compile the framework:
 ```
 The binaries will be placed in the folder `PointCloudDonkey/build/bin`.
 
+### Ubuntu 16.04
+
+TODO
+
 ## Quick Start
 This guide shows how to use the software to classify isolated point clouds.
 * Download example point cloud objects from the [PCL repository](https://github.com/PointCloudLibrary/data/tree/master/tutorials) <br> (five files for training `ism_train_*.pcd` and five files for testing `ism_test_*.pcd`).
@@ -165,16 +170,75 @@ TODO
 
 ## Citing
 
-* include papers to cite
+This sections lists all publications related to this repository. If you are using this repository for academic work, please consider citing one of the following publications. If you are unsure what to cite, please choose the "Extended Pipeline" paper.
+
+TODO add missing bibtex info
+
+### Extended Pipeline
+The extended pipeline is the generic point cloud processing pipeline depicted in the image on top of this page including the orange and green steps marked with a red star.
+
+#### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
+* accepted for publication at VISAPP 2019
+* PDF: TODO
+
+### Short-SHOT Feature Descriptor
+This descriptor is a modification to the original SHOT descriptor [2]. In short: it is based on the number of points in a grid bin in contrast to the orientations of their normals.
+
+#### A LOW-DIMENSIONAL FEATURE TRANSFORM FOR KEYPOINT MATCHING AND CLASSIFICATION OF POINT CLOUDS WITHOUT NORMAL COMPUTATION
+* Paper introducing and evaluating the short version of the SHOT descriptor
+* PDF: [Seib2018ALD](http://www.uni-koblenz.de/~agas/Documents/Seib2018ALD.pdf)
+
+### Base Pipeline
+The base pipeline is the generic point cloud processing pipeline depicted in the image on top of this page excluding all steps marked with a red star.
+
+#### Pose Estimation and Shape Retrieval with Hough Voting in a Continuous Voting Space
+* Paper presenting additional experiments and modifications to the base pipeline
+* PDF: [Seib2015PEA](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf)
+```
+@inproceedings{Seib2015PEA,
+   author = {Seib, Viktor and Link, Norman and Paulus, Dietrich},
+   editor = {Gall, Juergen and Gehler, Peter and Leibe, Bastian},
+   title = {Pose Estimation and Shape Retrieval with Hough Voting in a Continuous Voting Space},
+   booktitle = {Pattern Recognition},
+   publisher = {Springer International Publishing},
+   volume = {9358},
+   series = {LNCS},
+   pages = {458-469},
+   year = {2015},
+   isbn = {978-3-319-24946-9},
+}
+```
+
+#### Implicit Shape Models For 3D Shape Classification With a Continuous Voting Space
+* Paper with the original publication of a 3D ISM and a continuous voting space
+* PDF: [Seib2015ISM](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf)
+```
+@inproceedings{Seib2015ISM,
+   author = {Seib, Viktor and Link, Norman and Paulus, Dietrich},
+   editor = {Braz, and Battiato, Sebastiano and Imai, Francisco H.},
+   title = {Implicit Shape Models For 3D Shape Classification With a Continuous Voting Space},
+   booktitle = {{VISAPP} 2015 - Proceedings of the 10th International Conference on Computer Vision Theory and Applications},
+   publisher = {SciTePress},
+   volume = {2},
+   pages = {33-43},
+   year = {2015},
+   isbn = {978-989-758-090-1},
+}
+```
+
 
 ## License
 
 PointCloudDonkey is released under the BSD-3-Clause license. See [LICENSE](LICENSE) for details.
-PointCloudDonkey also includes some 3rd party code which might be subject to other licenses. Please see TODO for details.
+PointCloudDonkey also includes some 3rd party code which might be subject to other licenses.
 
 ## References
 
 [1] Leibe, Bastian and Leonardis, Ales and Schiele, Bernt; 
 "Combined Object Categorization and Segmentation with an Implicit Shape Model",
-    Workshop on statistical learning in computer vision, ECCV, 2004
+Workshop on statistical learning in computer vision, ECCV, 2004
+    
+[2] Tombari, Federico and Salti, Samuele and Di Stefano, Luigi;
+"Unique signatures of histograms for local surface description",
+European conference on computer vision, ECCV, 2010
 
