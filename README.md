@@ -64,52 +64,12 @@ Further, I would like to thank the developers of third party libraries used in t
 ## Installation
 
 This framework was tested with Ubuntu 14.04 LTS and Ubuntu 16.04 LTS.
+The installation instructions can be found on the Wiki pages.
 
-### Ubuntu 14.04 
-TODO: add commit ID or branch for Ubuntu 14
+[Ubuntu 14.04 LTS](Installation_Ubuntu_14.04_LTS)
 
-Note: You need to have OpenCV 2.4 installed to be able to use this code with Ubuntu 14. If you have different versions installed, make sure that `cmake` finds the OpenCV version 2.4 (I recommend using `ccmake` to configure paths).
+[Ubuntu 16.04 LTS](Installation_Ubuntu_16.04_LTS)
 
-#### Install Dependencies
-
-    sudo apt install libeigen3-dev libboost-all-dev qt5-default libvtk5.8 libvtk5-dev libvtk5.8-qt4 \
-         libvtk5-qt4-dev libgomp1 libopencv-core-dev libopencv-dev zlib1g zlib1g-dev libblitz0-dev \
-         libjsoncpp0 libjsoncpp-dev liblog4cxx10 liblog4cxx10-dev
-
-#### Install PCL
-PointCloudDonkey requires at least PCL version 1.8.0. However, only PCL 1.7.2 is available in Ubuntu packages for 14.04. Therefore, PCL version 1.8.0 must be installed from source.
-See the [official PCL instructions](http://www.pointclouds.org/documentation/tutorials/compiling_pcl_posix.php) or follow the steps below:
-* If you want to reproduce the classification results reported here, download PCL release 1.8.0 from [GitHub](https://github.com/PointCloudLibrary/pcl/releases), otherwise use PCL release 1.8.1
-* unpack the archive
-```
-    tar xvfj pcl-pcl-1.8.0.tar.gz
-```
-* fix a bug in SHOT initialization
-  * open the file `pcl-pcl-1.8.0/features/include/pcl/features/shot.h`
-  * change line 97 to be `maxAngularSectors_ (32),`
-* execute the following commands:
-``` 
-    cd pcl-pcl-1.8.0 && mkdir build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
-    make -j4
-    sudo make -j4 install
-```
-#### Optionally: Install VCG Library
-You can find instructions for installation on the [VCG Library webpage](http://vcg.isti.cnr.it/vcglib/). To include VCG in the compilation process
-* open the file `PointCloudDonkey/src/implicit_shape_model/CMakeLists.txt`
-* go to line 8 and set the `USE_VCG` flag to `true`
-#### Compiling
-Execute the following commands to compile the framework:
-``` 
-    cd PointCloudDonkey && mkdir build && cd build
-    cmake ../src
-    make -j4
-```
-The binaries will be placed in the folder `PointCloudDonkey/build/bin`.
-
-### Ubuntu 16.04
-
-TODO
 
 ## Quick Start
 This guide shows how to use the software to classify isolated point clouds.
