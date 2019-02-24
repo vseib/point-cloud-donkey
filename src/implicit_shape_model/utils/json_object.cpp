@@ -12,6 +12,7 @@
 #include "utils.h"
 #include <fstream>
 
+/*
 namespace boost {
     namespace filesystem {
         template < >
@@ -46,6 +47,7 @@ namespace boost {
     }
 }
 //namespace boost { namespace filesystem { using filesystem3::make_relative; } }
+*/
 
 namespace ism3d
 {
@@ -86,12 +88,12 @@ namespace ism3d
         LOG_INFO("writing object to files: " << file << ", " << fileData);
 
         // get relative path from ism file to data file
-        boost::filesystem::path relative = boost::filesystem::make_relative(boost::filesystem::path(file), boost::filesystem::path(fileData));
+        //boost::filesystem::path relative = boost::filesystem::make_relative(boost::filesystem::path(file), boost::filesystem::path(fileData));
 
         // create JSON config object
         Json::Value configJson(Json::objectValue);
         configJson["ObjectConfig"] = configToJson();
-        configJson["ObjectData"] = relative.string();
+        configJson["ObjectData"] = fileData; //relative.string();
         if(m_use_svm)
         {
             // this is to be easily accessible in the config file
