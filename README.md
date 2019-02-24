@@ -66,9 +66,9 @@ Further, I would like to thank the developers of third party libraries used in t
 This framework was tested with Ubuntu 14.04 LTS and Ubuntu 16.04 LTS.
 The installation instructions can be found on the Wiki pages.
 
-[Ubuntu 14.04 LTS](Installation_Ubuntu_14.04_LTS)
+[Ubuntu 14.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_14.04_LTS)
 
-[Ubuntu 16.04 LTS](Installation_Ubuntu_16.04_LTS)
+[Ubuntu 16.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_16.04_LTS)
 
 
 ## Quick Start
