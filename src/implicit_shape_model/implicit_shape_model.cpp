@@ -1125,7 +1125,7 @@ pcl::PointCloud<ISMFeature>::Ptr ImplicitShapeModel::removeNaNFeatures(pcl::Poin
         ISMFeature fff = modelFeatures->at(a);
         for(int b = 0; b < fff.descriptor.size(); b++)
         {
-            if(isnan(fff.descriptor.at(b)))
+            if(std::isnan(fff.descriptor.at(b)))
             {
                 nan_features++;
                 nan_found = true;
