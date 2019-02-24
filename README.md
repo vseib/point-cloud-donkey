@@ -72,55 +72,12 @@ The installation instructions can be found on the Wiki pages.
 
 
 ## Quick Start
-This guide shows how to use the software to classify isolated point clouds.
-* Download example point cloud objects from the [PCL repository](https://github.com/PointCloudLibrary/data/tree/master/tutorials) <br> (five files for training `ism_train_*.pcd` and five files for testing `ism_test_*.pcd`).
-* in the following steps I will assume that these files are downloaded and placed in the folder `PointCloudDonkey/example_clouds`.
 
-### Using the Command Line
-For this example I will use the executable `eval_tool` which is build from the code located in `PointCloudDonkey/src/eval_tool`. The `eval_tool` provides two interfaces: one that allows to specify the input data _as arguments_ on the command line and one that allows to specify _a file_ with input data.
-#### Training
-1. Data as arguments
-    * Run the following command from the `PointCloudDonkey` folder for training
-    ```
-        ./build/bin/eval_tool -t config/qs_input_config.ism -o output_config.ism  \
-        -m example_clouds/ism_train_cat.pcd example_clouds/ism_train_horse.pcd example_clouds/ism_train_lioness.pcd \
-        example_clouds/ism_train_michael.pcd example_clouds/ism_train_wolf.pcd -c 0 1 2 3 4
-      ```
-      * The executable takes an input config file for training (`-t`), a name for the output config file (`-o`), a list of point clouds (`-m`) and a list of class labels in the same order as the provided point clouds (`-c`).
-      
-2. Data in a file (recommended interface)
-    *  Run the following command from the `PointCloudDonkey` folder for training
-    ```
-        ./build/bin/eval_tool -t config/qs_input_config.ism -o output_config.ism -f data/qs_train_list.txt
-      ```
-   * As before, the executable takes an input config file for training (`-t`) and a name for the output config file (`-o`). However, the objects and corresponding class labels are specified inside a text file (`-f`).
+To quickly start training a classifier to classify isoloated point clouds, refer to the instructions on the following Wiki pages:
 
-After running either of the above commands you will see two new files: `output_config.ism` and `output_config.ismd`. The first file contains the parameters used for training and a reference to the second file. The second file is stored in binary format and contains all the data extracted from the dataset during training.
+[Quick Start Using the Command Line](https://github.com/vseib/PointCloudDonkey/wiki/Quick_Start_Using_Command_Line)
 
-
-#### Testing
-
-1. Data as arguments
-    * Run the following command from the `PointCloudDonkey` folder for testing (classification)
-    ```
-        ./build/bin/eval_tool -d output_config.ism -o output_folder -p example_clouds/ism_test_cat.pcd \
-        example_clouds/ism_test_horse.pcd example_clouds/ism_test_lioness.pcd example_clouds/ism_test_michael.pcd \
-        example_clouds/ism_test_wolf.pcd -g 0 1 2 3 4
-      ```
-      * The executable takes an input config file for testing (`-d`), a name for the output folder for logging (`-o`), a list of point clouds (`-p`) and a list of ground truth class labels in the same order as the provided point clouds (`-g`).
-      
-2. Data in a file (recommended interface)
-    *  Run the following command from the `PointCloudDonkey` folder for testing (classification)
-    ```
-        ./build/bin/eval_tool -d output_config.ism -o output_folder -f data/qs_test_list.txt
-      ```
-   * As before, the executable takes an input config file for testing (`-d`) and a name for the output folder (`-o`). However, the objects and corresponding ground truth labels are specified inside a text file (`-f`).
-
-After running either of the above commands you will see a new folder: `output_folder`. This folder contains detailed statistics about the classification process. It contains a textfile for each of the objects in the classification dataset with information about found maxima, their locations, class label and bounding box coordinates. Further, there is a file `summary.txt`that summarizes the classification of each object, the time taken for each step and the overall classification accuracy.
-
-
-### Using the GUI
-TODO
+TODO: [Quick Start Using the GUI]
 
 ## Documentation
 
