@@ -57,6 +57,7 @@ Further, I would like to thank the developers of third party libraries used in t
 
 | Date | Update |
 | ---  | ---    |
+| 2019-02-24 | Added instructions for Ubuntu 16, moved information to the Wiki |
 | 2019-02-08 | Added benchmark results and citing section |
 | 2019-01-25 | Initial code commit, ReadMe with quick start examples added |
 
@@ -73,7 +74,7 @@ The installation instructions can be found on the Wiki pages.
 
 ## Quick Start
 
-To quickly start training a classifier to classify isoloated point clouds, refer to the instructions on the following Wiki pages:
+To quickly start training a classifier to classify isolated point clouds, refer to the instructions on the following Wiki pages.
 
 [Quick Start Using the Command Line](https://github.com/vseib/PointCloudDonkey/wiki/Quick_Start_Using_Command_Line)
 
