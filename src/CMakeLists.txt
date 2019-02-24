@@ -41,17 +41,17 @@ file(COPY implicit_shape_model/third_party/cgf/embedding.py DESTINATION ${CMAKE_
 
 #add_subdirectory(vtk_utils)
 
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
 
-set(CMAKE_INCLUDE_PATH "/usr/share/qt4/include")
-find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-include(${QT_USE_FILE})
-
-include_directories(
-    SYSTEM
-    ${QT_INCLUDE_DIR}
-)
+#set(CMAKE_INCLUDE_PATH "/usr/share/qt4/include")
+#find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
+#include(${QT_USE_FILE})
+#
+#include_directories(
+#    SYSTEM
+#    ${QT_INCLUDE_DIR}
+#)
 
 
 #ISM training gui #TODO VS do not build now - include later when ROS re-integration starts

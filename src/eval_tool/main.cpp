@@ -435,7 +435,7 @@ int main(int argc, char **argv)
                         summaryFile << "\n\n result: " << numCorrectClasses << " of " << pointClouds.size() << " shapes classified correctly ("
                                     << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " result: " << numCorrect80 << " of " << pointClouds.size() << " shapes classified correctly ("
-                                    << ((float)numCorrect80/pointClouds.size())*100.0f << " %) [within 80% of top result's score]\n";
+                                    << ((float)numCorrect80/pointClouds.size())*100.0f << " %) [above 80% of top result's score]\n";
 
                         summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " shapes classified correctly with global descriptors ("
                                     << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
