@@ -17,7 +17,9 @@
 #include "features_bshot.h"
 #include "features_shot.h"
 #include "features_shot_global.h"
+#include "features_short_shot_pcl.h"
 #include "features_short_shot.h"
+#include "features_short_shot_global.h"
 #include "features_cshot.h"
 #include "features_cshot_global.h"
 //#include "features_short_cshot.h"  TODO VS: re-implement short c-shot
@@ -51,6 +53,8 @@ namespace ism3d
             return new FeaturesSHOT();
         else if (type == FeaturesBSHOT::getTypeStatic())
             return new FeaturesBSHOT();
+        else if (type == FeaturesSHORTSHOTPCL::getTypeStatic())
+            return new FeaturesSHORTSHOTPCL();
         else if (type == FeaturesSHORTSHOT::getTypeStatic())
             return new FeaturesSHORTSHOT();
         else if (type == FeaturesCSHOT::getTypeStatic())
@@ -89,6 +93,8 @@ namespace ism3d
             return new FeaturesSHOTGlobal(); // global feature!
         else if (type == FeaturesCSHOTGlobal::getTypeStatic())
             return new FeaturesCSHOTGlobal(); // global feature!
+        else if (type == FeaturesSHORTSHOTGlobal::getTypeStatic())
+            return new FeaturesSHORTSHOTGlobal(); // global feature!
         else if (type == FeaturesUSCGlobal::getTypeStatic())
             return new FeaturesUSCGlobal(); // global feature!
         else if (type == FeaturesDummy::getTypeStatic())
