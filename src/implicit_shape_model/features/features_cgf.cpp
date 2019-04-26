@@ -1,9 +1,20 @@
+/*
+ * BSD 3-Clause License
+ *
+ * Full text: https://opensource.org/licenses/BSD-3-Clause
+ *
+ * Copyright (c) 2018, Viktor Seib
+ * All rights reserved.
+ *
+ */
+
+
 #include "features_cgf.h"
 
 #define PCL_NO_PRECOMPILE
 #include <pcl/common/centroid.h>
 
-#include "../third_party/cgf/cgf.cpp"
+#include "../third_party/cgf/cgf.h"
 #include "../third_party/cnpy/cnpy.h"
 
 namespace ism3d

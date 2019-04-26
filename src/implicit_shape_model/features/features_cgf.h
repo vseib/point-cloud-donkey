@@ -1,3 +1,13 @@
+/*
+ * BSD 3-Clause License
+ *
+ * Full text: https://opensource.org/licenses/BSD-3-Clause
+ *
+ * Copyright (c) 2018, Viktor Seib
+ * All rights reserved.
+ *
+ */
+
 #ifndef ISM3D_FEATURESCGF_H
 #define ISM3D_FEATURESCGF_H
 
