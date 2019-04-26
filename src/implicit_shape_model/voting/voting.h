@@ -71,7 +71,20 @@ namespace ism3d
         std::pair<int, float> currentClassHypothesis; // pair of: this class_id and score
     };
 
-    enum SingleObjectMaxType
+    // represents an accumulated global result for a single class
+    struct GlobalResultAccu
+    {
+        GlobalResultAccu(unsigned num_occurences, float score)
+        {
+            this->num_occurences = num_occurences;
+            this->score_sum = score;
+        }
+
+        unsigned num_occurences;
+        float score_sum;
+    };
+
+    enum class SingleObjectMaxType
     {
         COMPLETE_VOTING_SPACE,
         BANDWIDTH,
@@ -137,13 +150,6 @@ namespace ism3d
         const std::map<unsigned, std::vector<Voting::Vote> >& getVotes() const;
 
         /**
-         * @brief get all votes for the specified class id
-         * @param classId the class id to search for
-         * @return a list of votes for the specified class id
-         */
-        const std::vector<Voting::Vote>& getVotes(unsigned classId) const;
-
-        /**
          * @brief calculate average bounding box dimensions during training to be used as hints for bin size and bandwidth during recognition
          * @param boundingBoxes bounding boxes of trained objects
          */
@@ -190,8 +196,7 @@ namespace ism3d
         Voting();
 
         void verifyMaxHypothesisWithGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr &points,
-                                                   const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
-                                                   const pcl::KdTreeFLANN<PointT> &input_points_kdtree, VotingMaximum &maximum);
+                                                   const pcl::PointCloud<pcl::Normal>::ConstPtr &normals, VotingMaximum &maximum);
 
         void classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr global_features, VotingMaximum &maximum);
 
@@ -226,7 +231,7 @@ namespace ism3d
         bool m_svm_error;
         std::vector<std::string> m_svm_files;
 
-        // maps class ids to a vector of global features, number of models per class = number of global features per class
+        // maps class ids to a vector of global features, number of objects per class = number of global features per class
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
 
         // all global features as a cloud
@@ -262,7 +267,7 @@ namespace ism3d
         float reweightMaximum(const VotingMaximum &max, const Eigen::Vector3f &query, const float search_dist) const;
         float getSearchDistForClass(const unsigned class_id) const;
 
-        void insertGlobalResult(std::map<unsigned, unsigned> &max_global_voting, unsigned found_class);
+        void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting, unsigned found_class, float score);
 
         static bool sortMaxima(const VotingMaximum&, const VotingMaximum&);
 

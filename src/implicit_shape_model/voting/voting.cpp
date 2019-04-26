@@ -82,13 +82,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     if (m_votes.size() == 0)
         return std::vector<VotingMaximum>();
 
-    // used to extract a portion of the input cloud to estimage a global feature
-    pcl::KdTreeFLANN<PointT> input_points_kdtree;
-    if(m_use_global_features)
-    {
-        input_points_kdtree.setInputCloud(points);
-    }
-
     std::vector<VotingMaximum> maxima;
 
     // find votes for each class individually
@@ -167,9 +160,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             }
 
             // in non-single object mode: extract points around maxima region and compute global features
+            // do this for each maximum
             if(m_use_global_features && !m_single_object_mode)
             {
-                verifyMaxHypothesisWithGlobalFeatures(points, normals, input_points_kdtree, maximum);
+                verifyMaxHypothesisWithGlobalFeatures(points, normals, maximum);
             }
 
             #pragma omp critical
@@ -180,32 +174,38 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     }
 
     // in single object mode: classify global features instead of maxima points
+    // do this only once
     if(m_use_global_features && m_single_object_mode)
     {
-        VotingMaximum global_max;
-        classifyGlobalFeatures(m_global_features_single_object, global_max);
+        VotingMaximum global_result;
+        classifyGlobalFeatures(m_global_features_single_object, global_result);
 
         // add global result to all maxima if in single object mode
         for(VotingMaximum &max : maxima)
-            max.globalHypothesis = global_max.globalHypothesis;
+            max.globalHypothesis = global_result.globalHypothesis;
 
         // if no maxima found in single object mode, use global hypothesis and fill in values
         if(maxima.size() == 0)
         {
-            global_max.classId = global_max.globalHypothesis.first;
-            global_max.weight = global_max.globalHypothesis.second;
+            global_result.classId = global_result.globalHypothesis.first;
+            global_result.weight = global_result.globalHypothesis.second;
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
-            global_max.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
-            global_max.boundingBox = Utils::computeMVBB<PointT>(points);
-            maxima.push_back(global_max);
+            global_result.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
+            global_result.boundingBox = Utils::computeMVBB<PointT>(points);
+            maxima.push_back(global_result);
         }
     }
+
+    // TODO VS: globale features bis hierhin geprüft
+    // * derzeit gibt es zwei global results: globalHypothesis und bestThisClassId
+    // ---> refactorn, damit es nur noch eins gibt
+
 
     // filter maxima
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
 
-    // TODO VS: global features do not work with the singele object max types: seems like global results are not merged in maxima
+    // TODO VS: global features do not work with the single object max types: seems like global results are not merged in maxima
     if(m_single_object_mode)
     {
         pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
@@ -691,9 +691,17 @@ float Voting::getSearchDistForClass(const unsigned class_id) const
 }
 
 
-void Voting::verifyMaxHypothesisWithGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr &points, const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
-                                                   const pcl::KdTreeFLANN<PointT> &input_points_kdtree, VotingMaximum &maximum)
+void Voting::verifyMaxHypothesisWithGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr &points,
+                                                   const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
+                                                   VotingMaximum &maximum)
 {
+    // used to extract a portion of the input cloud to estimage a global feature
+    pcl::KdTreeFLANN<PointT> input_points_kdtree;
+    if(m_use_global_features)
+    {
+        input_points_kdtree.setInputCloud(points);
+    }
+
     // first segment region cloud from input with typical radius for this class id
     pcl::PointCloud<PointT>::Ptr segmented_points(new pcl::PointCloud<PointT>());
     pcl::PointCloud<pcl::Normal>::Ptr segmented_normals(new pcl::PointCloud<pcl::Normal>());
@@ -740,10 +748,6 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
     if(m_svm_error) m_global_feature_method = "KNN";
 
     // process current global features according to some strategy
-    std::pair<unsigned, float> best_overall; // pair of class id and score
-    std::pair<unsigned, float> best_this_classId;
-    CustomSVM::SVMResponse svm_response;
-
     if(!m_index_created)
     {
         LOG_INFO("creating flann index for global features");
@@ -753,12 +757,11 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
 
     if(m_global_feature_method == "KNN")
     {
-        int new_k = m_k_global_features;
-
-        std::map<unsigned, unsigned> max_global_voting; // maps class id to number of occurences
-        int all_entries = 0;
+        std::map<unsigned, GlobalResultAccu> max_global_voting; // maps class id to struct with number of occurences and score
+        int num_all_entries = 0;
 
         // find nearest neighbors to current global features in learned data
+        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
         for(ISMFeature query_feature : global_features->points)
         {
             // insert the query point
@@ -773,54 +776,73 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
             std::vector<std::vector<float> > distances;
             if(m_flann_helper->getDistType() == "Euclidean")
             {
-                m_flann_helper->getIndexL2()->knnSearch(query, indices, distances, new_k, flann::SearchParams(-1));
+                m_flann_helper->getIndexL2()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
             else if(m_flann_helper->getDistType() == "ChiSquared")
             {
-                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, new_k, flann::SearchParams(-1));
+                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
             else if(m_flann_helper->getDistType() == "Hellinger")
             {
-                m_flann_helper->getIndexHel()->knnSearch(query, indices, distances, new_k, flann::SearchParams(-1));
+                m_flann_helper->getIndexHel()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
             else if(m_flann_helper->getDistType() == "HistIntersection")
             {
-                m_flann_helper->getIndexHist()->knnSearch(query, indices, distances, new_k, flann::SearchParams(-1));
+                m_flann_helper->getIndexHist()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
             delete[] query.ptr();
 
             // classic KNN approach
-            all_entries += indices[0].size(); // NOTE: is not necessaraly k, because only (k-x) might have been found
+            num_all_entries += indices[0].size(); // NOTE: is not necessaraly k, because only (k-x) might have been found
             // loop over results
             for(int i = 0; i < indices[0].size(); i++)
             {
                 // insert result
                 ISMFeature temp = m_all_global_features_cloud->at(indices[0].at(i));
-                insertGlobalResult(max_global_voting, temp.classId);
+                float dist_squared = distances[0].at(i);
+                const float sigma = 0.1;
+                constexpr float denom = 2 * sigma * sigma;
+                float score = std::exp(-dist_squared/denom);
+                insertGlobalResult(max_global_voting, temp.classId, score);
             }
         }
 
-        // normalize list and create result for score with current class id and ...
-        best_this_classId = {maximum.classId, 0};
-        if(all_entries > 0 && max_global_voting.find(maximum.classId) != max_global_voting.end())
+        std::pair<unsigned, float> global_result = {maximum.classId, 0}; // pair of class id and score
+        // determine score based on all votes
+        unsigned max_occurences = 0;
+        if(m_single_object_mode)
         {
-            float score = max_global_voting.at(maximum.classId) / (float) all_entries;
-            best_this_classId = {maximum.classId, score};
-        }
-        // ... overall best score
-        best_overall = {0, 0};
-        for(auto it : max_global_voting)
-        {
-            float score = all_entries == 0 ? 0 : it.second / (float) all_entries;
-            if(score > best_overall.second)
+            // find class with most occurences
+            for(auto it : max_global_voting)
             {
-                best_overall = {it.first, score};
+                if(it.second.num_occurences > max_occurences)
+                {
+                    max_occurences = it.second.num_occurences;
+                    global_result.first = it.first;
+                }
+            }
+            // compute score for best class (NOTE: determining best class based on score did not work well)
+            GlobalResultAccu gra = max_global_voting.at(global_result.first);
+            global_result.second = gra.score_sum / gra.num_occurences;
+        }
+        else // determine score based on current class
+        {
+            if(max_global_voting.find(maximum.classId) != max_global_voting.end())
+            {
+                GlobalResultAccu gra = max_global_voting.at(maximum.classId);
+                global_result.second = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
             }
         }
+
+        // assign global result
+        maximum.globalHypothesis = global_result;
+        maximum.currentClassHypothesis = global_result;
     }
     else if(m_global_feature_method == "SVM")
     {
+        CustomSVM::SVMResponse svm_response;
         std::vector<CustomSVM::SVMResponse> all_responses; // in case one object has multiple global features
+        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
         for(ISMFeature query_feature : global_features->points)
         {
             // convert to SVM data format
@@ -830,29 +852,29 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
             {
                 data[i] = data_raw.at(i);
             }
-            cv::Mat data_svm(1, data_raw.size(), CV_32FC1, data);
+            cv::Mat svm_input_data(1, data_raw.size(), CV_32FC1, data);
 
-            CustomSVM::SVMResponse temp_response = m_svm.predictUnifyScore(data_svm, m_svm_files);
+            CustomSVM::SVMResponse temp_response = m_svm.predictUnifyScore(svm_input_data, m_svm_files);
             all_responses.push_back(temp_response);
         }
 
         // check if several responses are available
         if(all_responses.size() > 1)
         {
-            std::map<unsigned, unsigned> num_of_occurences; // count number of class labels
-            for(CustomSVM::SVMResponse resp : all_responses)
+            std::map<unsigned, GlobalResultAccu> global_result_per_class;
+            for(const CustomSVM::SVMResponse &resp : all_responses)
             {
-                insertGlobalResult(num_of_occurences, (unsigned) resp.label);
+                insertGlobalResult(global_result_per_class, (unsigned) resp.label, resp.score);
             }
 
             int best_class = 0;
             int best_occurences = 0;
-            for(auto it : num_of_occurences)
+            for(const auto it : global_result_per_class)
             {
                 // NOTE: what if there are 2 equal classes?
-                if(it.second > best_occurences) // find highest number of occurences
+                if(it.second.num_occurences > best_occurences) // find highest number of occurences
                 {
-                    best_occurences = it.second;
+                    best_occurences = it.second.num_occurences;
                     best_class = it.first;
                 }
             }
@@ -877,34 +899,29 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
         {
             svm_response = all_responses.at(0);
         }
-    }
 
-    // pass the results to the maximum object
-    if(m_global_feature_method == "KNN")
-    {
-        maximum.globalHypothesis = best_overall;
-        maximum.currentClassHypothesis = best_this_classId;
-    }
-    else if(m_global_feature_method == "SVM")
-    {
+        // assign global result
         float cur_score = m_single_object_mode ? 0 : svm_response.all_scores.at(maximum.classId);
         maximum.globalHypothesis = {svm_response.label, svm_response.score};
         maximum.currentClassHypothesis = {maximum.classId, cur_score};
     }
 }
 
-void Voting::insertGlobalResult(std::map<unsigned, unsigned> &max_global_voting, unsigned found_class)
+void Voting::insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting,
+                                unsigned found_class,
+                                float score)
 {
     if(max_global_voting.find(found_class) != max_global_voting.end())
     {
         // found
-        int prev = max_global_voting.at(found_class);
-        max_global_voting.at(found_class) = prev + 1;
+        GlobalResultAccu &prev = max_global_voting.at(found_class);
+        prev.num_occurences++;
+        prev.score_sum += score;
     }
     else
     {
         // not found
-        max_global_voting.insert({found_class,1});
+        max_global_voting.insert({found_class, {1,score} });
     }
 }
 
@@ -916,16 +933,6 @@ bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 const std::map<unsigned, std::vector<Voting::Vote> >& Voting::getVotes() const
 {
     return m_votes;
-}
-
-const std::vector<Voting::Vote>& Voting::getVotes(unsigned classId) const
-{
-    if (m_votes.find(classId) == m_votes.end()) {
-        std::string desc = "no votes found for class id " + classId;
-        throw RuntimeException(desc);
-    }
-
-    return m_votes.find(classId)->second;
 }
 
 void Voting::clear()
