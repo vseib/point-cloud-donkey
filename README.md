@@ -52,6 +52,7 @@ Further, I would like to thank the developers of third party libraries used in t
 * [cnpy Library](https://github.com/rogersce/cnpy)
 * [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
 * [lzf Library](http://oldhome.schmorp.de/marc/liblzf.html)
+* [B-SHOT Descriptor](https://github.com/saimanoj18/iros_bshot)
 
 ## News
 
