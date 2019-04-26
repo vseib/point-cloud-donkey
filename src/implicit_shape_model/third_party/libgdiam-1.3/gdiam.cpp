@@ -1613,7 +1613,7 @@ void  convex_hull( vec_point_2d  & in, vec_point_2d  & out )
             ind++;
         } else {
 
-            // VS: old code: causes problems on some strangly shaped models
+            // VS: old code: causes problems on some strangly shaped clouds
             // first point to be added (ind == 1) directly goes to "else"-branch
             // normally, this should not happen because points are sorted and duplicates removed
             // (maybe there is an error or imprecision due to floating points in one of the dupblicates removal functions)
