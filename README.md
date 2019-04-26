@@ -58,6 +58,7 @@ Further, I would like to thank the developers of third party libraries used in t
 
 | Date | Update |
 | ---  | ---    |
+| 2019-04-26 | Cleaned up and updated the citing section |
 | 2019-02-24 | Added instructions for Ubuntu 16, moved information to the Wiki |
 | 2019-02-08 | Added benchmark results and citing section |
 | 2019-01-25 | Initial code commit, ReadMe with quick start examples added |
