@@ -104,7 +104,7 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword> >& codewords
 
         const std::vector<Utils::BoundingBox>& boundingBoxesClass = bbIt->second;
         if (boundingBoxesClass.size() != classModelFeatures.size()) {
-            LOG_ERROR("unequal number of bounding boxes and models for class id " << classId);
+            LOG_ERROR("unequal number of bounding boxes and objects for class id " << classId);
             continue;
         }
 
@@ -520,7 +520,7 @@ void Codebook::castVotes(pcl::PointCloud<ISMFeature>::Ptr features,
     }
 
     std::vector<std::shared_ptr<CodewordDistribution> > activatedEntries;
-    std::map<unsigned, std::vector<int> > featureIndizes;
+    std::map<unsigned, std::vector<int> > featureIndices;
 
     const std::vector<std::shared_ptr<Codeword>> codewords = getCodewords();
 
@@ -568,8 +568,8 @@ void Codebook::castVotes(pcl::PointCloud<ISMFeature>::Ptr features,
 
 #pragma omp critical
             {
-                featureIndizes[entry->getCodewordId()].push_back(i); // maps an activated codeword id to the activating feature index
-                if(featureIndizes[entry->getCodewordId()].size() == 1) // avoids dublicate activated entries
+                featureIndices[entry->getCodewordId()].push_back(i); // maps an activated codeword id to the activating feature index
+                if(featureIndices[entry->getCodewordId()].size() == 1) // avoids dublicate activated entries
                 {
                     activatedEntries.push_back(entry);
                 }
@@ -583,7 +583,7 @@ void Codebook::castVotes(pcl::PointCloud<ISMFeature>::Ptr features,
     {
         std::shared_ptr<CodewordDistribution> entry = activatedEntries[i];
         std::shared_ptr<Codeword> codeword = entry->getCodeword();
-        std::vector<int> featInd = featureIndizes[codeword->getId()];
+        std::vector<int> featInd = featureIndices[codeword->getId()];
 
         for (int j = 0; j < (int)featInd.size(); j++)
         {
