@@ -167,21 +167,3 @@ namespace ism3d
         return FeaturesBSHOT::getTypeStatic();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
