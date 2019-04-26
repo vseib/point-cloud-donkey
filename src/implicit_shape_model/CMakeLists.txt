@@ -78,7 +78,9 @@ add_library(implicit_shape_model
     features/features_shot.cpp
     features/features_bshot.cpp
     features/features_shot_global.cpp
+    features/features_short_shot_pcl.cpp
     features/features_short_shot.cpp
+    features/features_short_shot_global.cpp
     features/features_cshot.cpp
     features/features_cshot_global.cpp
     #features/features_short_cshot.cpp
