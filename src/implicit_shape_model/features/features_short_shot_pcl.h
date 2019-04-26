@@ -3,13 +3,13 @@
  *
  * Full text: https://opensource.org/licenses/BSD-3-Clause
  *
- * Copyright (c) 2019, Viktor Seib
+ * Copyright (c) 2018, Viktor Seib
  * All rights reserved.
  *
  */
 
-#ifndef ISM3D_FEATURESHORTSHOT_H
-#define ISM3D_FEATURESHORTSHOT_H
+#ifndef ISM3D_FEATURESSHORTSHOTPCL_H
+#define ISM3D_FEATURESSHORTSHOTPCL_H
 
 #include "features.h"
 
@@ -17,16 +17,23 @@ namespace ism3d
 {
     /**
      * @brief The FeaturesSHORTSHOT class
-     * Computes features using the generalized Short SHOT (reuses code from the Compact Geometric Features (CGF), see third_party/CGF/cgf.cpp)
+     * Computes features using the shortened signature of histograms of orientations descriptor.
      *
-     * Original CGF repo: https://marckhoury.github.io/CGF/ and https://github.com/marckhoury/CGF
+     * For more details see:
+     *
+     * Viktor Seib, Dietrich Paulus
+     * "A Low-Dimensional Feature Transform for Keypoint Matching and Classification of Point Clouds without Normal Computation"
+     * 25th IEEE International Conference on Image Processing (ICIP), 2018
+     * pages: 2949--2953
+     *
      */
-    class FeaturesSHORTSHOT
+
+    class FeaturesSHORTSHOTPCL
             : public Features
     {
     public:
-        FeaturesSHORTSHOT();
-        ~FeaturesSHORTSHOT();
+        FeaturesSHORTSHOTPCL();
+        ~FeaturesSHORTSHOTPCL();
 
         static std::string getTypeStatic();
         std::string getType() const;
@@ -42,21 +49,8 @@ namespace ism3d
 
     private:
 
-        std::vector<std::vector<double>> compute_descriptor(pcl::PointCloud<PointT>::ConstPtr cloud,
-                                                pcl::PointCloud<PointT>::Ptr keypoints,
-                                                pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames);
-
-        void configureSphericalGrid();
-
         double m_radius;
-        double m_min_radius;
-        bool m_log_radius;
-        int m_feature_dims;
-        int m_r_bins;
-        int m_e_bins;
-        int m_a_bins;
-        std::string m_bin_type;
     };
 }
 
-#endif // ISM3D_FEATURESHORTSHOT_H
+#endif // ISM3D_FEATURESSHORTSHOTPCL_H

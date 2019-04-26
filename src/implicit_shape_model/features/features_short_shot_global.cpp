@@ -8,20 +8,19 @@
  *
  */
 
-#include "features_short_shot.h"
+#include "features_short_shot_global.h"
 
 #define PCL_NO_PRECOMPILE
+#include <pcl/features/shot_omp.h>
 #include <pcl/common/angles.h>
 #include <pcl/common/centroid.h>
 #include <pcl/search/kdtree.h>
-#include <pcl/features/shot_lrf_omp.h>
 
 namespace ism3d
 {
-    FeaturesSHORTSHOT::FeaturesSHORTSHOT()
+    FeaturesSHORTSHOTGlobal::FeaturesSHORTSHOTGlobal()
     {
-        addParameter(m_radius, "Radius", 0.1);
-        addParameter(m_min_radius, "ShortShotMinRadius", m_radius*0.25);
+        addParameter(m_min_radius, "ShortShotMinRadius", 0.25);
         addParameter(m_feature_dims, "ShortShotDims", 32);
         addParameter(m_log_radius, "ShortShotLogRadius", false);
         addParameter(m_r_bins, "ShortShotRBins", 1);
@@ -30,26 +29,47 @@ namespace ism3d
         addParameter(m_bin_type, "ShortShotBinType", std::string("auto"));
     }
 
-    FeaturesSHORTSHOT::~FeaturesSHORTSHOT()
+    FeaturesSHORTSHOTGlobal::~FeaturesSHORTSHOTGlobal()
     {
     }
 
-    pcl::PointCloud<ISMFeature>::Ptr FeaturesSHORTSHOT::iComputeDescriptors(pcl::PointCloud<PointT>::ConstPtr pointCloud,
+    pcl::PointCloud<ISMFeature>::Ptr FeaturesSHORTSHOTGlobal::iComputeDescriptors(pcl::PointCloud<PointT>::ConstPtr pointCloud,
                                                                          pcl::PointCloud<pcl::Normal>::ConstPtr normals,
                                                                          pcl::PointCloud<PointT>::ConstPtr pointCloudWithoutNaNNormals,
                                                                          pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN,
                                                                          pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames,
                                                                          pcl::PointCloud<PointT>::Ptr keypoints,
-                                                                         pcl::search::Search<PointT>::Ptr search)
+                                                                       pcl::search::Search<PointT>::Ptr search)
     {
         configureSphericalGrid();
+        m_radius = getCloudRadius(pointCloudWithoutNaNNormals);
+
+        // for global SHORT SHOT use centroid instead of keypoints
+        Eigen::Vector4f centroid4f;
+        pcl::compute3DCentroid(*pointCloudWithoutNaNNormals, centroid4f);
+        pcl::PointCloud<PointT>::Ptr centroid_cloud(new pcl::PointCloud<PointT>());
+        PointT centroid_point;
+        centroid_point.x = centroid4f[0];
+        centroid_point.y = centroid4f[1];
+        centroid_point.z = centroid4f[2];
+        centroid_cloud->push_back(centroid_point);
+        centroid_cloud->height = 1;
+        centroid_cloud->width = 1;
+        centroid_cloud->is_dense = false;
+        keypoints = centroid_cloud;
+
+        // for global SHORT SHOT: compute centroid reference frame
+        pcl::PointCloud<pcl::ReferenceFrame>::Ptr centroid_frame(new pcl::PointCloud<pcl::ReferenceFrame>());
+        pcl::SHOTLocalReferenceFrameEstimationOMP<PointT, pcl::ReferenceFrame> refEst;
+        refEst.setRadiusSearch(m_radius);
+        refEst.setInputCloud(centroid_cloud);
+        refEst.setSearchSurface(pointCloudWithoutNaNNormals);
+        refEst.setSearchMethod(search);
+        refEst.compute(*centroid_frame);
 
         // compute features
         std::vector<std::vector<double>> raw_features = compute_descriptor(
-                    pointCloudWithoutNaNNormals, keypoints, referenceFrames);
-
-        Eigen::Vector4d centroid;
-        pcl::compute3DCentroid(*pointCloudWithoutNaNNormals, centroid);
+                    pointCloudWithoutNaNNormals, keypoints, centroid_frame);
 
         // create descriptor point cloud
         pcl::PointCloud<ISMFeature>::Ptr features(new pcl::PointCloud<ISMFeature>());
@@ -64,17 +84,14 @@ namespace ism3d
             feature.descriptor.resize(m_feature_dims);
             for (int j = 0; j < feature.descriptor.size(); j++)
                 feature.descriptor[j] = static_cast<float>(raw_hist[j]);
-
-            // store distance to centroid
-            PointT keyp = keypoints->at(i);
-            feature.centerDist = (Eigen::Vector3d(keyp.x, keyp.y, keyp.z)-Eigen::Vector3d(centroid.x(), centroid.y(), centroid.z())).norm();
         }
 
         return features;
     }
 
+
     // NOTE: the following method reuses code from CGF, see method "compute_intensities" in "third_party/cgf/cgf.cpp"
-    std::vector<std::vector<double>> FeaturesSHORTSHOT::compute_descriptor(
+    std::vector<std::vector<double>> FeaturesSHORTSHOTGlobal::compute_descriptor(
                                             pcl::PointCloud<PointT>::ConstPtr cloud,
                                             pcl::PointCloud<PointT>::Ptr keypoints,
                                             pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames)
@@ -88,7 +105,7 @@ namespace ism3d
         double ln_rmin = log(m_min_radius);
         double ln_rmax_rmin = log(m_radius/m_min_radius);
 
-        #pragma omp parallel for num_threads(m_numThreads)
+        //#pragma omp parallel for num_threads(m_numThreads) NOTE: no need for OMP - we have only 1 keypoint
         for(int i = 0; i < keypoints->points.size(); i++)
         {
             std::vector<int> indices;
@@ -147,7 +164,8 @@ namespace ism3d
         return intensities;
     }
 
-    void FeaturesSHORTSHOT::configureSphericalGrid()
+
+    void FeaturesSHORTSHOTGlobal::configureSphericalGrid()
     {
         // automatically set bins to default configuration to match the given dimensionality
         if(m_bin_type == "auto")
@@ -230,13 +248,13 @@ namespace ism3d
         }
     }
 
-    std::string FeaturesSHORTSHOT::getTypeStatic()
+    std::string FeaturesSHORTSHOTGlobal::getTypeStatic()
     {
-        return "SHORT_SHOT";
+        return "SHORT_SHOT_GLOBAL";
     }
 
-    std::string FeaturesSHORTSHOT::getType() const
+    std::string FeaturesSHORTSHOTGlobal::getType() const
     {
-        return FeaturesSHORTSHOT::getTypeStatic();
+        return FeaturesSHORTSHOTGlobal::getTypeStatic();
     }
 }

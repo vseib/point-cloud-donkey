@@ -8,25 +8,26 @@
  *
  */
 
-#ifndef ISM3D_FEATURESHORTSHOT_H
-#define ISM3D_FEATURESHORTSHOT_H
+#ifndef ISM3D_FEATURESSHORTSHOTGLOBAL_H
+#define ISM3D_FEATURESSHORTSHOTGLOBAL_H
 
 #include "features.h"
 
 namespace ism3d
 {
     /**
-     * @brief The FeaturesSHORTSHOT class
-     * Computes features using the generalized Short SHOT (reuses code from the Compact Geometric Features (CGF), see third_party/CGF/cgf.cpp)
+     * @brief The FeaturesSHORTSHOTGlobal class
+     * Computes a global SHORT SHOT feature.
+     * (reuses code from the Compact Geometric Features (CGF), see third_party/CGF/cgf.cpp)
      *
      * Original CGF repo: https://marckhoury.github.io/CGF/ and https://github.com/marckhoury/CGF
      */
-    class FeaturesSHORTSHOT
+    class FeaturesSHORTSHOTGlobal
             : public Features
     {
     public:
-        FeaturesSHORTSHOT();
-        ~FeaturesSHORTSHOT();
+        FeaturesSHORTSHOTGlobal();
+        ~FeaturesSHORTSHOTGlobal();
 
         static std::string getTypeStatic();
         std::string getType() const;
@@ -39,7 +40,6 @@ namespace ism3d
                                                              pcl::PointCloud<pcl::ReferenceFrame>::Ptr,
                                                              pcl::PointCloud<PointT>::Ptr,
                                                              pcl::search::Search<PointT>::Ptr);
-
     private:
 
         std::vector<std::vector<double>> compute_descriptor(pcl::PointCloud<PointT>::ConstPtr cloud,
@@ -59,4 +59,4 @@ namespace ism3d
     };
 }
 
-#endif // ISM3D_FEATURESHORTSHOT_H
+#endif // ISM3D_FEATURESSHORTSHOTGLOBAL_H
