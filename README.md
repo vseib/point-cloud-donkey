@@ -90,16 +90,13 @@ TODO: [Quick Start Using the GUI]
 
 ## Citing
 
-This sections lists all publications related to this repository. If you are using this repository for academic work, please consider citing one of the following publications. If you are unsure what to cite, please choose the "Extended Pipeline" paper.
+If you are using this repository for academic work, please consider citing the following publication:
 
-TODO add missing bibtex info
-
-### Extended Pipeline
-The extended pipeline is the generic point cloud processing pipeline depicted in the image on top of this page including the orange and green steps marked with a red star.
-
-#### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
+### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
 * Paper introducing codebook cleaning and global verification
+* This extended pipeline is the generic point cloud processing pipeline depicted in the image on top of this page including the orange and green steps marked with a red star.
 * PDF: [Seib2019B3S](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)
+
 ```
 @inproceedings{Seib2019B3S,
    author = {Seib, Viktor and Theisen, Nick and Paulus, Dietrich},
@@ -115,61 +112,11 @@ The extended pipeline is the generic point cloud processing pipeline depicted in
 }
 ```
 
-### Short-SHOT Feature Descriptor
-This descriptor is a modification to the original SHOT descriptor [2]. In short: it is based on the number of points in a grid bin in contrast to the orientations of their normals.
+If you consider citing a specific contribution contained in this repository, please refer to the following Wiki page:
 
-#### A LOW-DIMENSIONAL FEATURE TRANSFORM FOR KEYPOINT MATCHING AND CLASSIFICATION OF POINT CLOUDS WITHOUT NORMAL COMPUTATION
-* Paper introducing and evaluating the short version of the SHOT descriptor
-* PDF: [Seib2018ALF](http://www.uni-koblenz.de/~agas/Documents/Seib2018ALF.pdf)
-```
-@inproceedings{Seib2018ALF,
-   author = {Seib, Viktor and Paulus, Dietrich},
-   title = {A Low-Dimensional Feature Transform for Keypoint Matching and Classification of Point Clouds without Normal Computation},
-   booktitle = {2018 25th IEEE International Conference on Image Processing (ICIP)},
-   pages = {2949-2953},
-   month = {10},
-   year = {2018},
-   isbn = {978-1-4799-7061-2}
-}
-```
+[Citing This Repository](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers)
 
-### Base Pipeline
-The base pipeline is the generic point cloud processing pipeline depicted in the image on top of this page excluding all steps marked with a red star.
 
-#### Pose Estimation and Shape Retrieval with Hough Voting in a Continuous Voting Space
-* Paper presenting additional experiments and modifications to the base pipeline
-* PDF: [Seib2015PEA](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf)
-```
-@inproceedings{Seib2015PEA,
-   author = {Seib, Viktor and Link, Norman and Paulus, Dietrich},
-   editor = {Gall, Juergen and Gehler, Peter and Leibe, Bastian},
-   title = {Pose Estimation and Shape Retrieval with Hough Voting in a Continuous Voting Space},
-   booktitle = {Pattern Recognition},
-   publisher = {Springer International Publishing},
-   volume = {9358},
-   series = {LNCS},
-   pages = {458-469},
-   year = {2015},
-   isbn = {978-3-319-24946-9},
-}
-```
-
-#### Implicit Shape Models For 3D Shape Classification With a Continuous Voting Space
-* Paper with the original publication of a 3D ISM and a continuous voting space
-* PDF: [Seib2015ISM](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf)
-```
-@inproceedings{Seib2015ISM,
-   author = {Seib, Viktor and Link, Norman and Paulus, Dietrich},
-   editor = {Braz, and Battiato, Sebastiano and Imai, Francisco H.},
-   title = {Implicit Shape Models For 3D Shape Classification With a Continuous Voting Space},
-   booktitle = {{VISAPP} 2015 - Proceedings of the 10th International Conference on Computer Vision Theory and Applications},
-   publisher = {SciTePress},
-   volume = {2},
-   pages = {33-43},
-   year = {2015},
-   isbn = {978-989-758-090-1},
-}
-```
 
 
 ## License
@@ -182,8 +129,4 @@ PointCloudDonkey also includes some 3rd party code which might be subject to oth
 [1] Leibe, Bastian and Leonardis, Ales and Schiele, Bernt; 
 "Combined Object Categorization and Segmentation with an Implicit Shape Model",
 Workshop on statistical learning in computer vision, ECCV, 2004
-    
-[2] Tombari, Federico and Salti, Samuele and Di Stefano, Luigi;
-"Unique signatures of histograms for local surface description",
-European conference on computer vision, ECCV, 2010
 
