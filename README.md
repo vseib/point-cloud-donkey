@@ -98,8 +98,22 @@ TODO add missing bibtex info
 The extended pipeline is the generic point cloud processing pipeline depicted in the image on top of this page including the orange and green steps marked with a red star.
 
 #### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
-* accepted for publication at VISAPP 2019
-* PDF: TODO
+* Paper introducing codebook cleaning and global verification
+* PDF: [Seib2019B3S](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)
+```
+@inproceedings{Seib2019B3S,
+   author = {Seib, Viktor and Theisen, Nick and Paulus, Dietrich},
+   editor = {Tremeau, Alain and Farinella, Giovanni Maria and Braz, Jose},
+   title = {Boosting 3D Shape Classification with Global Verification and Redundancy-free Codebooks},
+   booktitle = {Proceedings of the 14th International Joint Conference on Computer Vision, Imaging and Computer Graphics Theory and Applications},
+   publisher = {SciTePress},
+   volume = {5},
+   pages = {257 - 264},
+   year = {2019},
+   url = {http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf},
+   isbn = {978-989-758-354-4},
+}
+```
 
 ### Short-SHOT Feature Descriptor
 This descriptor is a modification to the original SHOT descriptor [2]. In short: it is based on the number of points in a grid bin in contrast to the orientations of their normals.
