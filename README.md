@@ -90,7 +90,10 @@ TODO: [Quick Start Using the GUI]
 
 ## Citing
 
-If you are using this repository for academic work, please consider citing the following publication:
+If you are using this repository for academic work, please consider citing the publication listed below.
+If you consider citing a specific contribution contained in this repository, please refer to the following Wiki page:
+
+[Citing This Repository](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers)
 
 ### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
 * Paper introducing codebook cleaning and global verification
@@ -111,12 +114,6 @@ If you are using this repository for academic work, please consider citing the f
    isbn = {978-989-758-354-4},
 }
 ```
-
-If you consider citing a specific contribution contained in this repository, please refer to the following Wiki page:
-
-[Citing This Repository](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers)
-
-
 
 
 ## License
