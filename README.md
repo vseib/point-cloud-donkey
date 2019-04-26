@@ -39,9 +39,9 @@ The following table summarizes classification results on some datasets. For more
 | [ModelNet 40](http://modelnet.cs.princeton.edu/) | - |71.9 | 75.4 |
 
 <a name="fnaim">1</a>: Dataset no longer online <br>
-<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above <br>
-<a name="fnbasep">3</a>: Optimized parameters in training <br>
-<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above <br>
+<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [Base Pipeline](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) <br>
+<a name="fnbasep">3</a>: Optimized parameters in training [Optimized Base Pipeline](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) <br>
+<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [Extended Pipeline](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks)<br>
 
 ## Acknowledgments
 
