@@ -44,10 +44,10 @@
 #include <pcl/common/centroid.h>
 
 #include <fstream>
+#include <chrono>
 
 #include <iostream>
 #include <omp.h>
-
 #include <opencv2/ml/ml.hpp>
 
 #include "keypoints/keypoints_voxel_grid.h"
@@ -68,6 +68,9 @@
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/consoleappender.h>
 #include <log4cxx/basicconfigurator.h>
+
+// TODO VS temp for debug
+int ism3d::ImplicitShapeModel::m_counter = 0;
 
 namespace ism3d
 {
@@ -233,8 +236,8 @@ void ImplicitShapeModel::train()
 
         LOG_ASSERT(model_filenames.size() == modelsHaveNormals.size());
 
-        LOG_INFO("-------------------------------------------------------------------");
-        LOG_INFO("training class " << classId << " with " << model_filenames.size() << " models");
+        LOG_INFO("----------------------------------------------------------------");
+        LOG_INFO("training class " << classId << " with " << model_filenames.size() << " objects");
 
         for (int j = 0; j < (int)model_filenames.size(); j++)
         {
@@ -580,6 +583,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     {
         m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexChi(), m_flann_exact_match);
     }
+    // TODO VS: remove hellinger and histintersection everywhere
     else if(m_distance->getType() == "Hellinger")
     {
         m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexHel(), m_flann_exact_match);
@@ -690,7 +694,8 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     std::string descr_type = m_featureDescriptor->getType();
 
     // TODO VS: add descriptor type that can be checked for "needNormals" and "isBinary"
-    if (!hasNormals && (descr_type != "SHORT_SHOT" && descr_type != "SHORT_CSHOT"))
+    if (!hasNormals && (descr_type != "SHORT_SHOT" && descr_type != "SHORT_CSHOT" &&
+                        descr_type != "SHORT_SHOT_PCL"))
     {
         // compute normals on the model
         timer_normals.start();
@@ -1216,16 +1221,30 @@ std::map<unsigned, pcl::PointCloud<PointT>::Ptr > ImplicitShapeModel::analyzeVot
         pcl::PointCloud<PointT>::Ptr dataset(new pcl::PointCloud<PointT>());
 
         // include original points
+        int skip_counter = 0;
         for(auto p : points->points)
         {
+            // use only each 20th point
+            if(skip_counter++ % 20 != 0) continue;
+
             PointT origp;
             origp.x = p.x;
             origp.y = p.y;
             origp.z = p.z;
-            origp.r = p.r;
-            origp.g = p.g;
-            origp.b = p.b;
-            dataset->push_back(origp);
+            if(p.r == 0 && p.g == 0 && p.b == 0)
+            {
+                origp.r = 150;
+                origp.g = 150;
+                origp.b = 150;
+            }
+            else
+            {
+                origp.r = p.r;
+                origp.g = p.g;
+                origp.b = p.b;
+            }
+            // NOTE: uncomment to include points of object
+            // dataset->push_back(origp);
         }
 
         // build dataset of votes
@@ -1237,9 +1256,10 @@ std::map<unsigned, pcl::PointCloud<PointT>::Ptr > ImplicitShapeModel::analyzeVot
             votePoint.y = vote.position[1];
             votePoint.z = vote.position[2];
             votePoint.r = 0;
-            votePoint.g = 0;
+            votePoint.g = 255;
             votePoint.b = 255;
-            dataset->push_back(votePoint);
+            // NOTE: uncomment to include the actual votes
+            // dataset->push_back(votePoint);
         }
         dataset->height = 1;
         dataset->width = dataset->size();
@@ -1264,7 +1284,8 @@ void ImplicitShapeModel::addMaximaForDebug(std::map<unsigned, pcl::PointCloud<Po
         votePoint.r = 255;
         votePoint.g = 0;
         votePoint.b = 0;
-        all_votings.at(classId)->push_back(votePoint);
+        // NOTE: uncomment to include maxima locations
+        //all_votings.at(classId)->push_back(votePoint);
     }
 
     // check if path terminates in /
@@ -1272,12 +1293,20 @@ void ImplicitShapeModel::addMaximaForDebug(std::map<unsigned, pcl::PointCloud<Po
     if(pos != m_votingAnalysisOutputPath.size()-1)
     {
         m_votingAnalysisOutputPath = m_votingAnalysisOutputPath.append("/");
+        std::string command = "mkdir "+m_votingAnalysisOutputPath+" -p";
+        int unused = std::system(command.c_str());
     }
 
+    m_counter++;
+    std::ofstream ofs;
+    ofs.open(m_votingAnalysisOutputPath+"votes.txt", std::ofstream::out | std::ofstream::app);
     for(auto obj : all_votings)
     {
-        pcl::io::savePCDFileBinary(m_votingAnalysisOutputPath+std::to_string(obj.first)+".pcd", *obj.second);
+        pcl::io::savePCDFileBinary(m_votingAnalysisOutputPath+"file_idx_"+std::to_string(m_counter)+"_class_"+
+                                   std::to_string(obj.first)+".pcd", *obj.second);
+        ofs << "file: " << m_counter << ", class: " << obj.first << ", votes:" << obj.second->size() << std::endl;
     }
+    ofs.close();
 }
 
 }

@@ -66,7 +66,7 @@ namespace ism3d
     /**
      * @brief The ImplicitShapeModel class
      * This class is the main entry point for the implicit shape model detection algorithm.
-     * Use the functions addTrainingModel() to add training models and train() to actually
+     * Use the functions addTrainingModel() to add training objects and train() to actually
      * train the implicit shape model.
      * Use the detect() function for analyzing an unclassified point cloud for object occurrences
      * and returning a list of object hypotheses.
@@ -97,7 +97,7 @@ namespace ism3d
         bool addTrainingModel(const std::string& filename, unsigned classId);
 
         /**
-         * @brief Train the implicit shape model using all models added before
+         * @brief Train the implicit shape model using all objects added before
          */
         void train();
 
@@ -248,6 +248,7 @@ namespace ism3d
         bool m_index_created;
 
         // TODO VS temp
+        static int m_counter;
         double getElapsedTime(boost::timer::cpu_timer timer, std::string format);
         std::map<std::string, double> m_processing_times;
     };
