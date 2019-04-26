@@ -280,7 +280,7 @@ CustomSVM::SVMResponse CustomSVM::predictUnifyScore(cv::Mat test_data, std::vect
 
     if(svm_files.size() > 1)
     {
-        // OpenCV multiple SVMs to simulate an 1 vs all SVM
+        // OpenCV multiple two-class SVMs to simulate an 1 vs all SVM
         response = predictWithScore(test_data, svm_files); // the lower the score, the better
 
         // switch sign and normalize to [0|1] to make score compatible with other score
@@ -292,7 +292,7 @@ CustomSVM::SVMResponse CustomSVM::predictUnifyScore(cv::Mat test_data, std::vect
     }
     else if(svm_files.size() == 1)
     {
-        // OpenCV SVM with additional score
+        // OpenCV multi-class SVM with additional score
         response = predictWithScore(test_data, svm_files[0]);
     }
     else
@@ -402,18 +402,11 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
 
     // find class index with most votes
     int k = 0;
-    std::vector<int> same_votes_idx; // holds all indices with the same (highest) number of votes
     for(int i = 0; i < m_num_classes; i++)
     {
         if(class_votes.at(i) > class_votes.at(k))
         {
             k = i;
-            same_votes_idx.clear();
-            same_votes_idx.push_back(i);
-        }
-        else if(class_votes.at(i) == class_votes.at(k))
-        {
-            same_votes_idx.push_back(i);
         }
     }
 
@@ -437,7 +430,9 @@ void CustomSVM::computeScores()
 
     for(int i = 0; i < m_sums_of_sigmoids.size(); i++)
     {
-        float avg_of_sigm = m_sums_of_sigmoids.at(i) / ((float)m_num_classes - 1.0f);
+        // compute average of sigmoids
+        // NOTE: while there are n*(n-1) decision functions, each classes sums of sigmoids was only updated (n-1) times - once for each of the other classes
+        float avg_of_sigm = m_sums_of_sigmoids.at(i) / (m_num_classes - 1);
         m_scores.push_back(avg_of_sigm);
     }
 }
@@ -446,7 +441,7 @@ float CustomSVM::getScore(int class_id)
 {
     if(m_scores.size() == 0)
     {
-        LOG_ERROR("before calling the function \"getScore\" you must call the function \"predictWithDistance\"!");
+        LOG_ERROR("before calling the function \"getScore\" you must call the function \"predictWithScore\"!");
         return 0;
     }
     if(class_id == -1)
