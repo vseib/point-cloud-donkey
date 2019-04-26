@@ -39,9 +39,9 @@ The following table summarizes classification results on some datasets. For more
 | [ModelNet 40](http://modelnet.cs.princeton.edu/) | - |71.9 | 75.4 |
 
 <a name="fnaim">1</a>: Dataset no longer online <br>
-<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) [PDF](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf) <br>
-<a name="fnbasep">3</a>: Optimized parameters in training [bibtex](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) [PDF](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf) <br>
-<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [bibtex](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [PDF](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
+<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf) <br>
+<a name="fnbasep">3</a>: Optimized parameters in training [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf) <br>
+<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
 
 ## Acknowledgments
 
