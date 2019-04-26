@@ -3,11 +3,8 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
-#include <vector>
 #include <utility>
 
-//#include <boost/thread/thread.hpp>
-#include <pcl/common/common_headers.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/features/shot.h>
@@ -18,6 +15,8 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/transforms.h>
 #include <pcl/console/parse.h>
+
+#include "cgf.h"
 
 #include "../../third_party/liblzf-3.6/lzf_c.c"
 #include "../../third_party/liblzf-3.6/lzf_d.c"
@@ -36,7 +35,7 @@
  * BSD 3-Clause License
  * Full text: https://opensource.org/licenses/BSD-3-Clause
  *
- * As of January 11th, 2019, the author of the above mentioned GitHub repository did not add a license.
+ * As of March 1st, 2019, the author of the above mentioned GitHub repository did not add a license.
  * If you are reading this, please check if a license was added. If this is the case, please notify me,
  * especially if the added license is in conflict with the BSD 3-Clause License.
  *
@@ -44,8 +43,6 @@
  * Viktor Seib
  */
 
-
-using namespace std;
 
 void usage(const char* program)
 {
@@ -64,7 +61,7 @@ void usage(const char* program)
     cout << "-h Help menu." << endl;
 }
 
-vector<vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
+std::vector<std::vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                                             pcl::PointCloud<pcl::PointXYZRGB>::Ptr keypoints,
                                             int num_bins_radius, 
                                             int num_bins_polar,
@@ -74,7 +71,7 @@ vector<vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::C
                                             double rmin,
                                             int num_threads)
 {
-    vector<vector<double> > intensities;
+    std::vector<std::vector<double>> intensities;
     intensities.resize(keypoints->points.size());
 
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>());
@@ -101,38 +98,14 @@ vector<vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::C
     double ln_rmin = log(rmin);
     double ln_rmax_rmin = log(search_radius/rmin);
     
-    double azimuth_interval = 360.0 / num_bins_azimuth;
-    double polar_interval = 180.0 / num_bins_polar; 
-    vector<double> radii_interval, azimuth_division, polar_division;
-    for(int i = 0; i < num_bins_radius+1; i++) {
-        radii_interval.push_back(exp(ln_rmin + ((double)i) / num_bins_radius * ln_rmax_rmin));
-    }
-    for(int i = 0; i < num_bins_azimuth + 1; i++) {
-        azimuth_division.push_back(i * azimuth_interval);
-    } 
-    for(int i = 0; i < num_bins_polar + 1; i++) {
-        polar_division.push_back(i * polar_interval);
-    } 
-    radii_interval[0] = 0;
-
-    vector<double> integr_radius, integr_polar;
-    double integr_azimuth;
-    for(int i = 0; i < num_bins_radius; i++) {
-        integr_radius.push_back((radii_interval[i+1]*radii_interval[i+1]*radii_interval[i+1])/3 - (radii_interval[i]*radii_interval[i]*radii_interval[i])/3 );
-    }
-    integr_azimuth = pcl::deg2rad(azimuth_division[1]) - pcl::deg2rad(azimuth_division[0]);
-    for(int i = 0; i < num_bins_polar; i++) {
-        integr_polar.push_back(cos(pcl::deg2rad(polar_division[i]))-cos(pcl::deg2rad(polar_division[i+1])));
-    }  
-
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(num_threads)
 #endif
     for(int i = 0; i < keypoints->points.size(); i++)
     {
-        vector<int> indices;
-        vector<float> distances;
-        vector<double> intensity;
+        std::vector<int> indices;
+        std::vector<float> distances;
+        std::vector<double> intensity;
         int sum = 0;
         intensity.resize(num_bins_radius * num_bins_polar * num_bins_azimuth);
  
@@ -142,9 +115,9 @@ vector<vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::C
         Eigen::Vector4f current_frame_z (current_frame.z_axis[0], current_frame.z_axis[1], current_frame.z_axis[2], 0);
 
         if(isnan(current_frame_x[0]) || isnan(current_frame_x[1]) || isnan(current_frame_x[2]) ) {
-            current_frame_x[0] = 1, current_frame_x[1] = 0, current_frame_x[2] = 0;  
-            current_frame_y[0] = 0, current_frame_y[1] = 1, current_frame_y[2] = 0;  
-            current_frame_z[0] = 0, current_frame_z[1] = 0, current_frame_z[2] = 1;  
+            current_frame_x[0] = 1, current_frame_x[1] = 0, current_frame_x[2] = 0;
+            current_frame_y[0] = 0, current_frame_y[1] = 1, current_frame_y[2] = 0;
+            current_frame_z[0] = 0, current_frame_z[1] = 0, current_frame_z[2] = 1;
         } else {
             float nx = normals->points[i].normal_x, ny = normals->points[i].normal_y, nz = normals->points[i].normal_z;
             Eigen::Vector4f n(nx, ny, nz, 0);
@@ -185,15 +158,15 @@ vector<vector<double> > compute_intensities(pcl::PointCloud<pcl::PointXYZRGB>::C
                 intensity[j] /= sum;
             }
         }
-        intensities[i] = intensity;
+      intensities[i] = intensity;
     }
     //pcl::console::print_highlight("Raw Spherical Histograms Time: %f (s)\n", watch_intensities.getTimeSeconds());
     return intensities;
 }
 
 int cgf_main(std::vector<std::string> &argvector,
-             pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-             pcl::PointCloud<pcl::PointXYZRGB>::Ptr keypoints)
+                                     pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
+                                     pcl::PointCloud<pcl::PointXYZRGB>::Ptr keypoints)
 {
     // convert arguments to argc and argv
     int argc = argvector.size();
@@ -208,11 +181,11 @@ int cgf_main(std::vector<std::string> &argvector,
     double search_radius = 1.18, lrf_radius = 0.25;
     double diameter = 4*sqrt(3);
     double rmin = 0.1;
-    string output_file;
+    std::string output_file;
  
     if(pcl::console::find_argument(argc, argv, "-h") >= 0 || argc == 1) {
         usage(argv[0]);
-        return 0;
+        return 1;
     }
 
     pcl::console::parse_argument(argc, argv, "-r", num_bins_radius);
@@ -233,47 +206,36 @@ int cgf_main(std::vector<std::string> &argvector,
         rmin = 0.015 * diameter; 
     }
 
-//    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-//    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals(new pcl::PointCloud<pcl::PointNormal>);
+    std::ofstream fout;
+    fout.open(output_file.c_str(), ios::binary);
 
-    ofstream fout(output_file.c_str(), ios::binary);
-    vector<double> intensities_flat;
-
-//    string pcd_name = argv[argc-1];
-//    int success = pcl::io::loadPCDFile<pcl::PointXYZRGB>(pcd_name, *cloud);
-//    if(success == -1) {
-//        PCL_ERROR("Could not read file.");
-//        return 1;
-//    }
-//    success = pcl::io::loadPCDFile<pcl::PointNormal>(pcd_name, *cloud_with_normals);
-//    if(success == -1) {
-//        PCL_ERROR("Could not read file.");
-//        return 1;
-//    }
-
-    vector<vector<double> > intensities = compute_intensities(cloud, keypoints,
+    std::vector<double> intensities_flat;
+    std::vector<std::vector<double>> intensities = compute_intensities(cloud, keypoints,
                                                               num_bins_radius, num_bins_polar, num_bins_azimuth, 
                                                               search_radius, lrf_radius, 
                                                               rmin, num_threads);
 
-    //std::cout << "Computed " << intensities.size() << " features with length " << intensities[0].size() << std::endl;
-
-    for(int i = 0; i < intensities.size(); i++) {
-        for(int j = 0; j < intensities[i].size(); j++) {
+    // the rest of the code is only needed if an output is generated
+    for(int i = 0; i < intensities.size(); i++)
+    {
+        for(int j = 0; j < intensities[i].size(); j++)
+        {
             intensities_flat.push_back(intensities[i][j]);
         }
     }
 
-    if(intensities_flat.size()*sizeof(double) > 4294967293){
+    if(intensities_flat.size()*sizeof(double) > 4294967293)
+    {
         std::cout << "Warning: More than 4294967293 bytes allocated. Compression may not work as expected." << std::endl;
     }
-        
-    vector<unsigned char> intensities_bytes;
+
+    std::vector<unsigned char> intensities_bytes;
     intensities_bytes.resize(intensities_flat.size()*sizeof(double));
     memcpy(&intensities_bytes[0], &intensities_flat[0], intensities_flat.size()*sizeof(double));
-    vector<unsigned char> intensities_compressed;
-    intensities_compressed.resize(intensities_bytes.size()); 
+    std::vector<unsigned char> intensities_compressed;
+    intensities_compressed.resize(intensities_bytes.size());
     size_t compressed_len = lzf_compress(&intensities_bytes[0], intensities_bytes.size(), &intensities_compressed[0], intensities_bytes.size());
+
     fout.write(reinterpret_cast<const char*>(&intensities_compressed[0]), compressed_len);
     fout.close();
     return 0;
