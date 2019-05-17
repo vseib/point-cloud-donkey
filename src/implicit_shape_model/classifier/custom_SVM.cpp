@@ -13,6 +13,7 @@
 #include <iostream>
 #include <iomanip>
 #include <set>
+#include <fstream>
 #include "../utils/utils.h"
 
 CustomSVM::CustomSVM(std::string output_file_name)
@@ -83,7 +84,7 @@ int CustomSVM::prepareTrainingData(int run_id, int num_runs)
         else
             labels_arr[i] = m_labels.at(i);
     }
-    cv::Mat labelsMat(m_num_features, 1, CV_32SC1, labels_arr);
+    cv::Mat labelsMat(m_num_features, 1, CV_32S, labels_arr);
 
     float training_data_arr[m_num_features][dim_feature];
     for(int i = 0; i < m_num_features; i++)
@@ -93,7 +94,7 @@ int CustomSVM::prepareTrainingData(int run_id, int num_runs)
             training_data_arr[i][j] = (float)(m_training_data.at(i)).at(j);
         }
     }
-    cv::Mat trainingDataMat(m_num_features, dim_feature, CV_32FC1, training_data_arr);
+    cv::Mat trainingDataMat(m_num_features, dim_feature, CV_32F, training_data_arr);
 
     m_labels_mat = labelsMat.clone();
     m_train_data_mat = trainingDataMat.clone();
@@ -102,7 +103,7 @@ int CustomSVM::prepareTrainingData(int run_id, int num_runs)
 }
 
 
-void CustomSVM::trainSimple(cv::SVMParams svm_params, bool one_vs_all)
+void CustomSVM::trainSimple(double param_gamma, double param_c, bool one_vs_all)
 {
     if(m_training_data.size() == 0)
     {
@@ -120,10 +121,19 @@ void CustomSVM::trainSimple(cv::SVMParams svm_params, bool one_vs_all)
     for(int i = 0; i < num_runs; i++)
     {
         LOG_INFO("training loop " << (i+1) << " of " << num_runs);
-        clear();
-        int train_label = prepareTrainingData(i+1, num_runs);
+        // Set up SVM's parameters
+        cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
+        svm->setType(cv::ml::SVM::C_SVC);
+        svm->setKernel(cv::ml::SVM::RBF);
+        svm->setGamma(param_gamma);
+        svm->setC(param_c);
+        svm->setDegree(1);
+        svm->setCoef0(0.1);
+        //svm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, 100, 1e-6));
 
-        train(m_train_data_mat, m_labels_mat, cv::Mat(), cv::Mat(), svm_params);
+        int train_label = prepareTrainingData(i+1, num_runs);
+        cv::Ptr<cv::ml::TrainData> td = cv::ml::TrainData::create(m_train_data_mat, cv::ml::ROW_SAMPLE, m_labels_mat);
+        svm->train(td);
 
         // save trained file
         std::stringstream sstr;
@@ -135,7 +145,7 @@ void CustomSVM::trainSimple(cv::SVMParams svm_params, bool one_vs_all)
 
         complete_name = m_output_file_name + sstr.str() + ".svm";
         saved_files.push_back(complete_name);
-        save(complete_name.c_str());
+        svm->save(complete_name.c_str());
     }
 
     // if several files were generated ...
@@ -154,7 +164,7 @@ void CustomSVM::trainSimple(cv::SVMParams svm_params, bool one_vs_all)
 }
 
 
-void CustomSVM::trainAutomatically(cv::SVMParams svm_params, int k_fold, bool one_vs_all)
+void CustomSVM::trainAutomatically(double param_gamma, double param_c, int k_fold, bool one_vs_all)
 {
     if(m_training_data.size() == 0)
     {
@@ -173,70 +183,82 @@ void CustomSVM::trainAutomatically(cv::SVMParams svm_params, int k_fold, bool on
     for(int i = 0; i < num_runs; i++)
     {
         LOG_INFO("training loop " << (i+1) << " of " << num_runs);
-        clear();
+        // Set up SVM's parameters
+        cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
+        svm->setType(cv::ml::SVM::C_SVC);
+        svm->setKernel(cv::ml::SVM::RBF);
+        svm->setGamma(param_gamma);
+        svm->setC(param_c);
+        svm->setDegree(1);
+        svm->setCoef0(0.1);
+        //svm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, 100, 1e-6));
+
         int train_label = prepareTrainingData(i+1, num_runs);
+        cv::Ptr<cv::ml::TrainData> td = cv::ml::TrainData::create(m_train_data_mat, cv::ml::ROW_SAMPLE, m_labels_mat);
 
         // set up search grid for parameter optimization
-        CvParamGrid c_grid = get_default_grid(CvSVM::C);
-        c_grid.min_val = 0.00001;
-        c_grid.max_val = 4096;
-        c_grid.step = 2;
+        cv::ml::ParamGrid c_grid = cv::ml::SVM::getDefaultGrid(cv::ml::SVM::C);
+        c_grid.minVal = 0.00001;
+        c_grid.maxVal = 4096;
+        c_grid.logStep = 2;
         // if using too many features increase step size
         if(m_num_features > 1000)
         {
-            c_grid.min_val = 0.001;
-            c_grid.max_val = 1000;
-            c_grid.step = 10;
+            c_grid.minVal = 0.001;
+            c_grid.maxVal = 1000;
+            c_grid.logStep = 10;
         }
 
-        CvParamGrid gamma_grid = get_default_grid(CvSVM::GAMMA);
-        gamma_grid.min_val = 0.000001;
-        gamma_grid.max_val = 8;
-        gamma_grid.step = sqrt(2);
+        cv::ml::ParamGrid gamma_grid = cv::ml::SVM::getDefaultGrid(cv::ml::SVM::GAMMA);
+        gamma_grid.minVal = 0.000001;
+        gamma_grid.maxVal = 8;
+        gamma_grid.logStep = sqrt(2);
         // if using too many features increase step size
         if(m_num_features > 1000)
         {
-            gamma_grid.min_val = 0.0001;
-            gamma_grid.max_val = 10;
-            gamma_grid.step = 10;
+            gamma_grid.minVal = 0.0001;
+            gamma_grid.maxVal = 10;
+            gamma_grid.logStep = 10;
         }
 
-        train_auto(m_train_data_mat, m_labels_mat, cv::Mat(), cv::Mat(), svm_params, k_fold, c_grid, gamma_grid);
+        svm->trainAuto(td, k_fold, c_grid, gamma_grid);
 
-        cv::SVMParams best_params = get_params();
-        LOG_INFO("    SVM best params are: C: " << best_params.C << ", gamma: " << best_params.gamma);
+        double best_c = svm->getC();
+        double best_gamma = svm->getGamma();
+        LOG_INFO("    SVM best params are: C: " << best_c << ", gamma: " << best_gamma);
 
         // ------------ use finer grid ------------
         LOG_INFO("auto-training SVM with finer grid");
 
-        c_grid.min_val = best_params.C / (c_grid.step * c_grid.step);
-        if(c_grid.min_val < 0.00001)
+        c_grid.minVal = best_c / (c_grid.logStep * c_grid.logStep);
+        if(c_grid.minVal < 0.00001)
         {
-            LOG_INFO("    c grid min too small: " << c_grid.min_val);
-            c_grid.min_val = 0.00001;
+            LOG_INFO("    c grid min too small: " << c_grid.minVal);
+            c_grid.minVal = 0.00001;
         }
-        c_grid.max_val = best_params.C * (c_grid.step * c_grid.step);
-        c_grid.step = sqrt(c_grid.step);
+        c_grid.maxVal = best_c * (c_grid.logStep * c_grid.logStep);
+        c_grid.logStep = sqrt(c_grid.logStep);
 
-        gamma_grid.min_val = best_params.gamma / (gamma_grid.step * gamma_grid.step);
-        if(gamma_grid.min_val < 0.0001)
+        gamma_grid.minVal = best_gamma / (gamma_grid.logStep * gamma_grid.logStep);
+        if(gamma_grid.minVal < 0.0001)
         {
-            LOG_INFO("    gamma grid min too small: " << gamma_grid.min_val);
-            gamma_grid.min_val = 0.0001;
+            LOG_INFO("    gamma grid min too small: " << gamma_grid.minVal);
+            gamma_grid.minVal = 0.0001;
         }
-        gamma_grid.max_val = best_params.gamma * (gamma_grid.step * gamma_grid.step);
-        gamma_grid.step = sqrt(gamma_grid.step);
+        gamma_grid.maxVal = best_gamma * (gamma_grid.logStep * gamma_grid.logStep);
+        gamma_grid.logStep = sqrt(gamma_grid.logStep);
 
-        LOG_INFO("    C grid (min/max/step): " << c_grid.min_val << " " << c_grid.max_val << " " << c_grid.step);
-        LOG_INFO("    Gamma grid (min/max/step): " << gamma_grid.min_val << " " << gamma_grid.max_val << " " << gamma_grid.step);
+        LOG_INFO("    C grid (min/max/step): " << c_grid.minVal << " " << c_grid.maxVal << " " << c_grid.logStep);
+        LOG_INFO("    Gamma grid (min/max/step): " << gamma_grid.minVal << " " << gamma_grid.maxVal << " " << gamma_grid.logStep);
 
         // only refine grid with valid parameters
-        if(c_grid.min_val < c_grid.max_val && gamma_grid.min_val < gamma_grid.max_val)
+        if(c_grid.minVal < c_grid.maxVal && gamma_grid.minVal < gamma_grid.maxVal)
         {
-            train_auto(m_train_data_mat, m_labels_mat, cv::Mat(), cv::Mat(), svm_params, k_fold, c_grid, gamma_grid);
+            svm->trainAuto(td, k_fold, c_grid, gamma_grid);
 
-            best_params = get_params();
-            LOG_INFO("    SVM best params after fine grid are: C: " << best_params.C << ", gamma: " << best_params.gamma);
+            best_c = svm->getC();
+            best_gamma = svm->getGamma();
+            LOG_INFO("    SVM best params after fine grid are: C: " << best_c << ", gamma: " << best_gamma);
         }
         else
         {
@@ -256,7 +278,7 @@ void CustomSVM::trainAutomatically(cv::SVMParams svm_params, int k_fold, bool on
         {
             saved_files.push_back(complete_name);
         }
-        save(complete_name.c_str());
+        svm->save(complete_name.c_str());
     }
 
     // if several files were generated ...
@@ -313,9 +335,8 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::vecto
     for(std::string svm_string : svm_files)
     {
         // predict result
-        clear();
-        load(svm_string.c_str());
-        float score = predict(test_data, true);
+        cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load(svm_string.c_str());
+        float score = svm->predict(test_data, cv::noArray(), cv::ml::StatModel::Flags::RAW_OUTPUT);
         // get label
         int start = svm_string.find_last_of('_');
         int end = svm_string.find_last_of('.');
@@ -341,15 +362,29 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::vecto
 // NOTE: see https://github.com/opencv/opencv/blob/master/modules/ml/src/svm.cpp
 CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::string &svm_file)
 {
+    // TODO VS: refactor: SVM is loaded again and again for each object - load only once!
     // load svm
-    clear();
-    load(svm_file.c_str());
+    cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::load(svm_file.c_str());
 
     // get important parameters
     int feature_dim = test_data.cols; // size of descriptor
-    m_num_classes = class_labels->cols;
-    int num_sv = get_support_vector_count();
-    float gamma = -params.gamma;
+    // manually read number of classes because OpenCV does not provide a function for this
+    std::ifstream svm_input_file(svm_file);
+    std::string line;
+    while(std::getline(svm_input_file, line))
+    {
+        int pos = line.find_first_of(':');
+        if(line.substr(0, pos+1) == "   class_count:")
+        {
+            m_num_classes = std::atoi(line.substr(pos+1).c_str());
+            break;
+        }
+    }
+    svm_input_file.close();
+
+    cv::Mat support_vectors = svm->getSupportVectors();
+    int num_sv = support_vectors.rows;
+    float gamma = -1 * svm->getGamma();
 
     // calc RBF-kernel result vector
     std::vector<float> kernel_vector(num_sv, 0); // holds weights for each support vector
@@ -357,11 +392,11 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
     for(int i = 0; i < num_sv; i++)
     {
         float s = 0;
-        const float *supportVector = get_support_vector(i);
+        cv::Mat sv = support_vectors.row(i);
 
         for(int j = 0; j < feature_dim; j++)
         {
-            float t = supportVector[j] - test_data.at<float>(0,j);
+            float t = sv.at<float>(j) - test_data.at<float>(0,j);
             s += t*t;
         }
         kernel_vector.at(i) = std::exp(s * gamma);
@@ -376,16 +411,14 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
     {
         for(int j = i+1; j < m_num_classes; j++, dfi++)
         {
-            const CvSVMDecisionFunc df = decision_func[dfi];
-            double sum = -df.rho;
+            std::vector<double> alpha_vec;
+            std::vector<int> sv_index_vec;
+            double rho = svm->getDecisionFunction(dfi, alpha_vec, sv_index_vec);
+            double sum = -rho;
 
-            int sv_count = df.sv_count;
-            double *alpha = df.alpha;
-            int* sv_index = df.sv_index;
-
-            for(int k = 0; k < sv_count; k++)
+            for(int k = 0; k < sv_index_vec.size(); k++)
             {
-                sum += alpha[k] * kernel_vector.at(sv_index[k]);
+                sum += alpha_vec[k] * kernel_vector.at(sv_index_vec[k]);
             }
 
             // vote for class
@@ -411,8 +444,7 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
     }
 
     // finally the result (this is the result of the standard OpenCV SVM)
-    cv::Mat labels(class_labels);
-    int result_label_std_svm = labels.at<int>(k);
+    int result_label_std_svm = k;
 
     // create result object
     CustomSVM::SVMResponse svm_response;

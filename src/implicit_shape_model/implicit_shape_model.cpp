@@ -1152,14 +1152,6 @@ pcl::PointCloud<ISMFeature>::Ptr ImplicitShapeModel::removeNaNFeatures(pcl::Poin
 
 void ImplicitShapeModel::trainSVM(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures)
 {
-    cv::SVMParams svm_params;
-    svm_params.svm_type = CvSVM::C_SVC;
-    svm_params.kernel_type = CvSVM::RBF;
-    svm_params.gamma = m_svm_param_gamma;
-    svm_params.C = m_svm_param_c;
-    svm_params.degree = 1;
-    svm_params.coef0 = 0.1;
-
     // insert training data and labels
     std::vector< std::vector<float> > training_data;
     std::vector<int> labels;
@@ -1186,22 +1178,22 @@ void ImplicitShapeModel::trainSVM(std::map<unsigned, std::vector<pcl::PointCloud
     {
         if(m_svm_1_vs_all_train) // manual 1 vs all training
         {
-            svm.trainAutomatically(svm_params, m_svm_param_k_fold, true);
+            svm.trainAutomatically(m_svm_param_gamma, m_svm_param_c, m_svm_param_k_fold, true);
         }
         else // standard OpenCV pairwise 1 vs 1
         {
-            svm.trainAutomatically(svm_params, m_svm_param_k_fold, false);
+            svm.trainAutomatically(m_svm_param_gamma, m_svm_param_c, m_svm_param_k_fold, false);
         }
     }
     else
     {
         if(m_svm_1_vs_all_train) // manual 1 vs all training
         {
-            svm.trainSimple(svm_params, true);
+            svm.trainSimple(m_svm_param_gamma, m_svm_param_c, true);
         }
         else // standard OpenCV pairwise 1 vs 1
         {
-            svm.trainSimple(svm_params, false);
+            svm.trainSimple(m_svm_param_gamma, m_svm_param_c, false);
         }
     }
 }

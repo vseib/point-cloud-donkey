@@ -102,6 +102,7 @@ add_library(implicit_shape_model
     features/features_ourcvfh.cpp
     features/features_dummy.cpp
     features/features_cgf.cpp
+    features/features_gasd.cpp
     feature_ranking/feature_ranking.cpp
     feature_ranking/ranking_uniform.cpp
     feature_ranking/ranking_naive_bayes.cpp
@@ -152,4 +153,4 @@ add_library(implicit_shape_model
 
 # link library with dependencies
 target_link_libraries(implicit_shape_model ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${OpenCV_LIBS} ${VTK_LIBRARIES} ${ZLIB_LIBRARIES}
-    gomp blitz jsoncpp log4cxx)
+    gomp jsoncpp log4cxx)

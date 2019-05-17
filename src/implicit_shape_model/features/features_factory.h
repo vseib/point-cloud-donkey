@@ -38,6 +38,7 @@
 #include "features_usc_global.h"
 #include "features_esf_local.h"
 #include "features_cgf.h"
+#include "features_gasd.h"
 #include "features_dummy.h"
 
 namespace ism3d
@@ -97,6 +98,8 @@ namespace ism3d
             return new FeaturesSHORTSHOTGlobal(); // global feature!
         else if (type == FeaturesUSCGlobal::getTypeStatic())
             return new FeaturesUSCGlobal(); // global feature!
+        else if (type == FeaturesGASD::getTypeStatic())
+            return new FeaturesGASD(); // global feature, min. PCL 1.9!
         else if (type == FeaturesDummy::getTypeStatic())
             return new FeaturesDummy(); // global feature dummy to be able to use old config files without global features
         else

@@ -34,26 +34,26 @@ namespace ism3d
     {
 
         // Object for storing the ESF descriptor.
-        pcl::PointCloud<pcl::ESFSignature640>::Ptr descriptor(new pcl::PointCloud<pcl::ESFSignature640>);
+        pcl::PointCloud<pcl::ESFSignature640>::Ptr descriptor_cloud(new pcl::PointCloud<pcl::ESFSignature640>);
 
         // ESF estimation object.
         pcl::ESFEstimation<PointT, pcl::ESFSignature640> esf;
         esf.setInputCloud(pointCloudWithoutNaNNormals);
 
-        esf.compute(*descriptor);
+        esf.compute(*descriptor_cloud);
 
         // create descriptor point cloud
         pcl::PointCloud<ISMFeature>::Ptr features(new pcl::PointCloud<ISMFeature>());
-        features->resize(descriptor->size());
+        features->resize(descriptor_cloud->size());
 
         // compute cloud radius
         float cloud_radius = getCloudRadius(pointCloudWithoutNaNNormals);
 
-        for (int i = 0; i < (int)descriptor->size(); i++)
+        for (int i = 0; i < (int)descriptor_cloud->size(); i++)
         {
             ISMFeature& feature = features->at(i);
             feature.globalDescriptorRadius = cloud_radius;
-            const pcl::ESFSignature640& esf = descriptor->at(i);
+            const pcl::ESFSignature640& esf = descriptor_cloud->at(i);
 
             // store the descriptor
             feature.descriptor.resize(640);

@@ -325,9 +325,12 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             // type 6: apply intermediate T-conorm: S(a,b) = a+b-ab
             for(VotingMaximum &max : maxima)
             {
-                float w1 = max.weight;
-                float w2 = max.globalHypothesis.second;
-                max.weight = w1+w2 - w1*w2;
+                if(max.classId == max.globalHypothesis.first)
+                {
+                    float w1 = max.weight;
+                    float w2 = max.globalHypothesis.second;
+                    max.weight = w1+w2 - w1*w2;
+                }
             }
         }
 
@@ -757,6 +760,7 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
 
     if(m_global_feature_method == "KNN")
     {
+        LOG_INFO("starting global classification with knn");
         std::map<unsigned, GlobalResultAccu> max_global_voting; // maps class id to struct with number of occurences and score
         int num_all_entries = 0;
 
@@ -801,7 +805,7 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
                 ISMFeature temp = m_all_global_features_cloud->at(indices[0].at(i));
                 float dist_squared = distances[0].at(i);
                 const float sigma = 0.1;
-                constexpr float denom = 2 * sigma * sigma;
+                const float denom = 2 * sigma * sigma;
                 float score = std::exp(-dist_squared/denom);
                 insertGlobalResult(max_global_voting, temp.classId, score);
             }
@@ -840,6 +844,7 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
     }
     else if(m_global_feature_method == "SVM")
     {
+        LOG_INFO("starting global classification with svm");
         CustomSVM::SVMResponse svm_response;
         std::vector<CustomSVM::SVMResponse> all_responses; // in case one object has multiple global features
         // NOTE: some global features produce more than 1 descriptor per object, hence the loop

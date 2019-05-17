@@ -11,9 +11,9 @@
 #ifndef CUSTOM_SVM_H
 #define CUSTOM_SVM_H
 
-#include <opencv2/ml/ml.hpp>
+#include <opencv2/ml.hpp>
 
-class CustomSVM : public cv::SVM
+class CustomSVM
 {
 
 public:
@@ -30,8 +30,8 @@ public:
 
     void setData(std::vector< std::vector<float> > &training_data, std::vector<int> &labels);
 
-    void trainSimple(cv::SVMParams svm_params, bool one_vs_all);
-    void trainAutomatically(cv::SVMParams svm_params, int k_fold, bool one_vs_all);
+    void trainSimple(double param_gamma, double param_c, bool one_vs_all);
+    void trainAutomatically(double param_gamma, double param_c, int k_fold, bool one_vs_all);
 
     SVMResponse predictUnifyScore(cv::Mat test_data, std::vector<std::string> &svm_files);
     SVMResponse predictWithScore(cv::Mat test_data, std::vector<std::string> &svm_files); // 1 vs all SVM (simulated by multiple 2 class SVMs)
