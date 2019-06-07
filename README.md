@@ -58,6 +58,7 @@ Further, I would like to thank the developers of third party libraries used in t
 
 | Date | Update |
 | ---  | ---    |
+| 2019-06-07 | Added instructions for Ubuntu 18 |
 | 2019-04-26 | Cleaned up and updated the citing section |
 | 2019-02-24 | Added instructions for Ubuntu 16, moved information to the Wiki |
 | 2019-02-08 | Added benchmark results and citing section |
@@ -66,12 +67,14 @@ Further, I would like to thank the developers of third party libraries used in t
 
 ## Installation
 
-This framework was tested with Ubuntu 14.04 LTS and Ubuntu 16.04 LTS.
+This framework was tested with Ubuntu 14.04 LTS, Ubuntu 16.04 LTS and Ubuntu 18.04 LTS.
 The installation instructions can be found on the Wiki pages.
 
 [Ubuntu 14.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_14.04_LTS)
 
 [Ubuntu 16.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_16.04_LTS)
+
+[Ubuntu 18.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_18.04_LTS)
 
 
 ## Quick Start
