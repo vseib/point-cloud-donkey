@@ -88,9 +88,20 @@ TODO: [Quick Start Using the GUI]
 ## Documentation
 
 ### Preparing Point Clouds
+
+TODO
+
 ### Preparing a File List
+
+TODO
+
 ### Preparing a Config File
+
+TODO
+
 ### Detailed Config File Documentation
+
+TODO
 
 ## Citing
 
