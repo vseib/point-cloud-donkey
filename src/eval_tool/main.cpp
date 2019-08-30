@@ -39,7 +39,7 @@
 #include "../implicit_shape_model/implicit_shape_model.h"
 
 
-bool write_log_to_files = true;
+bool write_log_to_files = false;
 bool log_info = true;
 
 
