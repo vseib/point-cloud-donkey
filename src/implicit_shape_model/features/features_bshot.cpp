@@ -100,8 +100,7 @@ namespace ism3d
             }
 
             // store distance to centroid
-            PointT keyp = keypoints->at(i);
-            feature.centerDist = (Eigen::Vector3d(keyp.x, keyp.y, keyp.z)-Eigen::Vector3d(centroid.x(), centroid.y(), centroid.z())).norm();
+            feature.centerDist = (keypoints->at(i).getVector3fMap() - Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z())).norm();
         }
 
         return features;
