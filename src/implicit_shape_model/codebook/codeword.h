@@ -70,11 +70,10 @@ namespace ism3d
 
         /**
          * @brief add a feature position to this codeword when it has been activated
-         * @param featurePos the feature position that activated this codeword
          * @param classId the class id of the feature
          * @param weight weight of the descriptor that this featurePos belongs to
          */
-        void addFeature(const Eigen::Vector3f& featurePos, unsigned classId);
+        void addFeature(unsigned classId);
 
         const std::vector<Eigen::Vector3f>& getFeaturePositions() const;
         const std::vector<unsigned>& getFeatureClasses() const;
@@ -94,9 +93,6 @@ namespace ism3d
         std::vector<float> m_data; // this is the descriptor
         int m_numFeatures;
         std::vector<unsigned> m_featureClasses;
-
-        // TEMP
-        std::vector<Eigen::Vector3f> m_featurePositions;
     };
 }
 

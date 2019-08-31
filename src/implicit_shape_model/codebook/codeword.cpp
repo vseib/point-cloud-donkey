@@ -64,15 +64,9 @@ namespace ism3d
         return m_weight;
     }
 
-    void Codeword::addFeature(const Eigen::Vector3f& featurePos, unsigned classId)
+    void Codeword::addFeature(unsigned classId)
     {
-        m_featurePositions.push_back(featurePos);
         m_featureClasses.push_back(classId);
-    }
-
-    const std::vector<Eigen::Vector3f>& Codeword::getFeaturePositions() const
-    {
-        return m_featurePositions;
     }
 
     const std::vector<unsigned>& Codeword::getFeatureClasses() const

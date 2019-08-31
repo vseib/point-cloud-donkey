@@ -200,7 +200,7 @@ namespace ism3d
 
         std::vector<bool> getSignatureMask() const;
 
-        typedef std::map<int, std::shared_ptr<CodewordDistribution> > distribution_t; // maps codeword id to corresponding distribution
+        typedef std::map<int, std::shared_ptr<CodewordDistribution>> distribution_t; // maps codeword id to corresponding distribution
         distribution_t m_distribution;
 
         std::map<unsigned, float> m_term1;
@@ -216,8 +216,6 @@ namespace ism3d
 
         bool m_use_random_codebook;
         float m_random_codebook_factor;
-
-        bool m_directly_assign_codewords; // with knn=1 activation, directly assign features to codewords instead of flann matching
 
         int m_codeword_dim; // feature dimensions (i.e. length of descriptor)
 

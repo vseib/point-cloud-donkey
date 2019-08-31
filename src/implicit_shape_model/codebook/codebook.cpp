@@ -38,7 +38,6 @@ Codebook::Codebook()
 
     addParameter(m_use_random_codebook, "UseRandomCodebook", false);
     addParameter(m_random_codebook_factor, "RandomCodebookFactor", 1.0f);
-    addParameter(m_directly_assign_codewords, "DirectlyAssignCodewords", false);
 }
 
 Codebook::~Codebook()
@@ -86,14 +85,12 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword> >& codewords
 
     // for every class
     LOG_INFO("Starting step 1");
-    int tmp_cnt = 0;
-    int global_feature_counter = 0;
     for (std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >::const_iterator it = features.begin();
          it != features.end(); it++)
     {
-        LOG_INFO("Processing class " << (tmp_cnt+1) << " of " << features.size());
-        tmp_cnt++;
         unsigned classId = it->first;
+        LOG_INFO("Processing class " << (classId+1) << " of " << features.size());
+
         const std::vector<pcl::PointCloud<ISMFeature>::Ptr>& classModelFeatures = it->second;
 
         std::map<unsigned, std::vector<Utils::BoundingBox> >::const_iterator bbIt = boundingBoxes.find(classId);
@@ -108,42 +105,26 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword> >& codewords
             continue;
         }
 
-        pcl::PointCloud<ISMFeature> accumulatedFeatures;
-        std::map<int, int> allActivatedCodewords; // TODO VS: refactor to std::vector<int> (second argument of map is never read)
+        std::vector<ISMFeature> allModelFeatures;
+        std::vector<std::shared_ptr<Codeword>> allActivatedCodewords;
 
         // for every model in the class
-//#pragma omp parallel for
         for (int i = 0; i < (int)classModelFeatures.size(); i++)
         {
             const Utils::BoundingBox& boundingBox = boundingBoxesClass[i];
-            pcl::PointCloud<ISMFeature>::Ptr modelFeatures = classModelFeatures[i];
+            const pcl::PointCloud<ISMFeature>::Ptr modelFeatures = classModelFeatures[i];
 
             // for every feature in the model
-            //#pragma omp parallel for shared(keypoints, descriptors, codebook, modelCenter, boundingBox)
             for (int j = 0; j < (int)modelFeatures->size(); j++)
             {
                 const ISMFeature& feature = modelFeatures->at(j);
-
-//#pragma omp critical
-                {
-                    accumulatedFeatures.push_back(feature);
-                }
+                std::vector<std::shared_ptr<Codeword>> activatedCodewords;
 
                 // activate codeword with the current feature
-                std::vector<std::shared_ptr<Codeword> > activatedCodewords;
                 if(m_activationStrategy->getType() == "KNN")
                 {
-                    // features and codewords have same order in their lists
-                    // if k == 1 and no clustering is used, every feature activates its own codeword
-                    if(m_directly_assign_codewords)
-                    {
-                        activatedCodewords.push_back(codewords[global_feature_counter]);
-                    }
-                    else
-                    {
-                        ActivationStrategyKNN* asknn = dynamic_cast<ActivationStrategyKNN*>(m_activationStrategy);
-                        activatedCodewords = asknn->activateKNN(feature, codewords, index, flann_exact_match);
-                    }
+                    ActivationStrategyKNN* asknn = dynamic_cast<ActivationStrategyKNN*>(m_activationStrategy);
+                    activatedCodewords = asknn->activateKNN(feature, codewords, index, flann_exact_match);
                 }
                 else if(m_activationStrategy->getType() == "INN")
                 {
@@ -160,71 +141,53 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword> >& codewords
                 {
                     const std::shared_ptr<Codeword>& codeword = activatedCodewords[k];
 
-//#pragma omp critical
+                    // if the codeword has not yet been activated, create a new distribution entry
+                    if (m_distribution.find(codeword->getId()) == m_distribution.end())
                     {
-                        allActivatedCodewords[codeword->getId()] = 1;
-
-                        // if the codeword has not yet been activated, create a new distribution entry
-                        if (m_distribution.find(codeword->getId()) == m_distribution.end())
-                        {
-                            m_distribution[codeword->getId()] =
-                                    std::shared_ptr<CodewordDistribution>(new CodewordDistribution);
-                        }
-
-                        // add the codeword to the distribution
-                        m_distribution[codeword->getId()]->addCodeword(codeword, feature, classId, boundingBox);
+                        m_distribution[codeword->getId()] =
+                                std::shared_ptr<CodewordDistribution>(new CodewordDistribution);
                     }
+
+                    // add the codeword to the distribution
+                    m_distribution[codeword->getId()]->addCodeword(codeword, feature, classId, boundingBox);
                 }
-
-                global_feature_counter++; // count how many features have been processed
+                allActivatedCodewords.insert(allActivatedCodewords.end(), activatedCodewords.begin(), activatedCodewords.end());
             }
+            allModelFeatures.insert(allModelFeatures.end(), modelFeatures->begin(), modelFeatures->end());
         }
-
-        // distribution was changed, fill list with codewords
-        m_codewords.clear();
-        for (distribution_t::const_iterator it = m_distribution.begin(); it != m_distribution.end(); it++)
-            m_codewords.push_back(it->second->getCodeword());
 
         // compute the mean distance between all class-specific features and their activated codewords
-        float mean = 0;     // mean of distances between all features and all activated codewords inside the class
-        int meanCount = 0;
-        for (int i = 0; i < accumulatedFeatures.size(); i++)
+        double sum = 0;
+        std::vector<double> distances;
+        for (const ISMFeature& feature : allModelFeatures)
         {
-            const ISMFeature& feature = accumulatedFeatures.at(i);
-
-            for (std::map<int, int>::const_iterator it = allActivatedCodewords.begin(); it != allActivatedCodewords.end(); it++)
+            for(const std::shared_ptr<Codeword>& codeword : allActivatedCodewords)
             {
-                int id = it->first;
-                const std::shared_ptr<Codeword>& codeword = getCodewordById(id);
-
-                mean += (*distance)(feature.descriptor, codeword->getData());
-                meanCount++;
+                double d = (*distance)(feature.descriptor, codeword->getData());
+                sum += d;
+                distances.push_back(d);
             }
         }
-
-        mean /= meanCount;
+        int num = allModelFeatures.size()*allActivatedCodewords.size();
+        double mean = sum / num; // mean of distances between all features and all activated codewords inside the class
 
         // compute the corresponding class-specific variance
-        float variance = 0;
-        for (int i = 0; i < accumulatedFeatures.size(); i++)
+        double variance = 0;
+        for (const double &dist : distances)
         {
-            const ISMFeature& feature = accumulatedFeatures.at(i);
-
-            for (std::map<int, int>::const_iterator it = allActivatedCodewords.begin(); it != allActivatedCodewords.end(); it++) {
-                int id = it->first;
-                const std::shared_ptr<Codeword>& codeword = getCodewordById(id);
-
-                float dist = (*distance)(feature.descriptor, codeword->getData());  // current distance between feature and one of the codewords
-                float diff = dist - mean;  // distance of distance
-
-                variance += diff * diff;
-            }
+            double diff = dist - mean;
+            variance += diff * diff;
         }
-        variance /= meanCount - 1;
+        variance /= num - 1;
 
         // store class-specific variance
         m_classSigmas[classId] = variance;
     }
+
+    // distribution was changed, fill list with codewords
+    m_codewords.clear();
+    for (distribution_t::const_iterator it = m_distribution.begin(); it != m_distribution.end(); it++)
+        m_codewords.push_back(it->second->getCodeword());
 
     // remove all codewords that have more than 1 vote in KNN activation with k = 1 or in INN
     bool clean_up = false;
