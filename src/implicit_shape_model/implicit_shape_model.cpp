@@ -356,8 +356,7 @@ void ImplicitShapeModel::train()
 
         for (int j = 0; j < (int)clusters[i].size(); j++)
         {
-            codeword->addFeature(allFeatures_ranked->at(clusters[i][j]).getVector3fMap(),
-                                 allFeatureClasses_ranked[clusters[i][j]]);
+            codeword->addFeature(allFeatureClasses_ranked[clusters[i][j]]);
         }
         codewords.push_back(codeword);
     }
