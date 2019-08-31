@@ -39,12 +39,12 @@ public:
     }
 
     template<typename T>
-    std::vector<std::shared_ptr<Codeword> > activateKNN(const ISMFeature& feature,
+    std::vector<std::shared_ptr<Codeword>> activateKNN(const ISMFeature& feature,
                                                         const std::vector<std::shared_ptr<Codeword> >& codewords,
-                                                        const flann::Index<T> index,
+                                                        const flann::Index<T> &index,
                                                         const bool flann_exact_match) const
     {
-        std::vector<std::shared_ptr<Codeword> > activatedCodewords;
+        std::vector<std::shared_ptr<Codeword>> activatedCodewords;
 
         // no need to do anything
         if ((int)codewords.size() <= m_k) {
