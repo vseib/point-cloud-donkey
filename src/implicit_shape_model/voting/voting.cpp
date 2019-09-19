@@ -229,7 +229,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         // in single object mode global results are the same for all maxima
         if(maxima.size() > 0)
         {
-            for(VotingMaximum m : filtered_maxima)
+            for(VotingMaximum &m : filtered_maxima)
             {
                 m.globalHypothesis.first = maxima[0].globalHypothesis.first;
                 m.globalHypothesis.second = maxima[0].globalHypothesis.second;
