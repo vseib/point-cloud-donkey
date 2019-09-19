@@ -205,7 +205,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     // filter maxima
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
 
-    // TODO VS: global features do not work with the single object max types: seems like global results are not merged in maxima
     if(m_single_object_mode)
     {
         pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
@@ -226,7 +225,18 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::BANDWIDTH);
         if(m_single_object_max_type == "ModelRadiusMaxima")
             filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
+
+        // in single object mode global results are the same for all maxima
+        if(maxima.size() > 0)
+        {
+            for(VotingMaximum m : filtered_maxima)
+            {
+                m.globalHypothesis.first = maxima[0].globalHypothesis.first;
+                m.globalHypothesis.second = maxima[0].globalHypothesis.second;
+            }
+        }
     }
+    // TODO VS: fix global features if not in single object mode - add global result merging
     else
     {
         if(m_max_filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight
@@ -239,13 +249,13 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
 
-    // apply normlization: turn weights to probabilities
+    // apply normalization: turn weights to probabilities
     normalizeWeights(maxima);
 
     // add global features to result classification
     if(m_use_global_features) // here we have a sorted list of local maxima, all maxima have a global feature result
     {
-        // NOTE: types 1, 2 and 3 are for single object mode only
+        // NOTE: types 1, 2 and 3 are for single object mode only // TODO VS add warning
         if(m_global_feature_influence_type == 1 || m_global_feature_influence_type == 2)
         {
             // type 1: blind belief in good scores
@@ -463,6 +473,7 @@ std::vector<VotingMaximum> Voting::computeSingleMaxPerClass(const pcl::PointClou
         new_max.weight = density;
         new_max.voteIndices = indices;
         new_max.boundingBox = Utils::computeMVBB<PointNormalT>(points);
+
         #pragma omp critical
         {
             maxima.push_back(new_max);
