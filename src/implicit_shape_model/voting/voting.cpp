@@ -218,6 +218,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         if(m_single_object_max_type == "ModelRadiusVotes")
             filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
 
+        // TODO VS: maybe remove all of these
         // maxima based single maxima computation
         if(m_single_object_max_type == "VotingSpaceMaxima")
             filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::COMPLETE_VOTING_SPACE);
