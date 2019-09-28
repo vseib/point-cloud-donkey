@@ -1,7 +1,5 @@
 
 
-
-
 # PointCloudDonkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
@@ -10,18 +8,6 @@ A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Cloud
 The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (taken from [thingiverse](https://www.thingiverse.com/thing:923097") and converted to a point cloud).
 
 ---
-## Content
-
-[Description](#Description) <br>
-[Acknowledgments](#Acknowledgments) <br>
-[News](#News) <br>
-[Installation](#Installation) <br>
-[Quick Start](#Quick-Start) <br>
-[Documentation](#Documentation) <br>
-[Citing](#Citing) <br>
-[License](#License) <br>
-[References](#References) <br>
-
 
 ## Description
 
@@ -53,17 +39,6 @@ Further, I would like to thank the developers of third party libraries used in t
 * [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
 * [lzf Library](http://oldhome.schmorp.de/marc/liblzf.html)
 * [B-SHOT Descriptor](https://github.com/saimanoj18/iros_bshot)
-
-## News
-
-| Date | Update |
-| ---  | ---    |
-| 2019-06-07 | Added instructions for Ubuntu 18 |
-| 2019-04-26 | Cleaned up and updated the citing section |
-| 2019-02-24 | Added instructions for Ubuntu 16, moved information to the Wiki |
-| 2019-02-08 | Added benchmark results and citing section |
-| 2019-01-25 | Initial code commit, ReadMe with quick start examples added |
-
 
 ## Installation
 
