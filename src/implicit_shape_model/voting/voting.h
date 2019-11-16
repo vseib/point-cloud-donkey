@@ -260,11 +260,7 @@ namespace ism3d
         std::vector<VotingMaximum> filterMaxima(const std::vector<VotingMaximum> &maxima, bool merge = false) const;
         std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima) const;
 
-        std::vector<VotingMaximum> mergeMaximaForEachClass(const std::vector<VotingMaximum> &max_list,
-                                                           const pcl::PointCloud<PointNormalT>::ConstPtr &points,
-                                                           const SingleObjectMaxType max_type) const;
         VotingMaximum mergeMaxima(const std::vector<VotingMaximum> &max_list) const;
-        float reweightMaximum(const VotingMaximum &max, const Eigen::Vector3f &query, const float search_dist) const;
         float getSearchDistForClass(const unsigned class_id) const;
 
         void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting, unsigned found_class, float score);

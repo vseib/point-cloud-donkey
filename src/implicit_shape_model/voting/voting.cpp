@@ -218,15 +218,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         if(m_single_object_max_type == "ModelRadiusVotes")
             filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
 
-        // TODO VS: maybe remove all of these
-        // maxima based single maxima computation
-        if(m_single_object_max_type == "VotingSpaceMaxima")
-            filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::COMPLETE_VOTING_SPACE);
-        if(m_single_object_max_type == "BandwidthMaxima")
-            filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::BANDWIDTH);
-        if(m_single_object_max_type == "ModelRadiusMaxima")
-            filtered_maxima = mergeMaximaForEachClass(maxima, pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
-
         // in single object mode global results are the same for all maxima
         if(maxima.size() > 0)
         {
@@ -575,95 +566,6 @@ std::vector<VotingMaximum> Voting::filterMaxima(const std::vector<VotingMaximum>
     return filtered_maxima;
 }
 
-std::vector<VotingMaximum> Voting::mergeMaximaForEachClass(const std::vector<VotingMaximum> &max_list,
-                                                           const pcl::PointCloud<PointNormalT>::ConstPtr &points,
-                                                           const SingleObjectMaxType max_type) const
-{
-    // use object's centroid as query point for search
-    Eigen::Vector4f centr;
-    pcl::compute3DCentroid(*points, centr);
-    PointT query;
-    query.x = centr[0];
-    query.y = centr[1];
-    query.z = centr[2];
-    Eigen::Vector3f query_vec = query.getArray3fMap();
-
-    // find distance of farthest point from centroid
-    float model_radius = 0;
-    for(int i = 0; i < points->size(); i++)
-    {
-        float dist = (points->at(i).getVector3fMap() - query.getVector3fMap()).norm();
-        if(dist > model_radius) model_radius = dist;
-    }
-
-    std::vector<bool> used(max_list.size(), false);
-    std::vector<VotingMaximum> class_maxima;
-    std::vector<VotingMaximum> result_maxima;
-
-    for(int i = 0; i < max_list.size(); i++)
-    {
-        if(used.at(i)) continue;
-
-        class_maxima.clear();
-
-        VotingMaximum max_i = max_list.at(i);
-        unsigned current_class_id = max_i.classId;
-
-        float search_dist = 0;
-        if(max_type == SingleObjectMaxType::BANDWIDTH)
-            search_dist = getSearchDistForClass(current_class_id);
-        if(max_type == SingleObjectMaxType::MODEL_RADIUS)
-            search_dist = model_radius;
-
-        if(max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
-        {
-            class_maxima.push_back(max_i);
-            used.at(i) = true;
-        }
-        else
-        {
-            if((max_i.position - query_vec).norm() < search_dist)
-            {
-                max_i.weight = reweightMaximum(max_i, query_vec, search_dist);
-                class_maxima.push_back(max_i);
-                used.at(i) = true;
-            }
-        }
-
-        // search for maxima with same classID
-        for(int j = i+1; j < max_list.size(); j++)
-        {
-            if(used.at(j)) continue;
-
-            VotingMaximum max_j = max_list.at(j);
-            if(max_j.classId == current_class_id)
-            {
-                if(max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
-                {
-                    class_maxima.push_back(max_j);
-                    used.at(j) = true;
-                }
-                else
-                {
-                    if((max_j.position - query_vec).norm() < search_dist)
-                    {
-                        max_j.weight = reweightMaximum(max_j, query_vec, search_dist);
-                        class_maxima.push_back(max_j);
-                        used.at(j) = true;
-                    }
-                }
-            }
-        }
-
-        if(class_maxima.size() > 0)
-        {
-            VotingMaximum m = mergeMaxima(class_maxima);
-            result_maxima.push_back(m);
-        }
-    }
-
-    return result_maxima;
-}
 
 VotingMaximum Voting::mergeMaxima(const std::vector<VotingMaximum> &max_list) const
 {
@@ -691,16 +593,6 @@ VotingMaximum Voting::mergeMaxima(const std::vector<VotingMaximum> &max_list) co
     return result;
 }
 
-float Voting::reweightMaximum(const VotingMaximum &max, const Eigen::Vector3f &query, const float search_dist) const
-{
-    float dist = (max.position - query).squaredNorm();
-
-    // compute a normalized distance in {0, 1}
-    float u = dist / (search_dist * search_dist);
-
-    // compute new weight wigh Gaussian kernel
-    return std::exp(-0.5 * u) * max.weight;
-}
 
 float Voting::getSearchDistForClass(const unsigned class_id) const
 {
