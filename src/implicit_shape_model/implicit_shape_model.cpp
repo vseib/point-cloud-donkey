@@ -531,13 +531,12 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     pcl::PointCloud<ISMFeature>::ConstPtr globalFeatures;
     pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaN;
     pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN;
-    bool compute_global = m_single_object_mode;
     boost::timer::cpu_timer timer_normals;
     timer_normals.stop();
     boost::timer::cpu_timer timer_keypoints;
     timer_keypoints.stop();
     std::tie(features, globalFeatures, pointsWithoutNaN, normalsWithoutNaN) = computeFeatures(points, hasNormals, timer_normals, timer_keypoints,
-                                                                                              compute_global);
+                                                                                              m_single_object_mode);
     m_processing_times["normals"] += getElapsedTime(timer_normals, "milliseconds");
     m_processing_times["keypoints"] += getElapsedTime(timer_keypoints, "milliseconds");
     m_processing_times["features"] -= getElapsedTime(timer_normals, "milliseconds");
