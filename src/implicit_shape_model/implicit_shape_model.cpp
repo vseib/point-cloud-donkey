@@ -743,7 +743,8 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     // reference frames can be invalid, in which case associated keypoints are discarded
     LOG_ASSERT(features->size() <= keypoints->size());
 
-    // in training compute global features
+    // in training: always compute global features
+    // in testing: only in single object mode
     if(compute_global)
     {
         // compute global descriptors for objects
