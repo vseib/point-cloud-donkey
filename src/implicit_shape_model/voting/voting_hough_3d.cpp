@@ -29,7 +29,8 @@ namespace ism3d
         delete m_houghSpace;
     }
 
-    void VotingHough3D::iFindMaxima(const std::vector<Voting::Vote>& votes,
+    void VotingHough3D::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
+                                    const std::vector<Voting::Vote>& votes,
                                     std::vector<Eigen::Vector3f>& clusters,
                                     std::vector<double>& maxima,
                                     std::vector<std::vector<int> >& voteIndices,

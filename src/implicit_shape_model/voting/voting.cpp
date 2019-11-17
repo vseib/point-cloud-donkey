@@ -29,7 +29,6 @@ Voting::Voting()
     addParameter(m_radiusType, "BinOrBandwidthType", std::string("Config"));
     addParameter(m_radiusFactor, "BinOrBandwidthFactor", 1.0f);
     addParameter(m_max_filter_type, "MaxFilterType", std::string("None"));
-    addParameter(m_single_object_max_type, "SingleObjectMaxType", std::string("None"));
 
     addParameter(m_use_global_features, "UseGlobalFeatures", false);
     addParameter(m_global_feature_method, "GlobalFeaturesStrategy", std::string("KNN"));
@@ -38,6 +37,16 @@ Voting::Voting()
     addParameter(m_global_param_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
     addParameter(m_global_param_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_global_param_weight_factor, "GlobalParamWeightFactor", 1.5f);
+
+    addParameter(m_max_type_param, "SingleObjectMaxType", std::string("Default"));
+    if(m_max_type_param == "VotingSpaceVotes")
+        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
+    else if(m_max_type_param == "BandwidthVotes")
+        m_max_type = SingleObjectMaxType::BANDWIDTH;
+    else if(m_max_type_param == "ModelRadiusVotes")
+        m_max_type = SingleObjectMaxType::MODEL_RADIUS;
+    else if(m_max_type_param == "None" || m_max_type_param == "Default")
+        m_max_type = SingleObjectMaxType::DEFAULT;
 
     m_index_created = false;
     m_svm_error = false;
@@ -98,7 +107,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         std::vector<std::vector<float> > reweightedVotes; // reweighted votes, a list for each maximum
 
         // process the algorithm to find maxima on the votes of the current class
-        iFindMaxima(votes, clusters, maximaValues, voteIndices, reweightedVotes, classId, m_radius);
+        iFindMaxima(points, votes, clusters, maximaValues, voteIndices, reweightedVotes, classId, m_radius);
 
         LOG_ASSERT(clusters.size() == maximaValues.size());
         LOG_ASSERT(clusters.size() == voteIndices.size());
@@ -207,16 +216,17 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     if(m_single_object_mode)
     {
-        pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
-        pcl::concatenateFields(*points, *normals, *pointsWithNormals);
+        // TODO VS refactoring - moved this to voting_mean_shift.cpp
+//        pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
+//        pcl::concatenateFields(*points, *normals, *pointsWithNormals);
 
-        // vote based single maxima computation
-        if(m_single_object_max_type == "VotingSpaceVotes")
-            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::COMPLETE_VOTING_SPACE);
-        if(m_single_object_max_type == "BandwidthVotes")
-            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::BANDWIDTH);
-        if(m_single_object_max_type == "ModelRadiusVotes")
-            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
+//        // vote based single maxima computation
+//        if(m_single_object_max_type_str == "VotingSpaceVotes")
+//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::COMPLETE_VOTING_SPACE);
+//        if(m_single_object_max_type_str == "BandwidthVotes")
+//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::BANDWIDTH);
+//        if(m_single_object_max_type_str == "ModelRadiusVotes")
+//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
 
         // in single object mode global results are the same for all maxima
         if(maxima.size() > 0)
@@ -228,14 +238,16 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             }
         }
     }
+
     // TODO VS: fix global features if not in single object mode - add global result merging
-    else
+    if(!m_single_object_mode)
     {
         if(m_max_filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight
             filtered_maxima = filterMaxima(maxima);
         if(m_max_filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
             filtered_maxima = mergeAndFilterMaxima(maxima);
     }
+
     maxima = filtered_maxima;
 
     // sort maxima

@@ -33,7 +33,8 @@ float VotingMeanShift::iGetSeedsRange() const
     return (m_bandwidth * 2.0f) / sqrtf(2);
 }
 
-void VotingMeanShift::iFindMaxima(const std::vector<Voting::Vote>& votes, // all votes in the voting space for this class ID
+void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
+                                  const std::vector<Voting::Vote>& votes, // all votes in the voting space for this class ID
                                   std::vector<Eigen::Vector3f>& clusters,
                                   std::vector<double>& maxima_weights, // weights for all maxima
                                   std::vector<std::vector<int> >& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
@@ -45,6 +46,7 @@ void VotingMeanShift::iFindMaxima(const std::vector<Voting::Vote>& votes, // all
     // https://github.com/daviddoria/vtkMeanShiftClustering/blob/master/vtkMeanShiftClustering.cxx and
     // https://code.google.com/p/accord/source/browse/trunk/Sources/Accord.MachineLearning/Clustering/MeanShift.cs
 
+    // TODO VS check if not dublicate
     if(m_radiusType == "Config")
     {
         // leave bandwidth as it is from config
@@ -58,7 +60,8 @@ void VotingMeanShift::iFindMaxima(const std::vector<Voting::Vote>& votes, // all
         m_bandwidth = m_id_bb_dimensions_map.at(classId).second * m_radiusFactor;
     }
 
-    // forward bandwith to voting class
+
+    // forward bandwith to voting class // TODO VS get rid of this
     radius = m_bandwidth;
 
     // build dataset
@@ -77,29 +80,101 @@ void VotingMeanShift::iFindMaxima(const std::vector<Voting::Vote>& votes, // all
     dataset->width = dataset->size();
     dataset->is_dense = false;
 
-    // create seed points using binning strategy
-    std::vector<Voting::Vote> seeds = createSeeds(votes, iGetSeedsRange());
-
     // use a kd-tree for exact nearest neighbor search
     pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
     search->setInputCloud(dataset);
 
-    // perform mean shift
-    std::vector<Eigen::Vector3f> clusterCenters;
-    iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
+    // default behavior:
+    // 1) not single object mode, max type doesn't matter --> perform mean-shift to find maxima
+    // 2) single object mode only with default max type   --> perform mean-shift to find maxima
+    //    (this effectively disables single object mode for local features, but not for global ones)
+    if(!m_single_object_mode || m_max_type == SingleObjectMaxType::DEFAULT)
+    {
+        // create seed points using binning strategy
+        std::vector<Voting::Vote> seeds = createSeeds(votes, iGetSeedsRange());
 
-    // retrieve maximum points
-    if(m_maxima_suppression_type == "Suppress")
-    {
-        suppressNeighborMaxima(clusterCenters, clusters);
+        // perform mean shift
+        std::vector<Eigen::Vector3f> clusterCenters;
+        iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
+
+        // retrieve maximum points
+        if(m_maxima_suppression_type == "Suppress")
+        {
+            suppressNeighborMaxima(clusterCenters, clusters);
+        }
+        else if(m_maxima_suppression_type == "Average")
+        {
+            averageNeighborMaxima(clusterCenters, clusters);
+        }
+        else if(m_maxima_suppression_type == "AverageShift")
+        {
+            averageShiftNeighborMaxima(clusterCenters, clusters);
+        }
     }
-    else if(m_maxima_suppression_type == "Average")
+    // in single object mode we assume that the whole voting space contains only one object
+    // in such a case we do not need mean-shift, but solely estimate the density with differnt
+    // bandwidth depending on the single object mode max type
+    else
     {
-        averageNeighborMaxima(clusterCenters, clusters);
-    }
-    else if(m_maxima_suppression_type == "AverageShift")
-    {
-        averageShiftNeighborMaxima(clusterCenters, clusters);
+        // use object's centroid as query point for search
+        Eigen::Vector4f centr;
+        pcl::compute3DCentroid(*points, centr);
+        PointT query;
+        query.x = centr[0];
+        query.y = centr[1];
+        query.z = centr[2];
+
+        if(m_max_type == SingleObjectMaxType::BANDWIDTH)
+        {
+            ///// externalize method here - TODO VS
+            // TODO VS - the commented method will not work as it relies on the m_radius
+            //m_bandwidth = getSearchDistForClass(classId);
+
+            if(m_radiusType == "Config")
+            {
+                // leave bandwidth as it is from config
+            }
+            else if(m_radiusType == "FirstDim")
+            {
+                m_bandwidth = m_id_bb_dimensions_map.at(classId).first * m_radiusFactor;
+            }
+            else if(m_radiusType == "SecondDim")
+            {
+                m_bandwidth = m_id_bb_dimensions_map.at(classId).second * m_radiusFactor;
+            }
+        }
+        if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
+        {
+            ///// externalize and optimize method here - TODO VS
+            // find distance of farthest point from centroid
+            float model_radius = 0;
+            if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
+            {
+                for(int i = 0; i < points->size(); i++)
+                {
+                    float dist = (points->at(i).getVector3fMap() - query.getVector3fMap()).norm();
+                    if(dist > model_radius) model_radius = dist;
+                }
+            }
+            m_bandwidth = model_radius;
+        }
+        if(m_max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
+        {
+            ///// externalize and optimize method here - TODO VS
+            float max_dist = 0;
+            Eigen::Vector3f query_vec = query.getArray3fMap();
+            for(int i = 0; i < votes.size(); i++)
+            {
+                Voting::Vote v = votes.at(i);
+                float dist = (v.position - query_vec).squaredNorm();
+                max_dist = max_dist > dist ? max_dist : dist;
+            }
+            m_bandwidth = sqrt(max_dist);
+        }
+
+        // single object mode has only one cluster
+        clusters.clear();
+        clusters.push_back(query.getVector3fMap());
     }
 
     voteIndicesPerCluster.resize(clusters.size());
@@ -116,7 +191,8 @@ void VotingMeanShift::iFindMaxima(const std::vector<Voting::Vote>& votes, // all
     newVoteWeights.resize(votes.size());
 
     // estimate densities for cluster positions and reweight votes by the kernel value
-    for (int i = 0; i < (int)maxima_weights.size(); i++) {
+    for (int i = 0; i < (int)maxima_weights.size(); i++)
+    {
         // assigned clusters indices are changed
         maxima_weights[i] = estimateDensity(clusters[i], i, newVoteWeights, votes, search);
     }
@@ -191,6 +267,7 @@ float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
     query.z = position[2];
     std::vector<int> indices;
     std::vector<float> distances;
+
     search->radiusSearch(query, m_bandwidth, indices, distances);
 
     // shouldn't happen

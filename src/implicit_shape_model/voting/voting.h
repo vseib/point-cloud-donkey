@@ -86,6 +86,7 @@ namespace ism3d
 
     enum class SingleObjectMaxType
     {
+        DEFAULT,    // default means no special treatment
         COMPLETE_VOTING_SPACE,
         BANDWIDTH,
         MODEL_RADIUS
@@ -201,7 +202,8 @@ namespace ism3d
         void classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr global_features, VotingMaximum &maximum);
 
 
-        virtual void iFindMaxima(const std::vector<Voting::Vote>&,
+        virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
+                                 const std::vector<Voting::Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
                                  std::vector<std::vector<int> >&,
@@ -249,6 +251,10 @@ namespace ism3d
         float m_global_param_rate_limit;
         float m_global_param_weight_factor;
 
+        std::string m_max_filter_type;
+        SingleObjectMaxType m_max_type;
+        std::string m_max_type_param;
+
         // used to create FLANN index in FLANN helper
         std::string m_distanceType;
 
@@ -275,8 +281,6 @@ namespace ism3d
         int m_minVotesThreshold; // retrieve all maxima above the vote threshold
         int m_bestK;            // additionally retrieve only the k best maxima
         bool m_averageRotation;
-        std::string m_max_filter_type;
-        std::string m_single_object_max_type;
 
         std::shared_ptr<FlannHelper> m_flann_helper;
         bool m_index_created;

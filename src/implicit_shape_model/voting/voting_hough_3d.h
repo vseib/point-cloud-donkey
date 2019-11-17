@@ -31,7 +31,8 @@ namespace ism3d
         std::string getType() const;
 
     protected:
-        void iFindMaxima(const std::vector<Voting::Vote>&,
+        void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &,
+                         const std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<int> >&,
