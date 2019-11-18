@@ -88,7 +88,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     // 1) not single object mode, max type doesn't matter --> perform mean-shift to find maxima
     // 2) single object mode only with default max type   --> perform mean-shift to find maxima
     //    (this effectively disables single object mode for local features, but not for global ones)
-    if(!m_single_object_mode || m_max_type == SingleObjectMaxType::DEFAULT)
+    if(!m_single_object_mode || (m_single_object_mode && m_max_type == SingleObjectMaxType::DEFAULT))
     {
         // create seed points using binning strategy
         std::vector<Voting::Vote> seeds = createSeeds(votes, iGetSeedsRange());
