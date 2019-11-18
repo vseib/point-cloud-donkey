@@ -29,6 +29,7 @@ Voting::Voting()
     addParameter(m_radiusType, "BinOrBandwidthType", std::string("Config"));
     addParameter(m_radiusFactor, "BinOrBandwidthFactor", 1.0f);
     addParameter(m_max_filter_type, "MaxFilterType", std::string("None"));
+    addParameter(m_max_type_param, "SingleObjectMaxType", std::string("Default"));
 
     addParameter(m_use_global_features, "UseGlobalFeatures", false);
     addParameter(m_global_feature_method, "GlobalFeaturesStrategy", std::string("KNN"));
@@ -37,16 +38,6 @@ Voting::Voting()
     addParameter(m_global_param_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
     addParameter(m_global_param_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_global_param_weight_factor, "GlobalParamWeightFactor", 1.5f);
-
-    addParameter(m_max_type_param, "SingleObjectMaxType", std::string("Default"));
-    if(m_max_type_param == "VotingSpaceVotes")
-        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
-    else if(m_max_type_param == "BandwidthVotes")
-        m_max_type = SingleObjectMaxType::BANDWIDTH;
-    else if(m_max_type_param == "ModelRadiusVotes")
-        m_max_type = SingleObjectMaxType::MODEL_RADIUS;
-    else if(m_max_type_param == "None" || m_max_type_param == "Default")
-        m_max_type = SingleObjectMaxType::DEFAULT;
 
     m_index_created = false;
     m_svm_error = false;
@@ -88,6 +79,16 @@ void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId,
 std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                               pcl::PointCloud<pcl::Normal>::ConstPtr &normals)
 {
+    // set max type based on parameter value
+    if(m_max_type_param == "VotingSpaceVotes")
+        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
+    else if(m_max_type_param == "BandwidthVotes")
+        m_max_type = SingleObjectMaxType::BANDWIDTH;
+    else if(m_max_type_param == "ModelRadiusVotes")
+        m_max_type = SingleObjectMaxType::MODEL_RADIUS;
+    else if(m_max_type_param == "None" || m_max_type_param == "Default")
+        m_max_type = SingleObjectMaxType::DEFAULT;
+
     if (m_votes.size() == 0)
         return std::vector<VotingMaximum>();
 
