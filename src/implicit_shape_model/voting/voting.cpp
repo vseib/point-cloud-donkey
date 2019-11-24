@@ -108,7 +108,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         std::vector<std::vector<float> > reweightedVotes; // reweighted votes, a list for each maximum
 
         // process the algorithm to find maxima on the votes of the current class
-        iFindMaxima(points, votes, clusters, maximaValues, voteIndices, reweightedVotes, classId, m_radius);
+        iFindMaxima(points, votes, clusters, maximaValues, voteIndices, reweightedVotes, classId);
 
         LOG_ASSERT(clusters.size() == maximaValues.size());
         LOG_ASSERT(clusters.size() == voteIndices.size());
@@ -491,6 +491,7 @@ VotingMaximum Voting::mergeMaxima(const std::vector<VotingMaximum> &max_list) co
 
 float Voting::getSearchDistForClass(const unsigned class_id) const
 {
+    // NOTE: m_radius is assigned in derived classes and is related either to the bandwidth or bin size
     float search_dist = 0;
     if(m_radiusType == "Config")
         search_dist = m_radius;

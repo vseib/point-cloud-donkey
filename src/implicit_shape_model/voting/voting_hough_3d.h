@@ -37,7 +37,7 @@ namespace ism3d
                          std::vector<double>&,
                          std::vector<std::vector<int> >&,
                          std::vector<std::vector<float> >&,
-                         unsigned classId, float &radius);
+                         unsigned classId);
         void iPostInitConfig();
         void clear();
 

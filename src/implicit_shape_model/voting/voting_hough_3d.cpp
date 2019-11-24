@@ -35,8 +35,11 @@ namespace ism3d
                                     std::vector<double>& maxima,
                                     std::vector<std::vector<int> >& voteIndices,
                                     std::vector<std::vector<float> >& reweightedVotes,
-                                    unsigned classId, float& radius)
+                                    unsigned classId)
     {
+
+        LOG_WARN("SingleObjectMode is not supported with Hough3D - switch to MeanShift to use it!");
+
         if(m_radiusType == "Config")
         {
             // leave bin size as it is from config
@@ -55,7 +58,7 @@ namespace ism3d
         }
 
         // forward bin size to voting class
-        radius = m_binSize[0];
+        m_radius = m_binSize[0] * 0.5;
 
         // cast votes into own voting space
         iPostInitConfig();

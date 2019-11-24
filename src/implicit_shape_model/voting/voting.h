@@ -208,7 +208,9 @@ namespace ism3d
                                  std::vector<double>&,
                                  std::vector<std::vector<int> >&,
                                  std::vector<std::vector<float> >&,
-                                 unsigned, float&) = 0;
+                                 unsigned) = 0;
+
+        float getSearchDistForClass(const unsigned class_id) const;
 
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
@@ -264,7 +266,6 @@ namespace ism3d
         std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima) const;
 
         VotingMaximum mergeMaxima(const std::vector<VotingMaximum> &max_list) const;
-        float getSearchDistForClass(const unsigned class_id) const;
 
         void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting, unsigned found_class, float score);
 

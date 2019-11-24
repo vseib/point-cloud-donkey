@@ -12,6 +12,8 @@
 #include <omp.h>
 #include <pcl/filters/filter.h>
 
+#include "single_object_mode_helper.h"
+
 namespace ism3d
 {
 VotingMeanShift::VotingMeanShift()
@@ -39,30 +41,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                   std::vector<double>& maxima_weights, // weights for all maxima
                                   std::vector<std::vector<int> >& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
                                   std::vector<std::vector<float> >& newVoteWeightsPerCluster, // holds a list of reweighted vote weights per cluster
-                                  unsigned classId,
-                                  float& radius)
+                                  unsigned classId)
 {
+    // forward bandwith to voting class
+    m_radius = m_bandwidth;
+    m_bandwidth = getSearchDistForClass(classId);
+
     // basic ideas adapted from
     // https://github.com/daviddoria/vtkMeanShiftClustering/blob/master/vtkMeanShiftClustering.cxx and
     // https://code.google.com/p/accord/source/browse/trunk/Sources/Accord.MachineLearning/Clustering/MeanShift.cs
-
-    // TODO VS check if not dublicate
-    if(m_radiusType == "Config")
-    {
-        // leave bandwidth as it is from config
-    }
-    else if(m_radiusType == "FirstDim")
-    {
-        m_bandwidth = m_id_bb_dimensions_map.at(classId).first * m_radiusFactor;
-    }
-    else if(m_radiusType == "SecondDim")
-    {
-        m_bandwidth = m_id_bb_dimensions_map.at(classId).second * m_radiusFactor;
-    }
-
-
-    // forward bandwith to voting class // TODO VS get rid of this
-    radius = m_bandwidth;
 
     // build dataset
     pcl::PointCloud<PointT>::Ptr dataset(new pcl::PointCloud<PointT>());
@@ -126,50 +113,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
 
         if(m_max_type == SingleObjectMaxType::BANDWIDTH)
         {
-            ///// externalize method here - TODO VS
-            // TODO VS - the commented method will not work as it relies on the m_radius
-            //m_bandwidth = getSearchDistForClass(classId);
-
-            if(m_radiusType == "Config")
-            {
-                // leave bandwidth as it is from config
-            }
-            else if(m_radiusType == "FirstDim")
-            {
-                m_bandwidth = m_id_bb_dimensions_map.at(classId).first * m_radiusFactor;
-            }
-            else if(m_radiusType == "SecondDim")
-            {
-                m_bandwidth = m_id_bb_dimensions_map.at(classId).second * m_radiusFactor;
-            }
+            m_bandwidth = getSearchDistForClass(classId);
         }
         if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
         {
-            ///// externalize and optimize method here - TODO VS
-            // find distance of farthest point from centroid
-            float model_radius = 0;
-            if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
-            {
-                for(int i = 0; i < points->size(); i++)
-                {
-                    float dist = (points->at(i).getVector3fMap() - query.getVector3fMap()).norm();
-                    if(dist > model_radius) model_radius = dist;
-                }
-            }
-            m_bandwidth = model_radius;
+            m_bandwidth = SingleObjectModeHelper::getModelRadius(points, query);
         }
         if(m_max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
         {
-            ///// externalize and optimize method here - TODO VS
-            float max_dist = 0;
-            Eigen::Vector3f query_vec = query.getArray3fMap();
-            for(int i = 0; i < votes.size(); i++)
-            {
-                Voting::Vote v = votes.at(i);
-                float dist = (v.position - query_vec).squaredNorm();
-                max_dist = max_dist > dist ? max_dist : dist;
-            }
-            m_bandwidth = sqrt(max_dist);
+            m_bandwidth = SingleObjectModeHelper::getVotingSpaceSize(votes, query);
         }
 
         // single object mode has only one cluster

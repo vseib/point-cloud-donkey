@@ -45,7 +45,7 @@ namespace ism3d
                          std::vector<double>&,
                          std::vector<std::vector<int> >&,
                          std::vector<std::vector<float> >&,
-                         unsigned, float &radius);
+                         unsigned);
         float iGetSeedsRange() const;
         void iDoMeanShift(const std::vector<Voting::Vote>&,
                           const std::vector<Voting::Vote>&,
