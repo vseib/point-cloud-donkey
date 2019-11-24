@@ -127,6 +127,7 @@ add_library(implicit_shape_model
     voting/voting.cpp
     voting/voting_hough_3d.cpp
     voting/voting_mean_shift.cpp
+    voting/single_object_mode_helper.cpp
     # h-files
     activation_strategy/activation_strategy_factory.h
     clustering/clustering_factory.h
