@@ -80,14 +80,14 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                                               pcl::PointCloud<pcl::Normal>::ConstPtr &normals)
 {
     // set max type based on parameter value
-    if(m_max_type_param == "VotingSpaceVotes")
-        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
+    if(m_max_type_param == "None" || m_max_type_param == "Default")
+        m_max_type = SingleObjectMaxType::DEFAULT;
     else if(m_max_type_param == "BandwidthVotes")
         m_max_type = SingleObjectMaxType::BANDWIDTH;
+    else if(m_max_type_param == "VotingSpaceVotes")
+        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
     else if(m_max_type_param == "ModelRadiusVotes")
         m_max_type = SingleObjectMaxType::MODEL_RADIUS;
-    else if(m_max_type_param == "None" || m_max_type_param == "Default")
-        m_max_type = SingleObjectMaxType::DEFAULT;
 
     if (m_votes.size() == 0)
         return std::vector<VotingMaximum>();
@@ -365,124 +365,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                  ", glob: (" << max.globalHypothesis.first << ", " << max.globalHypothesis.second << ")" <<
                  ", this: (" << max.currentClassHypothesis.first << ", " << max.currentClassHypothesis.second << ")" <<
                  ", num votes: " << max.voteIndices.size());
-    }
-    return maxima;
-}
-
-std::vector<VotingMaximum> Voting::computeSingleMaxPerClass(const pcl::PointCloud<PointNormalT>::ConstPtr &points,
-                                                            const SingleObjectMaxType max_type) const
-{
-    std::vector<VotingMaximum> maxima;
-
-    // use object's centroid as query point for search
-    Eigen::Vector4f centr;
-    pcl::compute3DCentroid(*points, centr);
-    PointT query;
-    query.x = centr[0];
-    query.y = centr[1];
-    query.z = centr[2];
-
-    // find distance of farthest point from centroid
-    float model_radius = 0;
-    if(max_type == SingleObjectMaxType::MODEL_RADIUS)
-    {
-        for(int i = 0; i < points->size(); i++)
-        {
-            float dist = (points->at(i).getVector3fMap() - query.getVector3fMap()).norm();
-            if(dist > model_radius) model_radius = dist;
-        }
-    }
-
-    // compute densities for each class and create a maximum
-    #pragma omp parallel for
-    for(unsigned idx = 0; idx < m_votes.size(); idx++)
-    {
-        // for open-MP parallalization
-        auto it = m_votes.begin();
-        std::advance(it, idx);
-
-        unsigned classId = it->first;
-        const std::vector<Voting::Vote>& votes = it->second; // all votes for this class
-
-        float search_dist = 0;
-        std::vector<int> indices;
-        std::vector<float> distances;
-
-        // create dataset and use radius search
-        if(max_type != SingleObjectMaxType::COMPLETE_VOTING_SPACE)
-        {
-            if(max_type == SingleObjectMaxType::BANDWIDTH)
-                search_dist = getSearchDistForClass(classId);
-            if(max_type == SingleObjectMaxType::MODEL_RADIUS)
-                search_dist = model_radius;
-
-            // build dataset
-            pcl::PointCloud<PointT>::Ptr dataset(new pcl::PointCloud<PointT>());
-            dataset->resize(votes.size());
-            for (int i = 0; i < (int)votes.size(); i++)
-            {
-                const Voting::Vote& vote = votes[i];
-                PointT votePoint;
-                votePoint.x = vote.position[0];
-                votePoint.y = vote.position[1];
-                votePoint.z = vote.position[2];
-                dataset->at(i) = votePoint;
-            }
-            dataset->height = 1;
-            dataset->width = dataset->size();
-            dataset->is_dense = false;
-
-            // use a kd-tree for exact nearest neighbor search
-            pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
-            search->setInputCloud(dataset);
-            // find nearest points within search window
-            search->radiusSearch(query, search_dist, indices, distances);
-        }
-        else // use all votes: manually compute distances
-        {
-            float max_dist = 0;
-            Eigen::Vector3f query_vec = query.getArray3fMap();
-            for(int i = 0; i < votes.size(); i++)
-            {
-                Voting::Vote v = votes.at(i);
-                float dist = (v.position - query_vec).squaredNorm();
-                max_dist = max_dist > dist ? max_dist : dist;
-                distances.push_back(dist);
-                indices.push_back(i);
-            }
-            search_dist = sqrt(max_dist);
-        }
-
-        // NOTE: this is modified code from voting_mean_shift.cpp
-        // compute density
-        float density = 0;
-        for (int i = 0; i < (int)indices.size(); i++)
-        {
-            const Voting::Vote& vote = votes[indices[i]];
-
-            // get euclidean distance between current center and nearest neighbor
-            float distanceSqr = distances[i];
-
-            // compute a normalized distance in {0, 1}
-            float u = distanceSqr / (search_dist * search_dist);
-
-            // compute weights wigh Gaussian kernel
-            float weight = std::exp(-0.5 * u) * vote.weight;
-            density += weight;
-        }
-
-        // create one maximum per class
-        VotingMaximum new_max;
-        new_max.classId = classId;
-        new_max.position = query.getVector3fMap();
-        new_max.weight = density;
-        new_max.voteIndices = indices;
-        new_max.boundingBox = Utils::computeMVBB<PointNormalT>(points);
-
-        #pragma omp critical
-        {
-            maxima.push_back(new_max);
-        }
     }
     return maxima;
 }

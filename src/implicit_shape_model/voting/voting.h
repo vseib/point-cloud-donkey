@@ -260,9 +260,6 @@ namespace ism3d
 
     private:
 
-        std::vector<VotingMaximum> computeSingleMaxPerClass(const pcl::PointCloud<PointNormalT>::ConstPtr &points,
-                                                            const SingleObjectMaxType max_typ) const;
-
         std::vector<VotingMaximum> filterMaxima(const std::vector<VotingMaximum> &maxima, bool merge = false) const;
         std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima) const;
 
