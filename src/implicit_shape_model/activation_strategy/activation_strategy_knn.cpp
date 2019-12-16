@@ -16,7 +16,7 @@ namespace ism3d
 {
     ActivationStrategyKNN::ActivationStrategyKNN()
     {
-        addParameter(m_k, "K", 2);
+        addParameter(m_k, "K", 1);
     }
 
     ActivationStrategyKNN::~ActivationStrategyKNN()

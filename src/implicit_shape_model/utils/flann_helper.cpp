@@ -18,7 +18,7 @@ FlannHelper::~FlannHelper()
     delete[] dataset.ptr();
 }
 
-void FlannHelper::createDataset(std::vector<std::shared_ptr<Codeword>> &codewords)
+void FlannHelper::createDataset(const std::vector<std::shared_ptr<Codeword>> &codewords)
 {
     // build dataset
     for(int i = 0; i < (int)codewords.size(); i++)

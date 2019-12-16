@@ -306,7 +306,7 @@ bool FeatureRanking::isClassDeleted(const FeatureMapT& features_reduced)
 
 
 std::map<unsigned, std::vector<std::vector<float>>> FeatureRanking::unflatten_list(std::map<unsigned, std::vector<float> > &scores_flat_list,
-                                                                                FeatureMapT &features)
+                                                                                const FeatureMapT &features)
 {
     // unflatten scores list
     std::map<unsigned, std::vector<std::vector<float> > > scores;

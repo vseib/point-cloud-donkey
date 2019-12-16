@@ -34,7 +34,7 @@ public:
 
     ~FlannHelper();
 
-    void createDataset(std::vector<std::shared_ptr<Codeword> > &codewords);
+    void createDataset(const std::vector<std::shared_ptr<Codeword> > &codewords);
 
     void createDataset(pcl::PointCloud<ISMFeature>::Ptr global_features);
 

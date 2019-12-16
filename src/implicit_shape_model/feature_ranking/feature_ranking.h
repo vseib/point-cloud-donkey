@@ -50,7 +50,7 @@ namespace ism3d
             pcl::PointCloud<ISMFeature>::Ptr,
             std::vector<unsigned>>
     operator()(
-            std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features,
+            std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
             int num_kd_trees = 4, bool flann_exact_match = false);
 
         /**

@@ -47,38 +47,38 @@ Codebook::~Codebook()
 }
 
 template
-void Codebook::activate<flann::L2<float> >(const std::vector<std::shared_ptr<Codeword> >& codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+void Codebook::activate<flann::L2<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
+const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
 const Distance* distance, flann::Index<flann::L2<float>> &index,
 const bool flann_exact_match);
 
 template
-void Codebook::activate<flann::ChiSquareDistance<float> >(const std::vector<std::shared_ptr<Codeword> >& codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+void Codebook::activate<flann::ChiSquareDistance<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
+const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
 const Distance* distance, flann::Index<flann::ChiSquareDistance<float>> &index,
 const bool flann_exact_match);
 
 template
-void Codebook::activate<flann::HellingerDistance<float> >(const std::vector<std::shared_ptr<Codeword> >& codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+void Codebook::activate<flann::HellingerDistance<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
+const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
 const Distance* distance, flann::Index<flann::HellingerDistance<float>> &index,
 const bool flann_exact_match);
 
 template
-void Codebook::activate<flann::HistIntersectionDistance<float> >(const std::vector<std::shared_ptr<Codeword> >& codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+void Codebook::activate<flann::HistIntersectionDistance<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
+const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
 const Distance* distance, flann::Index<flann::HistIntersectionDistance<float>> &index,
 const bool flann_exact_match);
 
 
 template<typename T>
-void Codebook::activate(const std::vector<std::shared_ptr<Codeword> >& codewords,
-                        const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-                        const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
+                        const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+                        const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
                         const Distance* distance, flann::Index<T> &index, const bool flann_exact_match)
 {
     LOG_ASSERT(features.size() == boundingBoxes.size());

@@ -220,9 +220,9 @@ void ImplicitShapeModel::train()
     boost::timer::cpu_timer timer_all;
 
     // contains the whole list of features for each class id and for each model
-    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > features; // TODO VS rethink the whole feature data type!!!
-    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > globalFeatures;
-    std::map<unsigned, std::vector<Utils::BoundingBox> > boundingBoxes;
+    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> features; // TODO VS rethink the whole feature data type!!!
+    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> globalFeatures;
+    std::map<unsigned, std::vector<Utils::BoundingBox>> boundingBoxes;
 
     // compute features for all models and all classes
     for (auto it = m_trainingModelsFilenames.begin(); it != m_trainingModelsFilenames.end(); it++)
@@ -369,6 +369,7 @@ void ImplicitShapeModel::train()
     // create index depending on distance type
     if(m_distance->getType() == "Euclidean")
     {
+        // TODO VS do I still need the m_distance object???
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexL2(), m_flann_exact_match);
     }
     else if(m_distance->getType() == "ChiSquared")
@@ -1194,6 +1195,293 @@ void ImplicitShapeModel::trainSVM(std::map<unsigned, std::vector<pcl::PointCloud
         {
             svm.trainSimple(m_svm_param_gamma, m_svm_param_c, false);
         }
+    }
+}
+
+
+void ImplicitShapeModel::writeFeaturesToDisk(std::string file_name,
+                                             const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+                                             const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &globalFeatures,
+                                             const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes)
+{
+    std::ofstream ofs(file_name, std::ios::binary | std::ios::trunc);
+    boost::archive::binary_oarchive oa(ofs);
+
+    // save local features
+    int mapsize = features.size();
+    oa << mapsize;
+    for(auto it : features)
+    {
+        int class_id = it.first;
+        oa << class_id;
+
+        int num_pcs = it.second.size();
+        oa << num_pcs; // num of point clouds in std::vector
+
+        for(auto pc : it.second)
+        {
+            int pc_size = pc->size();
+            oa << pc_size;
+            for(auto f : pc->points)
+            {
+//                f.save(oa);
+                // save reference frame
+                for(unsigned i = 0; i < 9; i++)
+                {
+                    oa << f.referenceFrame.rf[i];
+                }
+                int dsize = f.descriptor.size();
+                oa << dsize;
+                for(float ff : f.descriptor)
+                {
+                    oa << ff;
+                }
+
+                oa << f.centerDist;
+                oa << f.globalDescriptorRadius;
+            }
+        }
+    }
+
+    // save global features
+    mapsize = globalFeatures.size();
+    oa << mapsize;
+    for(auto it : globalFeatures)
+    {
+        int class_id = it.first;
+        oa << class_id;
+
+        int num_pcs = it.second.size();
+        oa << num_pcs; // num of point clouds in std::vector
+
+        for(auto pc : it.second)
+        {
+            int pc_size = pc->size();
+            oa << pc_size;
+            for(auto f : pc->points)
+            {
+//                f.save(oa);
+                // save reference frame
+                for(unsigned i = 0; i < 9; i++)
+                {
+                    oa << f.referenceFrame.rf[i];
+                }
+                int dsize = f.descriptor.size();
+                oa << dsize;
+                for(float ff : f.descriptor)
+                {
+                    oa << ff;
+                }
+                oa << f.centerDist;
+                oa << f.globalDescriptorRadius;
+            }
+        }
+    }
+
+    // save bounding boxes
+    mapsize = boundingBoxes.size();
+    oa << mapsize;
+    for(auto it : boundingBoxes)
+    {
+        int class_id = it.first;
+        oa << class_id;
+
+        int num_bb = it.second.size();
+        oa << num_bb;
+        for(const auto &bb : it.second)
+        {
+            Eigen::Vector3f vec = bb.position;
+            oa << vec.x(); oa << vec.y(); oa << vec.z();
+            vec = bb.size;
+            oa << vec.x(); oa << vec.y(); oa << vec.z();
+
+            float quat1 = bb.rotQuat.R_component_1();
+            float quat2 = bb.rotQuat.R_component_2();
+            float quat3 = bb.rotQuat.R_component_3();
+            float quat4 = bb.rotQuat.R_component_4();
+            oa << quat1;
+            oa << quat2;
+            oa << quat3;
+            oa << quat4;
+        }
+    }
+
+
+    ofs.close();
+}
+
+
+void ImplicitShapeModel::readFeaturesFromDisk(std::string file_name,
+                          std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features,
+                          std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures,
+                          std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes)
+{
+    // read boost data object
+    std::ifstream ifs(file_name, std::ios::binary);
+    if(ifs)
+    {
+        boost::archive::binary_iarchive ia(ifs);
+
+        // load local features
+        features.clear();
+        int map_size;
+        ia >> map_size;
+        for(int i = 0; i < map_size; i++)
+        {
+            int class_id;
+            ia >> class_id;
+
+            std::vector<pcl::PointCloud<ISMFeature>::Ptr> map_elem;
+
+            int num_clouds;
+            ia >> num_clouds;
+            for(int j = 0; j < num_clouds; j++)
+            {
+                pcl::PointCloud<ISMFeature>::Ptr cloud(new pcl::PointCloud<ISMFeature>());
+
+                int cloud_size;
+                ia >> cloud_size;
+                for(int k = 0; k < cloud_size; k++)
+                {
+                    pcl::ReferenceFrame referenceFrame;
+                    for(int i_ref = 0; i_ref < 9; i_ref++)
+                    {
+                        float ref;
+                        ia >> ref;
+                        referenceFrame.rf[i_ref] = ref;
+                    }
+
+                    int dsize;
+                    ia >> dsize;
+                    std::vector<float> descriptor;
+                    for(int l = 0; l < dsize; l++)
+                    {
+                        float fff;
+                        ia >> fff;
+                        descriptor.push_back(fff);
+                    }
+
+                    float centerDist;
+                    ia >> centerDist;
+                    float radius;
+                    ia >> radius;
+
+                    ISMFeature ismf;
+//                    ismf.load(ia);
+                    ismf.referenceFrame = referenceFrame;
+                    ismf.descriptor = descriptor;
+                    ismf.centerDist = centerDist;
+                    ismf.globalDescriptorRadius = radius;
+                    ismf.classId = class_id;
+                    cloud->push_back(ismf);
+                }
+
+                cloud->height = 1;
+                cloud->width = cloud->size();
+                cloud->is_dense = false;
+                map_elem.push_back(cloud);
+            }
+            features.insert({class_id, map_elem});
+        }
+
+        // load global features
+        ia >> map_size;
+        for(int i = 0; i < map_size; i++)
+        {
+            int class_id;
+            ia >> class_id;
+
+            std::vector<pcl::PointCloud<ISMFeature>::Ptr> map_elem;
+
+            int num_clouds;
+            ia >> num_clouds;
+            for(int j = 0; j < num_clouds; j++)
+            {
+                pcl::PointCloud<ISMFeature>::Ptr cloud(new pcl::PointCloud<ISMFeature>());
+
+                int cloud_size;
+                ia >> cloud_size;
+                for(int k = 0; k < cloud_size; k++)
+                {
+                    pcl::ReferenceFrame referenceFrame;
+                    for(int i_ref = 0; i_ref < 9; i_ref++)
+                    {
+                        float ref;
+                        ia >> ref;
+                        referenceFrame.rf[i_ref] = ref;
+                    }
+
+                    int dsize;
+                    ia >> dsize;
+                    std::vector<float> descriptor;
+                    for(int l = 0; l < dsize; l++)
+                    {
+                        float fff;
+                        ia >> fff;
+                        descriptor.push_back(fff);
+                    }
+                    float centerDist;
+                    ia >> centerDist;
+                    float radius;
+                    ia >> radius;
+
+                    ISMFeature ismf;
+//                    ismf.load(ia);
+                    ismf.referenceFrame = referenceFrame;
+                    ismf.descriptor = descriptor;
+                    ismf.centerDist = centerDist;
+                    ismf.globalDescriptorRadius = radius;
+                    ismf.classId = class_id;
+                    cloud->push_back(ismf);
+                }
+
+                cloud->height = 1;
+                cloud->width = cloud->size();
+                cloud->is_dense = false;
+                map_elem.push_back(cloud);
+            }
+            globalFeatures.insert({class_id, map_elem});
+        }
+
+        // load bounding boxes
+        ia >> map_size;
+        for(int i = 0; i < map_size; i++)
+        {
+            int class_id;
+            ia >> class_id;
+            int num_elems;
+            ia >> num_elems;
+
+            std::vector<Utils::BoundingBox> map_elem;
+
+            for(int j = 0; j < num_elems; j++)
+            {
+                Utils::BoundingBox bb;
+                ia >> bb.position.x();
+                ia >> bb.position.y();
+                ia >> bb.position.z();
+                ia >> bb.size.x();
+                ia >> bb.size.y();
+                ia >> bb.size.z();
+                float quat1, quat2, quat3, quat4;
+                ia >> quat1;
+                ia >> quat2;
+                ia >> quat3;
+                ia >> quat4;
+                bb.rotQuat = boost::math::quaternion<float>(quat1, quat2, quat3, quat4);
+
+                map_elem.push_back(bb);
+            }
+
+            boundingBoxes[class_id] = map_elem;
+        }
+
+        ifs.close();
+    }
+    else
+    {
+        LOG_ERROR("Error opening file: " << file_name);
+        exit(1);
     }
 }
 
