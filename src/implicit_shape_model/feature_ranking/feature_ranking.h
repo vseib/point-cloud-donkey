@@ -77,7 +77,7 @@ namespace ism3d
 
         std::map<unsigned, std::vector<std::vector<float>>> unflatten_list(
                 std::map<unsigned, std::vector<float>> &scores_flat_list,
-                FeatureMapT &features);
+                const FeatureMapT &features);
 
         int getNumThreads() const;
 
