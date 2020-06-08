@@ -41,6 +41,7 @@
 
 bool write_log_to_files = false;
 bool log_info = true;
+// TODO VS write these maps to files to have same mappings during testing
 std::map<std::string, unsigned> class_labels_map;
 std::map<std::string, unsigned> instance_labels_map;
 
@@ -103,7 +104,7 @@ int main(int argc, char **argv)
 
         std::vector<std::string> filenames;
         std::vector<unsigned> class_labels;
-        std::vector<unsigned> instance_labels; //TODO VS: not used so far
+        std::vector<unsigned> instance_labels;
         std::string mode = "";
 
         if(variables.count("inputfile"))
@@ -116,25 +117,58 @@ int main(int argc, char **argv)
             std::string file;
             std::string class_label;
             std::string instance_label;
+            bool using_instances = false;
 
             // special treatment of first line: determine mode
             infile >> file;
             infile >> class_label;
+            infile >> instance_label;
+
+            std::cout << "first line: " << std::endl;
+            std::cout << "file: " << file << "   classs: " << class_label << "   ins: " << instance_label << std::endl;
+            std::cout << "first line end " << std::endl;
+
             if(file == "#" && (class_label == "train" || class_label == "test"))
             {
                 mode = class_label;
+                if (instance_label == "inst")
+                {
+                    using_instances = true;
+                }
             }
 
             // process remaining lines
-            while(infile >> file >> class_label)// >> instance_label) // TODO VS fix instance labels
+            if (using_instances)
             {
-                // other lines contain a filename and a label
-                if (file[0] == '#') continue; // allows to comment out lines
+                // other lines contain a filename, a class label and an instance label
+                while(infile >> file >> class_label >> instance_label)
+                {
+                    if (file[0] == '#') continue; // allows to comment out lines
+                    filenames.push_back(file);
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map);
+                    unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map);
+                    class_labels.push_back(converted_class_label);
+                    instance_labels.push_back(converted_instance_label);
+                }
+            }
+            else
+            {
+                // if no instances are used, the first filename has already been read into variable "instance_label"
+                file = instance_label;
+                infile >> class_label;
+
                 filenames.push_back(file);
                 unsigned converted_class_label = convertLabel(class_label, class_labels_map);
-              //  unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map);
+
                 class_labels.push_back(converted_class_label);
-              //  instance_labels.push_back(converted_instance_label);
+                // read remaining lines
+                while(infile >> file >> class_label)
+                {
+                    if (file[0] == '#') continue; // allows to comment out lines
+                    filenames.push_back(file);
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map);
+                    class_labels.push_back(converted_class_label);
+                }
             }
         }
 
@@ -177,30 +211,34 @@ int main(int argc, char **argv)
                         (filenames.size() > 0 && class_labels.size() > 0))
                 {
                     std::vector<std::string> models;
-                    std::vector<unsigned> classIds;
+                    std::vector<unsigned> class_ids;
+                    std::vector<unsigned> instance_ids;
 
                     if(variables.count("models")) // input directly from command line
                     {
                         models = variables["models"].as<std::vector<std::string> >();
-                        classIds = variables["classes"].as<std::vector<unsigned> >();
+                        class_ids = variables["classes"].as<std::vector<unsigned> >();
+                        instance_ids = class_ids; // NOTE: instance training not supported on direct command line input
                     }
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         models = filenames;
-                        classIds = class_labels;
+                        class_ids = class_labels;
+                        instance_ids = instance_labels;
                     }
 
-                    if (models.size() == classIds.size())
+                    if (models.size() == class_ids.size())
                     {
                         for (int i = 0; i < (int)models.size(); i++)
                         {
                             std::string filename = models[i];
-                            unsigned classId = classIds[i];
+                            unsigned class_id = class_ids[i];
+                            unsigned instance_id = instance_ids[i];
 
                             // add the training model to the ISM
-                            if (!ism.addTrainingModel(filename, classId))
+                            if (!ism.addTrainingModel(filename, class_id)) // TODO VS: add instance id
                             {
-                                std::cerr << "could not add training model: " << filename << ", class " << classId << std::endl;
+                                std::cerr << "could not add training model: " << filename << ", class " << class_id << std::endl;
                                 return 1;
                             }
                         }
