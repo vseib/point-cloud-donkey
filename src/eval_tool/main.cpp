@@ -41,7 +41,22 @@
 
 bool write_log_to_files = false;
 bool log_info = true;
+std::map<std::string, unsigned> class_labels_map;
+std::map<std::string, unsigned> instance_labels_map;
 
+unsigned convertLabel(std::string& label, std::map<std::string, unsigned>& labels_map)
+{
+    if(labels_map.find(label) != labels_map.end())
+    {
+        return labels_map[label];
+    }
+    else
+    {
+        size_t cur_size = labels_map.size();
+        labels_map.insert({label, cur_size});
+        return cur_size;
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -87,7 +102,8 @@ int main(int argc, char **argv)
     else {
 
         std::vector<std::string> filenames;
-        std::vector<unsigned> labels;
+        std::vector<unsigned> class_labels;
+        std::vector<unsigned> instance_labels; //TODO VS: not used so far
         std::string mode = "";
 
         if(variables.count("inputfile"))
@@ -98,20 +114,27 @@ int main(int argc, char **argv)
             // parse input
             std::ifstream infile(input_file);
             std::string file;
-            std::string label;
+            std::string class_label;
+            std::string instance_label;
 
-            while(infile >> file >> label)
+            // special treatment of first line: determine mode
+            infile >> file;
+            infile >> class_label;
+            if(file == "#" && (class_label == "train" || class_label == "test"))
             {
-                // special treatment of first line: determine mode
-                if(file == "#" && (label == "train" || label == "test"))
-                {
-                    mode = label;
-                }
-                else // other lines contain a filename and a label
-                {
-                    filenames.push_back(file);
-                    labels.push_back(std::stoul(label));
-                }
+                mode = class_label;
+            }
+
+            // process remaining lines
+            while(infile >> file >> class_label)// >> instance_label) // TODO VS fix instance labels
+            {
+                // other lines contain a filename and a label
+                if (file[0] == '#') continue; // allows to comment out lines
+                filenames.push_back(file);
+                unsigned converted_class_label = convertLabel(class_label, class_labels_map);
+              //  unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map);
+                class_labels.push_back(converted_class_label);
+              //  instance_labels.push_back(converted_instance_label);
             }
         }
 
@@ -151,7 +174,7 @@ int main(int argc, char **argv)
 
                 // add the training models to the ism
                 if ((variables.count("models") && variables.count("classes")) ||
-                        (filenames.size() > 0 && labels.size() > 0))
+                        (filenames.size() > 0 && class_labels.size() > 0))
                 {
                     std::vector<std::string> models;
                     std::vector<unsigned> classIds;
@@ -164,7 +187,7 @@ int main(int argc, char **argv)
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         models = filenames;
-                        classIds = labels;
+                        classIds = class_labels;
                     }
 
                     if (models.size() == classIds.size())
@@ -243,7 +266,7 @@ int main(int argc, char **argv)
                     return 1;
                 }
                 else if ((variables.count("pointclouds") && variables.count("groundtruth")) ||
-                         (filenames.size() > 0 && labels.size() > 0))  // load pointclouds and groundtruth
+                         (filenames.size() > 0 && class_labels.size() > 0))  // load pointclouds and groundtruth
                 {
                     std::vector<std::string> pointClouds;
                     std::vector<unsigned> groundtruth;
@@ -256,7 +279,7 @@ int main(int argc, char **argv)
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         pointClouds = filenames;
-                        groundtruth = labels;
+                        groundtruth = class_labels;
                     }
 
                     // prepare summary
