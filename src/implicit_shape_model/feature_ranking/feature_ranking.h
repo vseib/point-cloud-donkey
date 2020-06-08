@@ -47,8 +47,7 @@ namespace ism3d
          * @return a map with feature scores representing the structure of the input features map
          */
     std::tuple<std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>>,
-            pcl::PointCloud<ISMFeature>::Ptr,
-            std::vector<unsigned>>
+            pcl::PointCloud<ISMFeature>::Ptr>
     operator()(
             std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
             int num_kd_trees = 4, bool flann_exact_match = false);
@@ -62,18 +61,12 @@ namespace ism3d
     protected:
         FeatureRanking();
 
-        bool keepFeatureWithScore(float score);
-
         std::map<unsigned, std::vector<std::pair<int, float>>> rankFeaturesWithScores(
                 std::map<unsigned, std::vector<float>> &temp_scores);
 
         std::map<unsigned, std::vector<float>> extractSubsetFromRankedList(
                 const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map,
                 const std::map<unsigned, std::vector<float>> &scores);
-
-        void computeScoreThreshold(const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map);
-
-        bool isClassDeleted(const FeatureMapT& features_reduced);
 
         std::map<unsigned, std::vector<std::vector<float>>> unflatten_list(
                 std::map<unsigned, std::vector<float>> &scores_flat_list,
@@ -104,7 +97,6 @@ namespace ism3d
         int m_k_search;
         float m_dist_thresh;
         float m_factor;
-        bool m_iterative_ranking;
         float m_score_threshold;
         int m_num_kd_trees;
         bool m_flann_exact_match;

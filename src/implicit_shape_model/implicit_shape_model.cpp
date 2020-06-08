@@ -341,9 +341,8 @@ void ImplicitShapeModel::train()
     // remove features with low scores
     std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> features_ranked;
     pcl::PointCloud<ISMFeature>::Ptr allFeatures_ranked(new pcl::PointCloud<ISMFeature>());
-    std::vector<unsigned> allFeatureClasses_ranked;
 
-    std::tie(features_ranked, allFeatures_ranked, allFeatureClasses_ranked) =
+    std::tie(features_ranked, allFeatures_ranked) =
             (*m_featureRanking)(features, m_num_kd_trees, m_flann_exact_match);
 
     // cluster descriptors and extract cluster centers
@@ -362,7 +361,6 @@ void ImplicitShapeModel::train()
     // NOTE: if no clustering is used, clusterIndices are just ascending numbers (0, 1, 2, 3, ...)
     // in that case, clusters at each position have size == 1
     LOG_ASSERT(clusterIndices.size() == allFeatures_ranked->size());
-
 
     // create codewords and add them to the codebook - NOTE: if no clustering is used: a codeword
     // is just one feature and its center vector
