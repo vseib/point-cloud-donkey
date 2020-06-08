@@ -124,10 +124,6 @@ int main(int argc, char **argv)
             infile >> class_label;
             infile >> instance_label;
 
-            std::cout << "first line: " << std::endl;
-            std::cout << "file: " << file << "   classs: " << class_label << "   ins: " << instance_label << std::endl;
-            std::cout << "first line end " << std::endl;
-
             if(file == "#" && (class_label == "train" || class_label == "test"))
             {
                 mode = class_label;
