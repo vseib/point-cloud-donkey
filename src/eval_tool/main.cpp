@@ -220,7 +220,15 @@ int main(int argc, char **argv)
                     {
                         models = filenames;
                         class_ids = class_labels;
-                        instance_ids = instance_labels;
+                        // instance ids must be filled even if training with class labels only
+                        if(instance_labels.size() > 0)
+                        {
+                            instance_ids = instance_labels;
+                        }
+                        else
+                        {
+                            instance_ids = class_labels;
+                        }
                     }
 
                     if (models.size() == class_ids.size())
@@ -232,7 +240,7 @@ int main(int argc, char **argv)
                             unsigned instance_id = instance_ids[i];
 
                             // add the training model to the ISM
-                            if (!ism.addTrainingModel(filename, class_id)) // TODO VS: add instance id
+                            if (!ism.addTrainingModel(filename, class_id, instance_id))
                             {
                                 std::cerr << "could not add training model: " << filename << ", class " << class_id << std::endl;
                                 return 1;

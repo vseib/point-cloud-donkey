@@ -91,10 +91,11 @@ namespace ism3d
         /**
          * @brief Add a new training model for a specified class id.
          * @param filename the filename to the training model to add
-         * @param classId the class id for the training model
+         * @param class_id the class id for the training model
+         * @param instance_id the instance id for the training model
          * @return false if the training model has already been added, true if successful
          */
-        bool addTrainingModel(const std::string& filename, unsigned classId);
+        bool addTrainingModel(const std::string& filename, unsigned class_id, unsigned instance_id);
 
         /**
          * @brief Train the implicit shape model using all objects added before
@@ -227,8 +228,9 @@ namespace ism3d
         Voting* m_voting;
         FeatureRanking* m_featureRanking;
 
-        std::map<unsigned, std::vector<std::string> > m_trainingModelsFilenames;
-        std::map<unsigned, std::vector<bool> > m_trainingModelHasNormals;
+        std::map<unsigned, std::vector<std::string>> m_training_objects_filenames;
+        std::map<unsigned, std::vector<unsigned>> m_training_objects_instance_ids;
+        std::map<unsigned, std::vector<bool>> m_training_objects_has_normals;
         Distance* m_distance;
         std::string m_distanceType;
         bool m_useVoxelFiltering;

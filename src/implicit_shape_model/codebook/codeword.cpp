@@ -64,14 +64,15 @@ namespace ism3d
         return m_weight;
     }
 
-    void Codeword::addFeature(unsigned classId)
+    void Codeword::addFeature(unsigned classId, unsigned instanceId)
     {
-        m_featureClasses.push_back(classId);
+        m_feature_classes.push_back(classId);
+        m_feature_instances.push_back(instanceId);
     }
 
     const std::vector<unsigned>& Codeword::getFeatureClasses() const
     {
-        return m_featureClasses;
+        return m_feature_classes;
     }
 
     void Codeword::iSaveData(boost::archive::binary_oarchive &oa) const
@@ -82,7 +83,7 @@ namespace ism3d
 
         m_maxId = m_id + 1; // TODO VS: remove this
 
-        oa << m_featureClasses;
+        oa << m_feature_classes;
         oa << m_data;
     }
 
@@ -91,7 +92,7 @@ namespace ism3d
         ia >> m_id;
         ia >> m_numFeatures;
         ia >> m_weight;
-        ia >> m_featureClasses;
+        ia >> m_feature_classes;
         ia >> m_data;
 
         return true;
@@ -107,9 +108,9 @@ namespace ism3d
         m_maxId = m_id + 1;
 
         Json::Value classes(Json::arrayValue);
-        classes.resize(m_featureClasses.size());
-        for (int i = 0; i < (int)m_featureClasses.size(); i++)
-            classes[i] = m_featureClasses[i];
+        classes.resize(m_feature_classes.size());
+        for (int i = 0; i < (int)m_feature_classes.size(); i++)
+            classes[i] = m_feature_classes[i];
         object["Classes"] = classes;
 
         Json::Value dataArray(Json::arrayValue);
@@ -146,16 +147,16 @@ namespace ism3d
 
         m_id = id->asInt();
         m_numFeatures = numFeatures->asInt();
-        m_featureClasses.resize(classes->size());
+        m_feature_classes.resize(classes->size());
         m_data.resize(dataArray->size());
 
-        for (int i = 0; i < (int)m_featureClasses.size(); i++) {
+        for (int i = 0; i < (int)m_feature_classes.size(); i++) {
             Json::Value arrayVal = (*classes)[i];
 
             if (arrayVal.isNull() || !arrayVal.isInt())
                 return false;
 
-            m_featureClasses[i] = arrayVal.asInt();
+            m_feature_classes[i] = arrayVal.asInt();
         }
 
         for (int i = 0; i < (int)m_data.size(); i++) {
