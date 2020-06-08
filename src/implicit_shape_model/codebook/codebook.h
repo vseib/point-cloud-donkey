@@ -62,9 +62,9 @@ namespace ism3d
          * @param distance the distance measure to compare codewords to features
          */
         template<typename T>
-        void activate(const std::vector<std::shared_ptr<Codeword> >& codewords,
-                      const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> >& features,
-                      const std::map<unsigned, std::vector<Utils::BoundingBox> >& boundingBoxes,
+        void activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
+                      const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+                      const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
                       const Distance* distance, flann::Index<T> &index, const bool flann_exact_match);
 
         /**
