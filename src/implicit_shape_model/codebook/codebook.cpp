@@ -670,8 +670,7 @@ int Codebook::getNumOfFeaturesForClass(unsigned classId) const
     int numFeatures = 0;
     for (distribution_t::const_iterator it = m_distribution.begin(); it != m_distribution.end(); it++)
     {
-        const std::shared_ptr<Codeword>& codeword = it->second->getCodeword();
-        const std::vector<unsigned>& classes = codeword->getFeatureClasses();
+        const std::vector<unsigned>& classes = it->second->getClassIds();
 
         for (int j = 0; j < (int)classes.size(); j++) {
             if (classes[j] == classId)

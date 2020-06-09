@@ -371,14 +371,6 @@ void ImplicitShapeModel::train()
     for (int i = 0; i < (int)clusterCenters.size(); i++)
     {
         std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f)); // init with uniform weights
-
-        // TODO VS: WOW! this lines are not needed!!!
-//        for (int j = 0; j < (int)clusters[i].size(); j++)
-//        {
-//            int idx = clusters[i][j];
-//            const ISMFeature& ismf = allFeatures_ranked->at(idx);
-//            codeword->addFeature(ismf.classId, ismf.instanceId);
-//        }
         codewords.push_back(codeword);
     }
 

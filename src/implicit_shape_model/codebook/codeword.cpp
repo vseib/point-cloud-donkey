@@ -64,27 +64,11 @@ namespace ism3d
         return m_weight;
     }
 
-    void Codeword::addFeature(unsigned classId, unsigned instanceId)
-    {
-        m_feature_classes.push_back(classId);
-        m_feature_instances.push_back(instanceId);
-    }
-
-    const std::vector<unsigned>& Codeword::getFeatureClasses() const
-    {
-        return m_feature_classes;
-    }
-
     void Codeword::iSaveData(boost::archive::binary_oarchive &oa) const
     {
         oa << m_id;
         oa << m_numFeatures;
         oa << m_weight;
-
-        m_maxId = m_id + 1; // TODO VS: remove this
-
-        oa << m_feature_classes;
-        oa << m_feature_instances;
         oa << m_data;
     }
 
@@ -93,8 +77,6 @@ namespace ism3d
         ia >> m_id;
         ia >> m_numFeatures;
         ia >> m_weight;
-        ia >> m_feature_classes;
-        ia >> m_feature_instances;
         ia >> m_data;
 
         return true;
