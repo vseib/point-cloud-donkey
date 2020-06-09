@@ -60,21 +60,6 @@ const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
 const Distance* distance, flann::Index<flann::ChiSquareDistance<float>> &index,
 const bool flann_exact_match);
 
-template
-void Codebook::activate<flann::HellingerDistance<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
-const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
-const Distance* distance, flann::Index<flann::HellingerDistance<float>> &index,
-const bool flann_exact_match);
-
-template
-void Codebook::activate<flann::HistIntersectionDistance<float> >(const std::vector<std::shared_ptr<Codeword>> &codewords,
-const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
-const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
-const Distance* distance, flann::Index<flann::HistIntersectionDistance<float>> &index,
-const bool flann_exact_match);
-
-
 template<typename T>
 void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
                         const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
@@ -360,20 +345,12 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
 
 
 template
-void Codebook::castVotes<flann::L2<float> >(pcl::PointCloud<ISMFeature>::ConstPtr features,
-    const Distance* distance, Voting& voting, flann::Index<flann::L2<float> > &index, const bool flann_exact_match) const;
+void Codebook::castVotes<flann::L2<float>>(pcl::PointCloud<ISMFeature>::ConstPtr features,
+    const Distance* distance, Voting& voting, flann::Index<flann::L2<float>> &index, const bool flann_exact_match) const;
 
 template
-void Codebook::castVotes<flann::ChiSquareDistance<float> >(pcl::PointCloud<ISMFeature>::ConstPtr features,
-    const Distance* distance, Voting& voting, flann::Index<flann::ChiSquareDistance<float> > &index, const bool flann_exact_match) const;
-
-template
-void Codebook::castVotes<flann::HellingerDistance<float> >(pcl::PointCloud<ISMFeature>::ConstPtr features,
-    const Distance* distance, Voting& voting, flann::Index<flann::HellingerDistance<float> > &index, const bool flann_exact_match) const;
-
-template
-void Codebook::castVotes<flann::HistIntersectionDistance<float> >(pcl::PointCloud<ISMFeature>::ConstPtr features,
-    const Distance* distance, Voting& voting, flann::Index<flann::HistIntersectionDistance<float> > &index, const bool flann_exact_match) const;
+void Codebook::castVotes<flann::ChiSquareDistance<float>>(pcl::PointCloud<ISMFeature>::ConstPtr features,
+    const Distance* distance, Voting& voting, flann::Index<flann::ChiSquareDistance<float>> &index, const bool flann_exact_match) const;
 
 template<typename T>
 void Codebook::castVotes(pcl::PointCloud<ISMFeature>::ConstPtr features,
@@ -397,18 +374,6 @@ template
 void Codebook::castVotes<flann::ChiSquareDistance<float> >(pcl::PointCloud<ISMFeature>::Ptr features,
 const Distance* distance, Voting& voting,
 flann::Index<flann::ChiSquareDistance<float> > &index,
-const bool flann_exact_match) const;
-
-template
-void Codebook::castVotes<flann::HellingerDistance<float> >(pcl::PointCloud<ISMFeature>::Ptr features,
-const Distance* distance, Voting& voting,
-flann::Index<flann::HellingerDistance<float> > &index,
-const bool flann_exact_match) const;
-
-template
-void Codebook::castVotes<flann::HistIntersectionDistance<float> >(pcl::PointCloud<ISMFeature>::Ptr features,
-const Distance* distance, Voting& voting,
-flann::Index<flann::HistIntersectionDistance<float> > &index,
 const bool flann_exact_match) const;
 
 template<typename T>

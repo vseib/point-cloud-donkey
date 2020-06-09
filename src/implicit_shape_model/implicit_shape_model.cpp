@@ -389,15 +389,6 @@ void ImplicitShapeModel::train()
     {
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexChi(), m_flann_exact_match);
     }
-    // TODO VS remove hellinger and histintersection
-    else if(m_distance->getType() == "Hellinger")
-    {
-        m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexHel(), m_flann_exact_match);
-    }
-    else if(m_distance->getType() == "HistIntersection")
-    {
-        m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexHist(), m_flann_exact_match);
-    }
 
     if(m_enable_signals)
     {
@@ -596,15 +587,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     {
         m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexChi(), m_flann_exact_match);
     }
-    // TODO VS: remove hellinger and histintersection everywhere
-    else if(m_distance->getType() == "Hellinger")
-    {
-        m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexHel(), m_flann_exact_match);
-    }
-    else if(m_distance->getType() == "HistIntersection")
-    {
-        m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexHist(), m_flann_exact_match);
-    }
+
     m_processing_times["voting"] += getElapsedTime(timer_voting, "milliseconds");
 
     // analyze voting spaces - only for debug
@@ -990,7 +973,8 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    // TODO VS: this is necessary since objects are created before config is read in json_object.cpp
+    // this is necessary since objects are created before config is read in json_object.cpp
+    // forward svm path as it might have been manually changed in config
     m_voting->setSVMPath(m_svm_path);
 
     // init data for objects
@@ -1018,10 +1002,6 @@ void ImplicitShapeModel::iPostInitConfig()
         m_distance = new DistanceEuclidean;
     else if (m_distanceType == DistanceChiSquared::getTypeStatic())
         m_distance = new DistanceChiSquared;
-    else if (m_distanceType == DistanceHellinger::getTypeStatic())
-        m_distance = new DistanceHellinger;
-    else if (m_distanceType == DistanceHistIntersection::getTypeStatic())
-        m_distance = new DistanceHistIntersection;
     else
         throw RuntimeException("invalid distance type: " + m_distanceType);
 

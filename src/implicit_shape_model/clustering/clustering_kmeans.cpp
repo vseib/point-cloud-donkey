@@ -46,10 +46,6 @@ namespace ism3d
             LOG_WARN("The k-means algorithm is only defined on euclidean distance. Using other distance metrices may lead to unexpected results.");
             if (getDistance().getType() == DistanceChiSquared::getTypeStatic())
                 cluster<DistanceChiSquared::DistanceType>(features);
-            else if (getDistance().getType() == DistanceHellinger::getTypeStatic())
-                cluster<DistanceHellinger::DistanceType>(features);
-            else if (getDistance().getType() == DistanceHistIntersection::getTypeStatic())
-                cluster<DistanceHistIntersection::DistanceType>(features);
             else
                 throw RuntimeException("invalid distance type: " + getDistance().getType());
         }

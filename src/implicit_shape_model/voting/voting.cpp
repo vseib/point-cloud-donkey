@@ -611,14 +611,7 @@ void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr 
             {
                 m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
-            else if(m_flann_helper->getDistType() == "Hellinger")
-            {
-                m_flann_helper->getIndexHel()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-            }
-            else if(m_flann_helper->getDistType() == "HistIntersection")
-            {
-                m_flann_helper->getIndexHist()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-            }
+
             delete[] query.ptr();
 
             // classic KNN approach
