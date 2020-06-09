@@ -37,10 +37,11 @@ float VotingMeanShift::iGetSeedsRange() const
 
 void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                   const std::vector<Voting::Vote>& votes, // all votes in the voting space for this class ID
-                                  std::vector<Eigen::Vector3f>& clusters,
+                                  std::vector<Eigen::Vector3f>& clusters, // maxima positions
                                   std::vector<double>& maxima_weights, // weights for all maxima
-                                  std::vector<std::vector<int> >& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
-                                  std::vector<std::vector<float> >& newVoteWeightsPerCluster, // holds a list of reweighted vote weights per cluster
+                                  std::vector<std::vector<unsigned>>& instanceIdsPerCluster, // list of instance ids that belong to each maximum index
+                                  std::vector<std::vector<int>>& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
+                                  std::vector<std::vector<float>>& newVoteWeightsPerCluster, // holds a list of reweighted vote weights per cluster
                                   unsigned classId)
 {
     // forward bandwith to voting class
@@ -99,7 +100,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         }
     }
     // in single object mode we assume that the whole voting space contains only one object
-    // in such a case we do not need mean-shift, but solely estimate the density with differnt
+    // in such case we do not need mean-shift, but solely estimate the density with differnt
     // bandwidth depending on the single object mode max type
     else
     {
@@ -129,6 +130,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         clusters.push_back(query.getVector3fMap());
     }
 
+    instanceIdsPerCluster.resize(clusters.size());
     voteIndicesPerCluster.resize(clusters.size());
     newVoteWeightsPerCluster.resize(clusters.size());
     maxima_weights.resize(clusters.size());
@@ -149,14 +151,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         maxima_weights[i] = estimateDensity(clusters[i], i, newVoteWeights, votes, search);
     }
 
-    for (int i = 0; i < (int)m_clusterIndices.size(); i++)
+    for (int vote_id = 0; vote_id < (int)m_clusterIndices.size(); vote_id++)
     {
-        int clusterIndex = m_clusterIndices[i];
+        int clusterIndex = m_clusterIndices[vote_id];
         // if clusterIndex == -1, the vote does not belong to a cluster (i.e. its distance to the cluster is too high)
         if (clusterIndex >= 0)
         {
-            voteIndicesPerCluster[clusterIndex].push_back(i);
-            newVoteWeightsPerCluster[clusterIndex].push_back(newVoteWeights[i]);
+            instanceIdsPerCluster[clusterIndex].push_back(votes[vote_id].instanceId);
+            voteIndicesPerCluster[clusterIndex].push_back(vote_id);
+            newVoteWeightsPerCluster[clusterIndex].push_back(newVoteWeights[vote_id]);
         }
     }
 }

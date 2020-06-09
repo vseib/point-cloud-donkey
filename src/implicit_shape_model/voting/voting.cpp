@@ -13,6 +13,7 @@
 #include "../codebook/codeword_distribution.h"
 
 #include <fstream>
+#include <sstream>
 #include <pcl/common/centroid.h>
 
 namespace ism3d
@@ -105,11 +106,12 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
         std::vector<Eigen::Vector3f> clusters;  // positions of maxima
         std::vector<double> maximaValues;       // weights of maxima
-        std::vector<std::vector<int> > voteIndices; // list of indices of all votes for each maximum
-        std::vector<std::vector<float> > reweightedVotes; // reweighted votes, a list for each maximum
+        std::vector<std::vector<unsigned>> instanceIds; // list of instance ids for each maximum
+        std::vector<std::vector<int>> voteIndices; // list of indices of all votes for each maximum
+        std::vector<std::vector<float>> reweightedVotes; // reweighted votes, a list for each maximum
 
         // process the algorithm to find maxima on the votes of the current class
-        iFindMaxima(points, votes, clusters, maximaValues, voteIndices, reweightedVotes, classId);
+        iFindMaxima(points, votes, clusters, maximaValues, instanceIds, voteIndices, reweightedVotes, classId);
 
         LOG_ASSERT(clusters.size() == maximaValues.size());
         LOG_ASSERT(clusters.size() == voteIndices.size());
@@ -131,6 +133,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
             VotingMaximum maximum;
             maximum.classId = classId;
+            maximum.instanceIds = instanceIds[i];
             maximum.position = clusters[i];
             maximum.weight = maximaValues[i];
             maximum.voteIndices = voteIndices[i];
@@ -189,6 +192,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     if(m_use_global_features && m_single_object_mode)
     {
         VotingMaximum global_result;
+        // TODO VS: global classification does not use instance labels so far
         classifyGlobalFeatures(m_global_features_single_object, global_result);
 
         // add global result to all maxima if in single object mode
@@ -199,6 +203,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         if(maxima.size() == 0)
         {
             global_result.classId = global_result.globalHypothesis.first;
+            global_result.instanceIds = global_result.instanceIds;
             global_result.weight = global_result.globalHypothesis.second;
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
@@ -218,7 +223,9 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     if(m_single_object_mode)
     {
+        // TODO VS add instances to maxima merging !!!
         // TODO VS refactoring - moved this to voting_mean_shift.cpp
+        // TODO VS -- is this also available in hough3d???
 //        pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
 //        pcl::concatenateFields(*points, *normals, *pointsWithNormals);
 
@@ -362,7 +369,15 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     for (int i = 0; i < (int)maxima.size(); i++)
     {
         const VotingMaximum& max = maxima[i];
-        LOG_INFO("maximum " << i << ", class: " << max.classId << ", weight: " << max.weight <<
+        std::ostringstream ostr;
+        for(auto elem : max.instanceIds)
+        {
+            ostr << elem << " ";
+        }
+        ostr << "\b"; // move cursor one position back (to overwrite last space)
+        LOG_INFO("maximum " << i << ", class: " << max.classId <<
+                 ", instances: " << ostr.str() <<
+                 ", weight: " << max.weight <<
                  ", glob: (" << max.globalHypothesis.first << ", " << max.globalHypothesis.second << ")" <<
                  ", this: (" << max.currentClassHypothesis.first << ", " << max.currentClassHypothesis.second << ")" <<
                  ", num votes: " << max.voteIndices.size());

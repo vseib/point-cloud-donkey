@@ -53,6 +53,7 @@ namespace ism3d
             position = Eigen::Vector3f(0, 0, 0);
             weight = 0;
             classId = -1;
+            instanceIds = {std::numeric_limits<unsigned>::max()};
             boundingBox.size = Eigen::Vector3f(0,0,0);
             boundingBox.position = position;
             boundingBox.rotQuat = boost::math::quaternion<float>(1, 0, 0, 0);
@@ -63,6 +64,7 @@ namespace ism3d
         Eigen::Vector3f position;
         float weight;
         unsigned classId;
+        std::vector<unsigned> instanceIds;
         Utils::BoundingBox boundingBox;
         std::vector<int> voteIndices;
 
@@ -208,8 +210,9 @@ namespace ism3d
                                  const std::vector<Voting::Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
-                                 std::vector<std::vector<int> >&,
-                                 std::vector<std::vector<float> >&,
+                                 std::vector<std::vector<unsigned>>&,
+                                 std::vector<std::vector<int>>&,
+                                 std::vector<std::vector<float>>&,
                                  unsigned) = 0;
 
         float getSearchDistForClass(const unsigned class_id) const;

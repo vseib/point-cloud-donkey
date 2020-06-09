@@ -33,8 +33,9 @@ namespace ism3d
                                     const std::vector<Voting::Vote>& votes,
                                     std::vector<Eigen::Vector3f>& clusters,
                                     std::vector<double>& maxima,
-                                    std::vector<std::vector<int> >& voteIndices,
-                                    std::vector<std::vector<float> >& reweightedVotes,
+                                    std::vector<std::vector<unsigned>>& instanceIds,
+                                    std::vector<std::vector<int>>& voteIndices,
+                                    std::vector<std::vector<float>>& reweightedVotes,
                                     unsigned classId)
     {
 
@@ -86,6 +87,8 @@ namespace ism3d
         for (int i = 0; i < (int)voteIndices.size(); i++)
         {
             const std::vector<int>& clusterVotes = voteIndices[i];
+            std::vector<unsigned>& clusterInstances = instanceIds[i];
+            clusterInstances.resize(clusterVotes.size());
             std::vector<float>& voteWeights = reweightedVotes[i];
             voteWeights.resize(clusterVotes.size());
 
@@ -95,6 +98,7 @@ namespace ism3d
             {
                 int ind = clusterVotes[j];
                 const Vote& vote = votes[ind];
+                clusterInstances[j] = vote.instanceId;
                 voteWeights[j] = vote.weight;
 
                 clusterCenter += (vote.position * vote.weight);
