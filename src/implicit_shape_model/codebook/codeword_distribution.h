@@ -44,12 +44,10 @@ namespace ism3d
          * @brief Add a codeword to the distribution.
          * @param codeword the codeword
          * @param feature the feature that activated the codeword
-         * @param classId the class id from which the codeword was activated
          * @param boundingBox the bounding box for the training model
          */
         void addCodeword(const std::shared_ptr<Codeword>& codeword,
                          const ISMFeature& feature,
-                         unsigned classId,
                          const Utils::BoundingBox& boundingBox);
 
         /**
@@ -128,6 +126,12 @@ namespace ism3d
         const std::vector<unsigned>& getClassIds() const;
 
         /**
+         * @brief Get instance ids for each vote vector.
+         * @return the list of instance ids
+         */
+        const std::vector<unsigned>& getInstanceIds() const;
+
+        /**
          * @brief Check if a class id has a corresponding vote.
          * @param classId the class id to check
          * @return true if the class id has a corresponding vote
@@ -177,7 +181,8 @@ namespace ism3d
         std::shared_ptr<Codeword> m_codeword;             // the associated codeword
         std::vector<Eigen::Vector3f> m_votes;               // vote vectors per codeword
         std::vector<float> m_weights;                       // weights for vote vectors
-        std::vector<unsigned> m_classIds;                   // class ids for vote vectors
+        std::vector<unsigned> m_class_ids;                   // class ids for vote vectors
+        std::vector<unsigned> m_instance_ids;               // instance ids for vote vectors
         std::vector<Utils::BoundingBox> m_boundingBoxes;    // bounding boxes for vote vectors
         std::map<unsigned, float> m_classWeights;
 

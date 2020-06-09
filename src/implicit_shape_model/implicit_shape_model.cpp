@@ -295,19 +295,21 @@ void ImplicitShapeModel::train()
             pcl::PointCloud<ISMFeature>::ConstPtr global_features;
             std::tie(model_features, global_features, std::ignore, std::ignore) = computeFeatures(model, has_normals, timer, timer, true);
 
-            // insert instance labels into features
-            for(ISMFeature ismf : model_features->points)
-            {
-                ismf.instanceId = instance_id;
-            }
-            for(ISMFeature ismf : global_features->points)
-            {
-                ismf.instanceId = instance_id;
-            }
-
             // check for NAN features
             pcl::PointCloud<ISMFeature>::Ptr model_features_cleaned = removeNaNFeatures(model_features);
             pcl::PointCloud<ISMFeature>::Ptr global_features_cleaned = removeNaNFeatures(global_features);
+
+            // insert labels into features
+            for(ISMFeature& ismf : model_features_cleaned->points)
+            {
+                ismf.classId = class_id;
+                ismf.instanceId = instance_id;
+            }
+            for(ISMFeature& ismf : global_features_cleaned->points)
+            {
+                ismf.classId = class_id;
+                ismf.instanceId = instance_id;
+            }
 
             if(m_enable_signals)
             {
@@ -370,12 +372,13 @@ void ImplicitShapeModel::train()
     {
         std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f)); // init with uniform weights
 
-        for (int j = 0; j < (int)clusters[i].size(); j++)
-        {
-            int idx = clusters[i][j];
-            const ISMFeature& ismf = allFeatures_ranked->at(idx);
-            codeword->addFeature(ismf.classId, ismf.instanceId);
-        }
+        // TODO VS: WOW! this lines are not needed!!!
+//        for (int j = 0; j < (int)clusters[i].size(); j++)
+//        {
+//            int idx = clusters[i][j];
+//            const ISMFeature& ismf = allFeatures_ranked->at(idx);
+//            codeword->addFeature(ismf.classId, ismf.instanceId);
+//        }
         codewords.push_back(codeword);
     }
 
@@ -394,6 +397,7 @@ void ImplicitShapeModel::train()
     {
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexChi(), m_flann_exact_match);
     }
+    // TODO VS remove hellinger and histintersection
     else if(m_distance->getType() == "Hellinger")
     {
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexHel(), m_flann_exact_match);
@@ -527,9 +531,9 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     boost::timer::cpu_timer timer_features;
 
     // filter out nan points
-    std::vector<int> dummy;
+    std::vector<int> unused;
     pcl::PointCloud<PointNormalT>::Ptr points(new pcl::PointCloud<PointNormalT>());
-    pcl::removeNaNFromPointCloud(*points_in, *points, dummy);
+    pcl::removeNaNFromPointCloud(*points_in, *points, unused);
     points->is_dense = false;
 
     // check first normal

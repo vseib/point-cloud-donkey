@@ -149,7 +149,7 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
                     }
 
                     // add the codeword to the distribution
-                    m_distribution[codeword->getId()]->addCodeword(codeword, feature, classId, boundingBox);
+                    m_distribution[codeword->getId()]->addCodeword(codeword, feature, boundingBox);
                 }
                 allActivatedCodewords.insert(allActivatedCodewords.end(), activatedCodewords.begin(), activatedCodewords.end());
             }

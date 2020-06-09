@@ -3,7 +3,7 @@
  *
  * Full text: https://opensource.org/licenses/BSD-3-Clause
  *
- * Copyright (c) 2018, Viktor Seib
+ * Copyright (c) 2020, Viktor Seib
  * All rights reserved.
  *
  */
@@ -36,7 +36,6 @@ namespace ism3d
 
     void CodewordDistribution::addCodeword(const std::shared_ptr<Codeword>& codeword,
                                            const ISMFeature& feature,
-                                           unsigned classId,
                                            const Utils::BoundingBox& boundingBox)
     {
         if (!codeword.get())
@@ -57,7 +56,8 @@ namespace ism3d
 
         // update activation distribution
         m_votes.push_back(vote);
-        m_classIds.push_back(classId);
+        m_class_ids.push_back(feature.classId);
+        m_instance_ids.push_back(feature.instanceId);
 
         m_features.push_back(feature);
         m_modelCenters.push_back(center);
@@ -82,7 +82,7 @@ namespace ism3d
     {
         LOG_ASSERT(m_votes.size() == m_weights.size());
         LOG_ASSERT(m_votes.size() == m_boundingBoxes.size());
-        LOG_ASSERT(m_votes.size() == m_classIds.size());
+        LOG_ASSERT(m_votes.size() == m_class_ids.size());
 
         float dist = (*distance)(m_codeword->getData(), feature.descriptor);
 
@@ -90,7 +90,7 @@ namespace ism3d
         for (int i = 0; i < (int)m_votes.size(); i++)
         {
             const Eigen::Vector3f& vote = m_votes[i];
-            unsigned classId = m_classIds[i];
+            unsigned classId = m_class_ids[i];
 
             // find weight for class
             std::map<unsigned, float>::const_iterator it = m_classWeights.find(classId);
@@ -130,13 +130,6 @@ namespace ism3d
             {
                 //LOG_ERROR("------------ discarding vote due to big distance, dist: " << dist << ", sigma: " << classSigma);
                 continue;
-            }
-
-            //LOG_ASSERT(weight >= 0.0f);
-            //LOG_ASSERT(weight <= 1.0f);
-            if(weight < 0 || weight > 1)
-            {
-                //LOG_ERROR("weight: " << weight << ", sigma: " << classSigma << ", dist: " << dist );
             }
 
             if (weight < std::numeric_limits<float>::epsilon())
@@ -251,7 +244,8 @@ namespace ism3d
         }
 
         m_votes.insert(m_votes.end(), distribution->m_votes.begin(), distribution->m_votes.end());
-        m_classIds.insert(m_classIds.end(), distribution->m_classIds.begin(), distribution->m_classIds.end());
+        m_class_ids.insert(m_class_ids.end(), distribution->m_class_ids.begin(), distribution->m_class_ids.end());
+        m_instance_ids.insert(m_instance_ids.end(), distribution->m_instance_ids.begin(), distribution->m_instance_ids.end());
         m_boundingBoxes.insert(m_boundingBoxes.end(), distribution->m_boundingBoxes.begin(), distribution->m_boundingBoxes.end());
         m_originalVotes.insert(m_originalVotes.end(), distribution->m_originalVotes.begin(), distribution->m_originalVotes.end());
         m_features.insert(m_features.end(), distribution->m_features.begin(), distribution->m_features.end());
@@ -297,13 +291,18 @@ namespace ism3d
 
     const std::vector<unsigned>& CodewordDistribution::getClassIds() const
     {
-        return m_classIds;
+        return m_class_ids;
+    }
+
+    const std::vector<unsigned>& CodewordDistribution::getInstanceIds() const
+    {
+        return m_instance_ids;
     }
 
     bool CodewordDistribution::hasClassId(unsigned classId) const
     {
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            unsigned id = m_classIds[i];
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            unsigned id = m_class_ids[i];
             if (id == classId)
                 return true;
         }
@@ -313,8 +312,8 @@ namespace ism3d
     std::vector<unsigned> CodewordDistribution::getDistinctClassIds() const
     {
         std::vector<unsigned> classIds;
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            unsigned classId = m_classIds[i];
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            unsigned classId = m_class_ids[i];
             if (std::find(classIds.begin(), classIds.end(), classId) == classIds.end())
                 classIds.push_back(classId);
         }
@@ -334,8 +333,8 @@ namespace ism3d
     int CodewordDistribution::getNumVotesForClass(unsigned classId) const
     {
         int numVotes = 0;
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            if (m_classIds[i] == classId)
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            if (m_class_ids[i] == classId)
                 numVotes++;
         }
         return numVotes;
@@ -355,7 +354,8 @@ namespace ism3d
         }
 
         oa << m_weights;
-        oa << m_classIds;
+        oa << m_class_ids;
+        oa << m_instance_ids;
 
         int class_weights_size = m_classWeights.size();
         oa << class_weights_size;
@@ -404,7 +404,8 @@ namespace ism3d
 
         m_votes.clear();
         m_weights.clear();
-        m_classIds.clear();
+        m_class_ids.clear();
+        m_instance_ids.clear();
         m_classWeights.clear();
         m_boundingBoxes.clear();
 
@@ -421,7 +422,8 @@ namespace ism3d
         }
 
         ia >> m_weights;
-        ia >> m_classIds;
+        ia >> m_class_ids;
+        ia >> m_instance_ids;
 
         int weights_size;
         ia >> weights_size;
