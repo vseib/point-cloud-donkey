@@ -311,17 +311,19 @@ int main(int argc, char **argv)
                          (filenames.size() > 0 && class_labels.size() > 0))  // load pointclouds and groundtruth
                 {
                     std::vector<std::string> pointClouds;
-                    std::vector<unsigned> groundtruth;
+                    std::vector<unsigned> gt_class_ids;
+                    std::vector<unsigned> gt_instance_ids;
 
                     if(variables.count("pointclouds")) // input directly from command line
                     {
                         pointClouds = variables["pointclouds"].as<std::vector<std::string> >();
-                        groundtruth = variables["groundtruth"].as<std::vector<unsigned> >();
+                        gt_class_ids = variables["groundtruth"].as<std::vector<unsigned> >();
                     }
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         pointClouds = filenames;
-                        groundtruth = class_labels;
+                        gt_class_ids = class_labels;
+                        gt_instance_ids = instance_labels;
                     }
 
                     // prepare summary
@@ -341,7 +343,7 @@ int main(int argc, char **argv)
                         std::string command = "mkdir ";
                         std::string folder = variables["output"].as<std::string>();
                         command.append(folder);
-                        int unused = std::system(command.c_str());
+                        std::ignore = std::system(command.c_str());
                         sleep(1);
 
                         // summary file
@@ -355,8 +357,9 @@ int main(int argc, char **argv)
                         std::cerr << "no output file specified, detected maxima will not be saved" << std::endl;
                     }
 
-                    if (pointClouds.size() == groundtruth.size())
+                    if (pointClouds.size() == gt_class_ids.size())
                     {
+                        // TODO VS: include instance labels in output file
                         boost::timer::cpu_timer timer;
 
                         std::map<std::string, double> times;
@@ -364,7 +367,7 @@ int main(int argc, char **argv)
                         {
                             // detect
                             std::string pointCloud = pointClouds.at(i);
-                            unsigned trueID = groundtruth.at(i);
+                            unsigned trueID = gt_class_ids.at(i);
                             std::vector<ism3d::VotingMaximum> maxima;
 
                             std::cout << "Processing file: " << pointCloud << std::endl;
@@ -513,13 +516,13 @@ int main(int argc, char **argv)
                     }
                     else
                     {
-                        std::cerr << "number of pointclouds does not match the number of groundtruth ids" << std::endl;
+                        std::cerr << "number of point clouds does not match the number of groundtruth ids" << std::endl;
                         return 1;
                     }
                 }
                 else
                 {
-                    std::cerr << "number of pointclouds arguments does not match the number of groundtruth id arguments" << std::endl;
+                    std::cerr << "number of point clouds arguments does not match the number of groundtruth id arguments" << std::endl;
                     return 1;
                 }
             }
