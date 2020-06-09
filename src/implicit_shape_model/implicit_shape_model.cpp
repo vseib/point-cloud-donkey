@@ -1,7 +1,7 @@
 /*
  * BSD 3-Clause License
  *
- * Copyright (c) 2018, Viktor Seib, Norman Link
+ * Copyright (c) 2020, Viktor Seib, Norman Link
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1010,95 +1010,6 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    return true;
-}
-
-Json::Value ImplicitShapeModel::iDataToJson() const
-{
-    Json::Value data(Json::objectValue);
-    data["Codebook"] = m_codebook->dataToJson();
-    data["Keypoints"] = m_keypointsDetector->dataToJson();
-    data["Features"] = m_featureDescriptor->dataToJson();
-    data["GlobalFeatures"] = m_globalFeatureDescriptor->dataToJson();
-    data["Clustering"] = m_clustering->dataToJson();
-    data["Voting"] = m_voting->dataToJson();
-    data["FeatureWeighting"] = m_featureRanking->dataToJson();
-    return data;
-}
-
-bool ImplicitShapeModel::iDataFromJson(const Json::Value& object)
-{
-    const Json::Value *codebook = &(object["Codebook"]);
-    const Json::Value *keypoints = &(object["Keypoints"]);
-    const Json::Value *features = &(object["Features"]);
-    const Json::Value *global_features = &(object["GlobalFeatures"]);
-    const Json::Value *clustering = &(object["Clustering"]);
-    const Json::Value *voting = &(object["Voting"]);
-    const Json::Value *feature_ranking = &(object["FeatureWeighting"]);
-
-    if (codebook->isNull() || !codebook->isObject() ||
-            keypoints->isNull() || !keypoints->isObject() ||
-            features->isNull() || !features->isObject() ||
-            clustering->isNull() || !clustering->isObject() ||
-            voting->isNull() || !voting->isObject()) {
-        LOG_ERROR("could not find necessary json entries");
-        return false;
-    }
-
-    // for backward compatibility the following objects give an error, but do not return false
-    if(feature_ranking->isNull() || !feature_ranking->isObject())
-    {
-        LOG_ERROR("could not find \"FeatureWeighting\" object in json file");
-    }
-
-    // handle global features separately to be able to use old configs and trained files
-    bool use_dummy = false;
-    Json::Value dummy(Json::objectValue);
-    dummy["Type"] = Json::Value("Dummy");
-
-    if (global_features->isNull() || !global_features->isObject())
-    {
-        use_dummy = true;
-        LOG_WARN("No global features available in data file, using Dummy global feature!");
-    }
-
-
-    // objects have to be initialized already
-    if (!m_codebook || !m_keypointsDetector || !m_featureDescriptor || !m_globalFeatureDescriptor ||
-            !m_clustering || !m_voting || !m_featureRanking) {
-        LOG_ERROR("object is not initialized");
-        return false;
-    }
-
-    // descriptor needs to have the same type
-    Json::Value featureType = (*features)["Type"];
-    Json::Value globalFeatureType = use_dummy ? dummy["Type"] : (*global_features)["Type"];
-
-    if (featureType.isNull() || !featureType.isString() ||
-            globalFeatureType.isNull() || !globalFeatureType.isString() ) {
-        LOG_ERROR("invalid feature type");
-        return false;
-    }
-
-    std::string typeStr = featureType.asString();
-    if (typeStr != m_featureDescriptor->getType())
-        throw RuntimeException("Cannot change local descriptor type after learning.");
-
-    std::string typeStrGlobal = globalFeatureType.asString();
-    if (typeStrGlobal != m_globalFeatureDescriptor->getType())
-        throw RuntimeException("Cannot change global descriptor type after learning.");
-
-    // init data for objects
-    if (!m_codebook->dataFromJson(*codebook) ||
-            !m_keypointsDetector->dataFromJson(*keypoints) ||
-            !m_featureDescriptor->dataFromJson(*features) ||
-            !m_globalFeatureDescriptor->dataFromJson(*global_features) ||
-            !m_clustering->dataFromJson(*clustering) ||
-            !m_voting->dataFromJson(*voting) ||
-            !m_featureRanking->dataFromJson(*feature_ranking)) {
-        LOG_ERROR("could not create child objects");
-        return false;
-    }
     return true;
 }
 

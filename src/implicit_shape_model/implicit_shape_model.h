@@ -175,8 +175,6 @@ namespace ism3d
         bool iChildConfigsFromJson(const Json::Value&);
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
-        Json::Value iDataToJson() const;
-        bool iDataFromJson(const Json::Value&);
         void iPostInitConfig();
 
     private:

@@ -71,9 +71,6 @@ namespace ism3d
         void saveData(boost::archive::binary_oarchive &oa) const;
         bool loadData(boost::archive::binary_iarchive &ia);
 
-        Json::Value dataToJson() const;
-        bool dataFromJson(const Json::Value&);
-
         void setOutputFilename(std::string file);
 
     protected:
@@ -87,9 +84,6 @@ namespace ism3d
 
         virtual void iSaveData(boost::archive::binary_oarchive &oa) const;
         virtual bool iLoadData(boost::archive::binary_iarchive &ia);
-
-        virtual Json::Value iDataToJson() const;
-        virtual bool iDataFromJson(const Json::Value&);
 
         virtual void iPostInitConfig();
 

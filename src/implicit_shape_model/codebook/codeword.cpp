@@ -84,6 +84,7 @@ namespace ism3d
         m_maxId = m_id + 1; // TODO VS: remove this
 
         oa << m_feature_classes;
+        oa << m_feature_instances;
         oa << m_data;
     }
 
@@ -93,80 +94,8 @@ namespace ism3d
         ia >> m_numFeatures;
         ia >> m_weight;
         ia >> m_feature_classes;
+        ia >> m_feature_instances;
         ia >> m_data;
-
-        return true;
-    }
-
-    Json::Value Codeword::iDataToJson() const
-    {
-        Json::Value object(Json::objectValue);
-        object["ID"] = m_id;
-        object["NumFeatures"] = m_numFeatures;
-        object["Weight"] = m_weight;
-
-        m_maxId = m_id + 1;
-
-        Json::Value classes(Json::arrayValue);
-        classes.resize(m_feature_classes.size());
-        for (int i = 0; i < (int)m_feature_classes.size(); i++)
-            classes[i] = m_feature_classes[i];
-        object["Classes"] = classes;
-
-        Json::Value dataArray(Json::arrayValue);
-        dataArray.resize(m_data.size());
-        for (int i = 0; i < (int)m_data.size(); i++)
-            dataArray[i] = m_data[i];
-        object["CodewordArray"] = dataArray;
-
-        return object;
-    }
-
-    bool Codeword::iDataFromJson(const Json::Value& object)
-    {
-        const Json::Value *id = &(object["ID"]);
-        const Json::Value *numFeatures = &(object["NumFeatures"]);
-        const Json::Value *classes = &(object["Classes"]);
-        const Json::Value *dataArray = &(object["CodewordArray"]);
-        const Json::Value *weight = &(object["Weight"]);
-
-        if (id->isNull() || !id->isInt() ||
-                numFeatures->isNull() || !numFeatures->isInt() ||
-                classes->isNull() || !classes->isArray() ||
-                dataArray->isNull() || !dataArray->isArray())
-            return false;
-
-        if(weight->isNull() || !weight->isDouble())
-        {
-            m_weight = 1.0f;
-        }
-        else
-        {
-            m_weight = weight->asFloat();
-        }
-
-        m_id = id->asInt();
-        m_numFeatures = numFeatures->asInt();
-        m_feature_classes.resize(classes->size());
-        m_data.resize(dataArray->size());
-
-        for (int i = 0; i < (int)m_feature_classes.size(); i++) {
-            Json::Value arrayVal = (*classes)[i];
-
-            if (arrayVal.isNull() || !arrayVal.isInt())
-                return false;
-
-            m_feature_classes[i] = arrayVal.asInt();
-        }
-
-        for (int i = 0; i < (int)m_data.size(); i++) {
-            Json::Value arrayVal = (*dataArray)[i];
-
-            if (arrayVal.isNull() || !arrayVal.isNumeric())
-                return false;
-
-            m_data[i] = arrayVal.asFloat();
-        }
 
         return true;
     }

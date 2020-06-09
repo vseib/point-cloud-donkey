@@ -84,9 +84,6 @@ namespace ism3d
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
 
-        Json::Value iDataToJson() const;
-        bool iDataFromJson(const Json::Value&);
-
     private:
         static int m_maxId;
         int m_id;

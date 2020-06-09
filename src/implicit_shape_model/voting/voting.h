@@ -215,9 +215,6 @@ namespace ism3d
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
 
-        Json::Value iDataToJson() const;
-        bool iDataFromJson(const Json::Value& data);
-
         float m_radius;              // holds the bin size or the bandwith
 
         std::string m_radiusType; // take value from config or used learned average bounding box dimensions
