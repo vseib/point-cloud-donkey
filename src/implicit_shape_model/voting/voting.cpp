@@ -53,12 +53,12 @@ Voting::~Voting()
     {
         for(std::string s : m_svm_files)
         {
-            int ret = std::system(("rm " + s).c_str());
+            std::ignore = std::system(("rm " + s).c_str());
         }
     }
 }
 
-void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId,
+void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsigned instanceId,
                   const Eigen::Vector3f& keypoint, const Utils::BoundingBox& boundingBox, int codewordId)
 {
     // add the vote
@@ -66,6 +66,7 @@ void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId,
     newVote.position = position; // position of object center the vote votes for
     newVote.weight = weight;
     newVote.classId = classId;
+    newVote.instanceId = instanceId;
     newVote.keypoint = keypoint;
     newVote.boundingBox = boundingBox;
     newVote.codewordId = codewordId;

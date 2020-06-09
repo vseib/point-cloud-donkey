@@ -116,6 +116,7 @@ namespace ism3d
             Eigen::Vector3f position;
             float weight;
             unsigned classId;
+            unsigned instanceId;
             Eigen::Vector3f keypoint;       // associated keypoint position
             Utils::BoundingBox boundingBox; // associated bounding box
             int codewordId;                 // codeword the vote belongs to
@@ -126,13 +127,14 @@ namespace ism3d
          * @param position the vote position
          * @param weight the vote weight
          * @param classId the class id for the vote
+         * @param instanceId the instance id for the vote
          * @param keypoint the keypoint position from which the vote originated
          * @param boundingBox the bounding box for the object that casted the vote
          * @param codewordId the id of the codeword the vote belongs to
          */
         void vote(Eigen::Vector3f position,
                   float weight,
-                  unsigned classId,
+                  unsigned classId, unsigned instanceId,
                   const Eigen::Vector3f& keypoint,
                   const Utils::BoundingBox& boundingBox, int codewordId);
 

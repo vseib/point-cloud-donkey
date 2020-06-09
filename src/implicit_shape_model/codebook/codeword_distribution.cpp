@@ -91,6 +91,7 @@ namespace ism3d
         {
             const Eigen::Vector3f& vote = m_votes[i];
             unsigned classId = m_class_ids[i];
+            unsigned instanceId = m_instance_ids[i];
 
             // find weight for class
             std::map<unsigned, float>::const_iterator it = m_classWeights.find(classId);
@@ -136,7 +137,8 @@ namespace ism3d
                 continue;
 
             // cast vote into voting space
-            castVote(vote, feature.referenceFrame, feature, m_boundingBoxes[i], weight, classId, voting, m_codeword->getId());
+            castVote(vote, feature.referenceFrame, feature, m_boundingBoxes[i],
+                     weight, classId, instanceId, voting, m_codeword->getId());
         }
     }
 
@@ -146,6 +148,7 @@ namespace ism3d
                                         Utils::BoundingBox boundingBox,
                                         float weight,
                                         unsigned classId,
+                                        unsigned instanceId,
                                         Voting& voting,
                                         int codewordId) const
     {
@@ -159,7 +162,7 @@ namespace ism3d
         Utils::getRotQuaternion(refFrame, rotQuat);
         boundingBox.rotQuat = boundingBox.rotQuat * rotQuat;
 
-        voting.vote(center, weight, classId, keyPos, boundingBox, codewordId);
+        voting.vote(center, weight, classId, instanceId, keyPos, boundingBox, codewordId);
     }
 
     void CodewordDistribution::computeWeights()

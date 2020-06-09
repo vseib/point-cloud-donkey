@@ -173,8 +173,8 @@ namespace ism3d
                       const pcl::ReferenceFrame&,
                       const ISMFeature&,
                       Utils::BoundingBox,
-                      float,
-                      unsigned,
+                      float weight,
+                      unsigned classId, unsigned instanceId,
                       Voting&, int codewordId) const;
 
         // saved with the distribution
