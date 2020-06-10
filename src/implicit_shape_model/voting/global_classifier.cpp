@@ -118,18 +118,18 @@ namespace ism3d
         }
     }
 
-    void GlobalClassifier::verifyHypothesis(
+    void GlobalClassifier::segmentROI(
             const pcl::PointCloud<PointT>::ConstPtr &points,
             const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
-            ism3d::VotingMaximum &maximum)
+            const ism3d::VotingMaximum &maximum,
+            pcl::PointCloud<PointT>::Ptr &segmented_points,
+            pcl::PointCloud<pcl::Normal>::Ptr &segmented_normals)
     {
         // used to extract a portion of the input cloud to estimage a global feature
         pcl::KdTreeFLANN<PointT> input_points_kdtree;
         input_points_kdtree.setInputCloud(points);
 
         // first segment region cloud from input with typical radius for this class id
-        pcl::PointCloud<PointT>::Ptr segmented_points(new pcl::PointCloud<PointT>());
-        pcl::PointCloud<pcl::Normal>::Ptr segmented_normals(new pcl::PointCloud<pcl::Normal>());
         std::vector<int> pointIdxRadiusSearch;
         std::vector<float> pointRadiusSquaredDistance;
         PointT query;
@@ -157,20 +157,16 @@ namespace ism3d
         {
             LOG_WARN("Error during nearest neighbor search.");
         }
-
-        // compute global feature on segmented points
-        pcl::PointCloud<PointT>::ConstPtr dummy_keypoints(new pcl::PointCloud<PointT>());
-        pcl::search::Search<PointT>::Ptr search = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
-        pcl::PointCloud<ISMFeature>::ConstPtr global_features =
-                (*m_feature_algorithm)(segmented_points, segmented_normals, segmented_points, segmented_normals, dummy_keypoints, search);
-
-        classify(global_features, maximum);
     }
 
     void GlobalClassifier::classify(
-            const pcl::PointCloud<ISMFeature>::ConstPtr global_features,
+            const pcl::PointCloud<PointT>::ConstPtr &points,
+            const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
             VotingMaximum &maximum)
     {
+        // compute global features
+        pcl::PointCloud<ISMFeature>::ConstPtr global_features = computeGlobalFeatures(points, normals);
+
         // if no SVM data available defaul to KNN
         if(m_svm_error) m_global_feature_method = "KNN";
 
@@ -329,6 +325,14 @@ namespace ism3d
             maximum.globalHypothesis = {svm_response.label, svm_response.score};
             maximum.currentClassHypothesis = {maximum.classId, cur_score};
         }
+    }
+
+    pcl::PointCloud<ISMFeature>::ConstPtr GlobalClassifier::computeGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr points,
+                                                 const pcl::PointCloud<pcl::Normal>::ConstPtr normals)
+    {
+        pcl::PointCloud<PointT>::ConstPtr dummy_keypoints(new pcl::PointCloud<PointT>());
+        pcl::search::Search<PointT>::Ptr search = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
+        return (*m_feature_algorithm)(points, normals, points, normals, dummy_keypoints, search);
     }
 
     void GlobalClassifier::insertGlobalResult(std::map<unsigned, ism3d::GlobalResultAccu> &max_global_voting,

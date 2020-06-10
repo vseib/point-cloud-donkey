@@ -33,6 +33,7 @@ Voting::Voting()
     addParameter(m_radiusFactor, "BinOrBandwidthFactor", 1.0f);
     addParameter(m_max_filter_type, "MaxFilterType", std::string("None"));
     addParameter(m_max_type_param, "SingleObjectMaxType", std::string("Default"));
+    addParameter(m_single_object_mode, "SingleObjectMode", false);
 
     addParameter(m_use_global_features, "UseGlobalFeatures", false);
     addParameter(m_global_feature_method, "GlobalFeaturesStrategy", std::string("KNN"));
@@ -41,8 +42,6 @@ Voting::Voting()
     addParameter(m_global_param_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
     addParameter(m_global_param_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_global_param_weight_factor, "GlobalParamWeightFactor", 1.5f);
-
-    m_single_object_mode = false;
 }
 
 Voting::~Voting()
@@ -168,7 +167,11 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             // do this for each maximum
             if(m_use_global_features && !m_single_object_mode)
             {
-                m_global_classifier->verifyHypothesis(points, normals, maximum);
+                pcl::PointCloud<PointT>::Ptr segmented_points(new pcl::PointCloud<PointT>());
+                pcl::PointCloud<pcl::Normal>::Ptr segmented_normals(new pcl::PointCloud<pcl::Normal>());
+
+                m_global_classifier->segmentROI(points, normals, maximum, segmented_points, segmented_normals);
+                m_global_classifier->classify(segmented_points, segmented_normals, maximum);
             }
 
             #pragma omp critical
@@ -184,7 +187,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     {
         VotingMaximum global_result;
         // TODO VS: global classification does not use instance labels so far
-        m_global_classifier->classify(m_global_features_single_object, global_result);
+        m_global_classifier->classify(points, normals, global_result);
 
         // add global result to all maxima if in single object mode
         for(VotingMaximum &max : maxima)
@@ -587,14 +590,6 @@ void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
     }
 }
 
-// TODO VS: move single object mode entirely to voting class
-void Voting::setGlobalFeatures(pcl::PointCloud<ISMFeature>::Ptr &globalFeatures)
-{
-    m_global_features_single_object = globalFeatures;
-    m_single_object_mode = true;
-    m_global_classifier->enableSingleObjectMode();
-}
-
 void Voting::forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures)
 {
     m_global_features = globalFeatures;
@@ -763,6 +758,13 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         m_global_classifier->setLoadedFeatures(global_features_cloud);
         m_global_classifier->computeAverageRadii(global_features_map);
         m_global_classifier->loadSVMModels(m_svm_path);
+        if(m_single_object_mode)
+        {
+            LOG_INFO("enabling single object mode in voting class");
+            m_global_classifier->enableSingleObjectMode();
+        }
+        else
+            LOG_INFO("DISABLED single object mode in voting class");
     }
     return true;
 }

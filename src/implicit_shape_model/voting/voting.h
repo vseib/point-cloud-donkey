@@ -111,12 +111,6 @@ namespace ism3d
          */
         void forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures);
 
-        /**
-         * @brief setGlobalFeatures set a PointCloud with global featues to be used during detection in single-object-mode
-         * @param globalFeatures
-         */
-        void setGlobalFeatures(pcl::PointCloud<ISMFeature>::Ptr &globalFeatures);
-
         /** @brief set pointer to global features descriptor for detection (set while loading the dataset)
          *  @param glob - pointer to the descriptor object
          */
@@ -170,13 +164,13 @@ namespace ism3d
 
         // maps class ids to a vector of global features, number of objects per class = number of global features per class
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
-        pcl::PointCloud<ISMFeature>::Ptr m_global_features_single_object; // used during detection in single-object-mode
 
-        bool m_single_object_mode;
         int m_global_feature_influence_type;
         float m_global_param_min_svm_score;
         float m_global_param_rate_limit;
         float m_global_param_weight_factor;
+
+        bool m_single_object_mode;
 
         std::string m_max_filter_type;
         SingleObjectMaxType m_max_type;
@@ -208,7 +202,6 @@ namespace ism3d
         std::string m_global_feature_method;
         std::string m_svm_path; // path in config to svm models
         Features* m_global_feature_descriptor;
-
 
         // NOTE: only for debug
         static float state_gt;

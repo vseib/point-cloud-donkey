@@ -56,12 +56,16 @@ namespace ism3d
                          int k_global);
         virtual ~GlobalClassifier();
 
-        void verifyHypothesis(const pcl::PointCloud<PointT>::ConstPtr &points,
+        // segment isolated object from point cloud
+        void segmentROI(const pcl::PointCloud<PointT>::ConstPtr &points,
                               const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
-                              ism3d::VotingMaximum &maximum);
+                              const ism3d::VotingMaximum &maximum,
+                              pcl::PointCloud<PointT>::Ptr &segmented_points,
+                              pcl::PointCloud<pcl::Normal>::Ptr &segmented_normals);
 
-        void classify(const pcl::PointCloud<ISMFeature>::ConstPtr global_features,
-                      ism3d::VotingMaximum &maximum);
+        void classify(const pcl::PointCloud<PointT>::ConstPtr &points,
+                      const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
+                      VotingMaximum &maximum);
 
         void computeAverageRadii(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &global_features);
 
@@ -92,6 +96,9 @@ namespace ism3d
         void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting,
                                 unsigned found_class,
                                 float score) const;
+
+        pcl::PointCloud<ISMFeature>::ConstPtr computeGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr points,
+                                                                    const pcl::PointCloud<pcl::Normal>::ConstPtr normals);
 
         bool m_index_created;
         bool m_single_object_mode;

@@ -507,6 +507,12 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
         LOG_WARN("point cloud is empty");
         return std::make_tuple(std::vector<VotingMaximum>(), m_processing_times);
     }
+    if(m_single_object_mode)
+    {
+        // to avoid errors if using old config files
+        LOG_FATAL("The parameter for \"single object mode\" must be set inside the \"Voting\" section of the config file. You are using the \"Parameters\" section.");
+        return std::make_tuple(std::vector<VotingMaximum>(), m_processing_times);
+    }
 
     // measure the time
     boost::timer::cpu_timer timer;
@@ -533,15 +539,13 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     // compute features
     pcl::PointCloud<ISMFeature>::ConstPtr features;
-    pcl::PointCloud<ISMFeature>::ConstPtr globalFeatures;
     pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaN;
     pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN;
     boost::timer::cpu_timer timer_normals;
     timer_normals.stop();
     boost::timer::cpu_timer timer_keypoints;
     timer_keypoints.stop();
-    std::tie(features, globalFeatures, pointsWithoutNaN, normalsWithoutNaN) = computeFeatures(points, hasNormals, timer_normals, timer_keypoints,
-                                                                                              m_single_object_mode);
+    std::tie(features, std::ignore, pointsWithoutNaN, normalsWithoutNaN) = computeFeatures(points, hasNormals, timer_normals, timer_keypoints, false);
     m_processing_times["normals"] += getElapsedTime(timer_normals, "milliseconds");
     m_processing_times["keypoints"] += getElapsedTime(timer_keypoints, "milliseconds");
     m_processing_times["features"] -= getElapsedTime(timer_normals, "milliseconds");
@@ -549,7 +553,6 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     // check for NAN features
     pcl::PointCloud<ISMFeature>::Ptr features_cleaned = removeNaNFeatures(features);
-    pcl::PointCloud<ISMFeature>::Ptr globalFeatures_cleaned = removeNaNFeatures(globalFeatures);
     m_processing_times["features"] += getElapsedTime(timer_features, "milliseconds");
 
     if(m_enable_signals)
@@ -595,9 +598,6 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     {
         all_votings = analyzeVotingSpacesForDebug(m_voting->getVotes(), points);
     }
-
-    // forward global feature to voting class in single object mode
-    if(m_single_object_mode) m_voting->setGlobalFeatures(globalFeatures_cleaned);
 
     LOG_INFO("finding maxima");
     boost::timer::cpu_timer timer_maxima;

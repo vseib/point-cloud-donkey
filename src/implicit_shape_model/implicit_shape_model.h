@@ -245,7 +245,7 @@ namespace ism3d
         double m_svm_param_c;
         double m_svm_param_gamma;
         int m_svm_param_k_fold;
-        bool m_single_object_mode;
+        bool m_single_object_mode; // remains here for backward-compatible error throwing
 
         int m_num_kd_trees;
         bool m_flann_exact_match;
