@@ -188,7 +188,6 @@ namespace ism3d
             // NOTE: some global features produce more than 1 descriptor per object, hence the loop
             for(ISMFeature query_feature : global_features->points)
             {
-                LOG_INFO("   query_feature.descriptor.size() " << query_feature.descriptor.size());
                 // insert the query point
                 flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
                 for(int i = 0; i < query_feature.descriptor.size(); i++)

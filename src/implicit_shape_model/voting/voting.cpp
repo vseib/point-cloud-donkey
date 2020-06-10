@@ -760,11 +760,9 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         m_global_classifier->loadSVMModels(m_svm_path);
         if(m_single_object_mode)
         {
-            LOG_INFO("enabling single object mode in voting class");
             m_global_classifier->enableSingleObjectMode();
         }
-        else
-            LOG_INFO("DISABLED single object mode in voting class");
+
     }
     return true;
 }
