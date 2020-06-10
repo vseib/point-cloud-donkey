@@ -39,8 +39,8 @@ namespace ism3d
                                     unsigned classId)
     {
 
-        LOG_WARN("SingleObjectMode is not supported with Hough3D - switch to MeanShift to use it!");
-        // TODO VS only warn in single object mode
+        if(m_single_object_mode)
+            LOG_WARN("SingleObjectMode is not supported with Hough3D - switch to MeanShift to use it!");
 
         if(m_radiusType == "Config")
         {

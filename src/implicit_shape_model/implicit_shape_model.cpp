@@ -382,7 +382,6 @@ void ImplicitShapeModel::train()
     // create index depending on distance type
     if(m_distance->getType() == "Euclidean")
     {
-        // TODO VS do I still need the m_distance object???
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexL2(), m_flann_exact_match);
     }
     else if(m_distance->getType() == "ChiSquared")

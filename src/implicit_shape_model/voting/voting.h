@@ -14,7 +14,6 @@
 #include <vector>
 #include <map>
 #include <Eigen/Core>
-#include <boost/shared_ptr.hpp>
 
 #include "../features/features.h"
 #include "../classifier/custom_SVM.h"

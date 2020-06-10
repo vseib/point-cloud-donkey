@@ -59,16 +59,6 @@ namespace ism3d
                               const std::vector<Voting::Vote>&,
                               pcl::search::KdTree<PointT>::Ptr& search);
 
-        // only the first maximum in the radius is retained
-        void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
-        // the average of the maxima in the radius is retained
-        void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
-        // the average of the maxima and its [neighbor's neighbor's ...] neighbors in the radius is retained
-        void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
-
     private:
         bool computeMeanShift(const std::vector<Voting::Vote>&,
                               const Eigen::Vector3f& center,

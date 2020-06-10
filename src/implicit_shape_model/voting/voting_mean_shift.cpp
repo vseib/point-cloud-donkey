@@ -13,6 +13,7 @@
 #include <pcl/filters/filter.h>
 
 #include "single_object_mode_helper.h"
+#include "maxima_handler.h"
 
 namespace ism3d
 {
@@ -85,19 +86,9 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         std::vector<Eigen::Vector3f> clusterCenters;
         iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
 
-        // retrieve maximum points
-        if(m_maxima_suppression_type == "Suppress")
-        {
-            suppressNeighborMaxima(clusterCenters, clusters);
-        }
-        else if(m_maxima_suppression_type == "Average")
-        {
-            averageNeighborMaxima(clusterCenters, clusters);
-        }
-        else if(m_maxima_suppression_type == "AverageShift")
-        {
-            averageShiftNeighborMaxima(clusterCenters, clusters);
-        }
+        // suppress or average neighboring maxima (or average shift multiple times)
+        std::shared_ptr<MaximaHandler> maxh = std::make_shared<MaximaHandler>(m_maxima_suppression_type);
+        maxh->processMaxima(clusterCenters, m_bandwidth, clusters);
     }
     // in single object mode we assume that the whole voting space contains only one object
     // in such case we do not need mean-shift, but solely estimate the density with differnt
@@ -298,168 +289,6 @@ bool VotingMeanShift::computeMeanShift(const std::vector<Voting::Vote>& votes,
 
     return true;
 }
-
-void VotingMeanShift::suppressNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
-                                             std::vector<Eigen::Vector3f>& clusters) const
-{
-    std::vector<bool> duplicate(maxima.size());
-    duplicate.assign(duplicate.size(), false);
-
-    for (int i = 0; i < (int)maxima.size(); i++)
-    {
-        const Eigen::Vector3f& pointA = maxima[i];
-
-        if (duplicate[i])
-            continue;
-
-        for (int j = i + 1; j < (int)maxima.size(); j++)
-        {
-            const Eigen::Vector3f& pointB = maxima[j];
-
-            if (duplicate[j])
-                continue;
-
-            float distance = (pointA - pointB).norm();
-
-            if (distance < m_bandwidth)
-                duplicate[j] = true;
-        }
-    }
-
-    // add correct cluster centers
-    for (int i = 0; i < (int)duplicate.size(); i++) {
-        if (!duplicate[i])
-            clusters.push_back(maxima[i]);
-    }
-}
-
-void VotingMeanShift::averageNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
-                                             std::vector<Eigen::Vector3f>& clusters) const
-{
-    std::vector<std::vector<int>> duplicate_indices(maxima.size());
-    for(int i = 0; i < duplicate_indices.size(); i++)
-    {
-        // add itself for simpler averaging later
-        duplicate_indices.at(i).push_back(i);
-    }
-
-    std::vector<bool> duplicate(maxima.size());
-    duplicate.assign(duplicate.size(), false);
-
-    for (int k = 0; k < (int)maxima.size(); k++)
-    {
-        const Eigen::Vector3f& pointA = maxima[k];
-
-        if (duplicate[k])
-            continue;
-
-        for (int j = k + 1; j < (int)maxima.size(); j++)
-        {
-            const Eigen::Vector3f& pointB = maxima[j];
-
-            if (duplicate[j])
-                continue;
-
-            float distance = (pointA - pointB).norm();
-
-            if (distance < m_bandwidth)
-            {
-                duplicate[j] = true;
-                duplicate_indices.at(k).push_back(j);
-            }
-        }
-    }
-
-    // add correct cluster centers
-    for (int i = 0; i < (int)duplicate_indices.size(); i++)
-    {
-        std::vector<int> index_list = duplicate_indices.at(i);
-        if(index_list.size() == 1)
-        {
-            // maximum without neighbors can be added directly
-            clusters.push_back(maxima[index_list.at(0)]);
-        }
-        else
-        {
-            // compute average of maximum and all neighbors
-            Eigen::Vector3f average(0, 0, 0);
-            for (int i = 0; i < index_list.size(); i++)
-            {
-                // update shifted position
-                average += maxima[index_list.at(i)];
-            }
-            average /= index_list.size();
-            clusters.push_back(average);
-        }
-    }
-}
-
-
-void VotingMeanShift::averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
-                                            std::vector<Eigen::Vector3f>& clusters) const
-{
-    std::vector<std::vector<int>> duplicate_indices(maxima.size());
-    for(int i = 0; i < duplicate_indices.size(); i++)
-    {
-        // add itself as seedpoint for maxima suppression
-        duplicate_indices.at(i).push_back(i);
-    }
-
-    std::vector<bool> duplicate(maxima.size());
-    duplicate.assign(duplicate.size(), false);
-
-    // for each maximum ...
-    for(int k = 0; k < (int)maxima.size(); k++)
-    {
-        if (duplicate[k])
-            continue;
-
-        // ... take the seedpoint
-        for(int i : duplicate_indices.at(k))
-        {
-            const Eigen::Vector3f& pointA = maxima[i];
-
-            // check all maxima within bandwidth
-            for (int j = i + 1; j < (int)maxima.size(); j++)
-            {
-                const Eigen::Vector3f& pointB = maxima[j];
-
-                float distance = (pointA - pointB).norm();
-
-                if (distance < m_bandwidth)
-                {
-                    // enables to check neighbors of neighbors etc.
-                    duplicate[j] = true;
-                    duplicate_indices.at(i).push_back(j);
-                }
-            }
-        }
-    }
-
-    // add correct cluster centers
-    for (int i = 0; i < (int)duplicate_indices.size(); i++)
-    {
-        std::vector<int> index_list = duplicate_indices.at(i);
-        if(index_list.size() == 1)
-        {
-            // maximum without neighbors can be added directly
-            clusters.push_back(maxima[index_list.at(0)]);
-        }
-        else
-        {
-            // compute average of maximum and all neighbors
-            Eigen::Vector3f shifted(0, 0, 0);
-            for (int i = 0; i < index_list.size(); i++)
-            {
-                // update shifted position
-                shifted += maxima[index_list.at(i)];
-            }
-            shifted /= index_list.size();
-            clusters.push_back(shifted);
-        }
-    }
-}
-
 
 float VotingMeanShift::kernel(float x) const
 {

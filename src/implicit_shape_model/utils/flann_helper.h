@@ -48,7 +48,7 @@ public:
     bool m_index_created;
     flann::Matrix<float> dataset;
 
-    // TODO VS make this nicer
+    // TODO make this nicer
     std::shared_ptr<flann::Index<flann::L2<float>>> getIndexL2();
     std::shared_ptr<flann::Index<flann::ChiSquareDistance<float>>> getIndexChi();
 
