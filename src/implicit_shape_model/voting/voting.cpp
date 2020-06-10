@@ -14,12 +14,14 @@
 
 #include <fstream>
 #include <sstream>
+
+#define PCL_NO_PRECOMPILE
+#include <pcl/point_types.h>
+#include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/common/centroid.h>
 
 namespace ism3d
 {
-
-std::string exec(const char *cmd); // defined at the end of file
 
 Voting::Voting()
 {
@@ -40,23 +42,12 @@ Voting::Voting()
     addParameter(m_global_param_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_global_param_weight_factor, "GlobalParamWeightFactor", 1.5f);
 
-    m_index_created = false;
-    m_svm_error = false;
     m_single_object_mode = false;
 }
 
 Voting::~Voting()
 {
     m_votes.clear();
-
-    // delete files that were unpacked for recognition
-    if(m_svm_files.size() > 1)
-    {
-        for(std::string s : m_svm_files)
-        {
-            std::ignore = std::system(("rm " + s).c_str());
-        }
-    }
 }
 
 void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsigned instanceId,
@@ -138,7 +129,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             maximum.weight = maximaValues[i];
             maximum.voteIndices = voteIndices[i];
 
-            std::vector<boost::math::quaternion<float> > quats;
+            std::vector<boost::math::quaternion<float>> quats;
             std::vector<float> weights;
 
             // compute weighted maximum values
@@ -177,7 +168,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             // do this for each maximum
             if(m_use_global_features && !m_single_object_mode)
             {
-                verifyMaxHypothesisWithGlobalFeatures(points, normals, maximum);
+                m_global_classifier->verifyHypothesis(points, normals, maximum);
             }
 
             #pragma omp critical
@@ -193,7 +184,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     {
         VotingMaximum global_result;
         // TODO VS: global classification does not use instance labels so far
-        classifyGlobalFeatures(m_global_features_single_object, global_result);
+        m_global_classifier->classify(m_global_features_single_object, global_result);
 
         // add global result to all maxima if in single object mode
         for(VotingMaximum &max : maxima)
@@ -518,236 +509,6 @@ float Voting::getSearchDistForClass(const unsigned class_id) const
     return search_dist;
 }
 
-
-void Voting::verifyMaxHypothesisWithGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr &points,
-                                                   const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
-                                                   VotingMaximum &maximum)
-{
-    // used to extract a portion of the input cloud to estimage a global feature
-    pcl::KdTreeFLANN<PointT> input_points_kdtree;
-    if(m_use_global_features)
-    {
-        input_points_kdtree.setInputCloud(points);
-    }
-
-    // first segment region cloud from input with typical radius for this class id
-    pcl::PointCloud<PointT>::Ptr segmented_points(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<pcl::Normal>::Ptr segmented_normals(new pcl::PointCloud<pcl::Normal>());
-    std::vector<int> pointIdxRadiusSearch;
-    std::vector<float> pointRadiusSquaredDistance;
-    float radius = m_average_radii.at(maximum.classId);
-    PointT query;
-    query.x = maximum.position.x();
-    query.y = maximum.position.y();
-    query.z = maximum.position.z();
-
-    if(input_points_kdtree.radiusSearch(query, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
-    {
-        // segment points
-        pcl::ExtractIndices<PointT> extract;
-        extract.setInputCloud(points);
-        pcl::PointIndices::Ptr indices (new pcl::PointIndices());
-        indices->indices = pointIdxRadiusSearch;
-        extract.setIndices(indices);
-        extract.filter(*segmented_points);
-        // segment normals
-        pcl::ExtractIndices<pcl::Normal> extract_normals;
-        extract_normals.setInputCloud(normals);
-        extract_normals.setIndices(indices); // use same indices
-        extract_normals.filter(*segmented_normals);
-    }
-    else
-    {
-        LOG_WARN("Error during nearest neighbor search.");
-    }
-
-    // compute global feature on segmented points
-    pcl::PointCloud<PointT>::ConstPtr dummy_keypoints(new pcl::PointCloud<PointT>());
-    pcl::search::Search<PointT>::Ptr search = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
-    pcl::PointCloud<ISMFeature>::ConstPtr global_features =
-            (*m_globalFeatureDescriptor)(segmented_points, segmented_normals, segmented_points, segmented_normals, dummy_keypoints, search);
-
-    classifyGlobalFeatures(global_features, maximum);
-}
-
-void Voting::classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr global_features, VotingMaximum &maximum)
-{
-    // if no SVM data available defaul to KNN
-    if(m_svm_error) m_global_feature_method = "KNN";
-
-    // process current global features according to some strategy
-    if(!m_index_created)
-    {
-        LOG_INFO("creating flann index for global features");
-        m_flann_helper->buildIndex(m_distanceType, 1);
-        m_index_created = true;
-    }
-
-    if(m_global_feature_method == "KNN")
-    {
-        LOG_INFO("starting global classification with knn");
-        std::map<unsigned, GlobalResultAccu> max_global_voting; // maps class id to struct with number of occurences and score
-        int num_all_entries = 0;
-
-        // find nearest neighbors to current global features in learned data
-        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
-        for(ISMFeature query_feature : global_features->points)
-        {
-            // insert the query point
-            flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
-            for(int i = 0; i < query_feature.descriptor.size(); i++)
-            {
-                query[0][i] = query_feature.descriptor.at(i);
-            }
-
-            // search
-            std::vector<std::vector<int> > indices;
-            std::vector<std::vector<float> > distances;
-            if(m_flann_helper->getDistType() == "Euclidean")
-            {
-                m_flann_helper->getIndexL2()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-            }
-            else if(m_flann_helper->getDistType() == "ChiSquared")
-            {
-                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-            }
-
-            delete[] query.ptr();
-
-            // classic KNN approach
-            num_all_entries += indices[0].size(); // NOTE: is not necessaraly k, because only (k-x) might have been found
-            // loop over results
-            for(int i = 0; i < indices[0].size(); i++)
-            {
-                // insert result
-                ISMFeature temp = m_all_global_features_cloud->at(indices[0].at(i));
-                float dist_squared = distances[0].at(i);
-                const float sigma = 0.1;
-                const float denom = 2 * sigma * sigma;
-                float score = std::exp(-dist_squared/denom);
-                insertGlobalResult(max_global_voting, temp.classId, score);
-            }
-        }
-
-        std::pair<unsigned, float> global_result = {maximum.classId, 0}; // pair of class id and score
-        // determine score based on all votes
-        unsigned max_occurences = 0;
-        if(m_single_object_mode)
-        {
-            // find class with most occurences
-            for(auto it : max_global_voting)
-            {
-                if(it.second.num_occurences > max_occurences)
-                {
-                    max_occurences = it.second.num_occurences;
-                    global_result.first = it.first;
-                }
-            }
-            // compute score for best class (NOTE: determining best class based on score did not work well)
-            GlobalResultAccu gra = max_global_voting.at(global_result.first);
-            global_result.second = gra.score_sum / gra.num_occurences;
-        }
-        else // determine score based on current class
-        {
-            if(max_global_voting.find(maximum.classId) != max_global_voting.end())
-            {
-                GlobalResultAccu gra = max_global_voting.at(maximum.classId);
-                global_result.second = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
-            }
-        }
-
-        // assign global result
-        maximum.globalHypothesis = global_result;
-        maximum.currentClassHypothesis = global_result;
-    }
-    else if(m_global_feature_method == "SVM")
-    {
-        LOG_INFO("starting global classification with svm");
-        CustomSVM::SVMResponse svm_response;
-        std::vector<CustomSVM::SVMResponse> all_responses; // in case one object has multiple global features
-        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
-        for(ISMFeature query_feature : global_features->points)
-        {
-            // convert to SVM data format
-            std::vector<float> data_raw = query_feature.descriptor;
-            float data[data_raw.size()];
-            for(unsigned i = 0; i < data_raw.size(); i++)
-            {
-                data[i] = data_raw.at(i);
-            }
-            cv::Mat svm_input_data(1, data_raw.size(), CV_32FC1, data);
-
-            CustomSVM::SVMResponse temp_response = m_svm.predictUnifyScore(svm_input_data, m_svm_files);
-            all_responses.push_back(temp_response);
-        }
-
-        // check if several responses are available
-        if(all_responses.size() > 1)
-        {
-            std::map<unsigned, GlobalResultAccu> global_result_per_class;
-            for(const CustomSVM::SVMResponse &resp : all_responses)
-            {
-                insertGlobalResult(global_result_per_class, (unsigned) resp.label, resp.score);
-            }
-
-            int best_class = 0;
-            int best_occurences = 0;
-            for(const auto it : global_result_per_class)
-            {
-                // NOTE: what if there are 2 equal classes?
-                if(it.second.num_occurences > best_occurences) // find highest number of occurences
-                {
-                    best_occurences = it.second.num_occurences;
-                    best_class = it.first;
-                }
-            }
-
-            // find best class in list of responses with "best" (highest) score
-            float best_score = -999999;
-            CustomSVM::SVMResponse best_response = all_responses.at(0); // init with first value
-            for(int i = 0; i < all_responses.size(); i++)
-            {
-                if(all_responses.at(i).label == best_class)
-                {
-                    if(all_responses.at(i).score > best_score)
-                    {
-                        best_score = all_responses.at(i).score;
-                        best_response = all_responses.at(i);
-                    }
-                }
-            }
-            svm_response = best_response;
-        }
-        else if(all_responses.size() == 1)
-        {
-            svm_response = all_responses.at(0);
-        }
-
-        // assign global result
-        float cur_score = m_single_object_mode ? 0 : svm_response.all_scores.at(maximum.classId);
-        maximum.globalHypothesis = {svm_response.label, svm_response.score};
-        maximum.currentClassHypothesis = {maximum.classId, cur_score};
-    }
-}
-
-void Voting::insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting,
-                                unsigned found_class,
-                                float score)
-{
-    if(max_global_voting.find(found_class) != max_global_voting.end())
-    {
-        // found
-        GlobalResultAccu &prev = max_global_voting.at(found_class);
-        prev.num_occurences++;
-        prev.score_sum += score;
-    }
-    else
-    {
-        // not found
-        max_global_voting.insert({found_class, {1,score} });
-    }
-}
-
 bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 {
     return maxA.weight > maxB.weight;
@@ -826,10 +587,12 @@ void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
     }
 }
 
+// TODO VS: move single object mode entirely to voting class
 void Voting::setGlobalFeatures(pcl::PointCloud<ISMFeature>::Ptr &globalFeatures)
 {
     m_global_features_single_object = globalFeatures;
     m_single_object_mode = true;
+    m_global_classifier->enableSingleObjectMode();
 }
 
 void Voting::forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures)
@@ -929,10 +692,9 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
     // read global features
     if(m_use_global_features)
     {
-        // accumulate all global features into a single cloud
-        m_all_global_features_cloud = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-
-        m_global_features.clear();
+        // load all global features from training into a single cloud
+        pcl::PointCloud<ISMFeature>::Ptr global_features_cloud(new pcl::PointCloud<ISMFeature>());
+        std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> global_features_map;
         int descriptor_length;
 
         int global_feat_size;
@@ -948,7 +710,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
             ia >> cloud_size;
             for(int j = 0; j < cloud_size; j++)
             {
-                pcl::PointCloud<ISMFeature>::Ptr feature_cloud(new pcl::PointCloud<ISMFeature>());
+                pcl::PointCloud<ISMFeature>::Ptr temp_cloud(new pcl::PointCloud<ISMFeature>());
 
                 int feat_size;
                 ia >> feat_size;
@@ -967,115 +729,42 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
                     float radius;
                     ia >> radius;
 
+                    // TODO VS load and store instance label in global features
                     ISMFeature ism_feature;
                     ism_feature.referenceFrame = referenceFrame;
                     ism_feature.descriptor = descriptor;
                     ism_feature.globalDescriptorRadius =  radius;
                     ism_feature.classId = classId;
-                    feature_cloud->push_back(ism_feature);
-                    m_all_global_features_cloud->push_back(ism_feature);
+                    temp_cloud->push_back(ism_feature);
+                    global_features_cloud->push_back(ism_feature);
                     descriptor_length = ism_feature.descriptor.size(); // are all the same just overwrite
                 }
-                feature_cloud->height = 1;
-                feature_cloud->width = feature_cloud->size();
-                feature_cloud->is_dense = false;
-                cloud_vector.push_back(feature_cloud);
+                temp_cloud->height = 1;
+                temp_cloud->width = temp_cloud->size();
+                temp_cloud->is_dense = false;
+                cloud_vector.push_back(temp_cloud);
             }
-            m_global_features.insert({classId, cloud_vector});
+            global_features_map.insert({classId, cloud_vector});
         }
 
         // create flann index
-        m_flann_helper = std::make_shared<FlannHelper>(m_all_global_features_cloud->at(0).descriptor.size(), m_all_global_features_cloud->size());
-        m_flann_helper->createDataset(m_all_global_features_cloud);
+        // TODO VS simplify constructor call, e.g. first argument is descriptor_length
+        std::shared_ptr<FlannHelper> fh = std::make_shared<FlannHelper>(
+                    global_features_cloud->at(0).descriptor.size(), global_features_cloud->size());
+        fh->createDataset(global_features_cloud);
         // NOTE: index will be build when the first object is recognized - otherwise parameters are not initialized from config, but with default values
-        //m_flann_helper->buildIndex(m_distanceType, m_num_kd_trees);
+        //fh->buildIndex(m_distanceType, m_num_kd_trees);
 
-        // compute average radii
-        for(auto it = m_global_features.begin(); it != m_global_features.end(); it++)
-        {
-            float avg_radius = 0;
-            int num_points = 0;
-            unsigned classID = it->first;
-
-            std::vector<pcl::PointCloud<ISMFeature>::Ptr> cloud_vector = it->second;
-            for(auto cloud : cloud_vector)
-            {
-                for(ISMFeature ism_feature : cloud->points)
-                {
-                    avg_radius += ism_feature.globalDescriptorRadius;
-                    num_points += 1;
-                }
-            }
-            m_average_radii.insert({classID, avg_radius / num_points});
-        }
-
-        // NOTE: not needed anymore
-        m_global_features.clear();
-
-        // load SVM for global features
-        // NOTE: if SVM works better than nearest neighbor, all of the above with global features can be removed ... except the radius
-        if(m_svm_path != "")
-        {
-            // get path and check for errors
-            boost::filesystem::path path(m_svm_path);
-            boost::filesystem::path p_comp = boost::filesystem::complete(path);
-
-            if(boost::filesystem::exists(p_comp) && boost::filesystem::is_regular_file(p_comp))
-            {
-                m_svm_files.clear();
-                // check if multiple svm files are available (i.e. 1 vs all svm)
-                if(m_svm_path.find("tar") != std::string::npos)
-                {
-                    // show the content of the tar file
-                    std::string result = exec(("tar -tf " + p_comp.string()).c_str());
-                    // split the string and add to list
-                    std::stringstream sstr;
-                    sstr.str(result);
-                    std::string item;
-                    while (std::getline(sstr, item, '\n'))
-                    {
-                        boost::filesystem::path paths(item);
-                        boost::filesystem::path ppp = boost::filesystem::complete(paths);
-                        m_svm_files.push_back(ppp.string());
-                    }
-                    // unzip tar file
-                    int ret = std::system(("tar -xzf " + p_comp.string()).c_str());
-                    sleep(2);
-                }
-                else
-                {
-                    // only one file: standard OpenCV SVM (i.e. pairwise 1 vs 1 svm)
-                    m_svm_files.push_back(p_comp.string());
-                }
-            }
-            else
-            {
-                LOG_ERROR("SVM file not valid or missing!");
-                m_svm_error = true;
-            }
-        }
-        else
-        {
-            LOG_ERROR("SVM path is NULL!");
-            m_svm_error = true;
-        }
+        m_global_classifier = std::make_shared<GlobalClassifier>(
+                    m_global_feature_descriptor,
+                    m_global_feature_method,
+                    m_k_global_features);
+        m_global_classifier->setFlannHelper(fh);
+        m_global_classifier->setLoadedFeatures(global_features_cloud);
+        m_global_classifier->computeAverageRadii(global_features_map);
+        m_global_classifier->loadSVMModels(m_svm_path);
     }
     return true;
-}
-
-
-// NOTE: from http://stackoverflow.com/questions/478898/how-to-execute-a-command-and-get-output-of-command-within-c-using-posix
-std::string exec(const char* cmd)
-{
-    std::array<char, 128> buffer;
-    std::string result;
-    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-    if (!pipe) throw std::runtime_error("popen() failed!");
-    while (!feof(pipe.get())) {
-        if (fgets(buffer.data(), 128, pipe.get()) != NULL)
-            result += buffer.data();
-    }
-    return result;
 }
 
 }

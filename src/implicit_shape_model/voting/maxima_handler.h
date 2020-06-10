@@ -26,7 +26,7 @@ namespace ism3d
 
     public:
         MaximaHandler(std::string type);
-        virtual ~MaximaHandler(){};
+        virtual ~MaximaHandler(){}
 
         void processMaxima(const std::vector<Eigen::Vector3f>& clusterCenters,
                            const float radius,

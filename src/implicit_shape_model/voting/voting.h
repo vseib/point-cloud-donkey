@@ -16,19 +16,10 @@
 #include <Eigen/Core>
 
 #include "../features/features.h"
-#include "../classifier/custom_SVM.h"
 #include "../utils/utils.h"
 #include "../utils/json_object.h"
 #include "../utils/ism_feature.h"
-#include "../utils/flann_helper.h"
-
-// to use SVM
-#include <opencv2/ml/ml.hpp>
-
-#define PCL_NO_PRECOMPILE
-#include <pcl/point_types.h>
-#include <pcl/recognition/cg/hough_3d.h>
-#include <pcl/filters/extract_indices.h>
+#include "global_classifier.h"
 
 // TODO VS X: clean up
 // - there are multiple global feature members
@@ -39,52 +30,6 @@
 
 namespace ism3d
 {
-    /**
-     * @brief The VotingMaximum struct
-     * A voting maximum represents a found object occurrence and is characterized
-     * by a position and a bounding box. The weight defines the certainty of the
-     * detection and the class id is the class type of the object.
-     * Voting and maxima detection is performed for each class individually.
-     */
-    struct VotingMaximum
-    {
-        VotingMaximum() {
-            position = Eigen::Vector3f(0, 0, 0);
-            weight = 0;
-            classId = -1;
-            instanceIds = {std::numeric_limits<unsigned>::max()};
-            boundingBox.size = Eigen::Vector3f(0,0,0);
-            boundingBox.position = position;
-            boundingBox.rotQuat = boost::math::quaternion<float>(1, 0, 0, 0);
-            globalHypothesis = {-1, -1};
-            currentClassHypothesis = {-1, -1};
-        }
-
-        Eigen::Vector3f position;
-        float weight;
-        unsigned classId;
-        std::vector<unsigned> instanceIds;
-        Utils::BoundingBox boundingBox;
-        std::vector<int> voteIndices;
-
-        // TODO VS temp for testing: as soon as it is final include it in maxima merging: look for all occurences of TEMP FIX THIS!
-        std::pair<int, float> globalHypothesis; // pair of: class_id and score
-        std::pair<int, float> currentClassHypothesis; // pair of: this class_id and score
-    };
-
-    // represents an accumulated global result for a single class
-    struct GlobalResultAccu
-    {
-        GlobalResultAccu(unsigned num_occurences, float score)
-        {
-            this->num_occurences = num_occurences;
-            this->score_sum = score;
-        }
-
-        unsigned num_occurences;
-        float score_sum;
-    };
-
     enum class SingleObjectMaxType
     {
         DEFAULT,    // default means no special treatment
@@ -173,11 +118,11 @@ namespace ism3d
         void setGlobalFeatures(pcl::PointCloud<ISMFeature>::Ptr &globalFeatures);
 
         /** @brief set pointer to global features descriptor for detection (set while loading the dataset)
-         *
+         *  @param glob - pointer to the descriptor object
          */
         void setGlobalFeatureDescriptor(Features* glob)
         {
-            m_globalFeatureDescriptor = glob;
+            m_global_feature_descriptor = glob;
         }
 
         /**
@@ -186,9 +131,9 @@ namespace ism3d
         virtual void clear();
 
         // set when FLANN index for local features is created in ImplicitShapeModel.cpp
-        void setDistanceType(std::string dist)
+        void setDistanceType(std::string type)
         {
-            m_distanceType = dist;
+            m_global_classifier->setDistanceType(type);
         }
 
         void setSVMPath(std::string path)
@@ -198,12 +143,6 @@ namespace ism3d
 
     protected:
         Voting();
-
-        void verifyMaxHypothesisWithGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr &points,
-                                                   const pcl::PointCloud<pcl::Normal>::ConstPtr &normals, VotingMaximum &maximum);
-
-        void classifyGlobalFeatures(const pcl::PointCloud<ISMFeature>::ConstPtr global_features, VotingMaximum &maximum);
-
 
         virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
                                  const std::vector<Voting::Vote>&,
@@ -229,25 +168,10 @@ namespace ism3d
         // maps class ids to average pairs of two longest bounding box dimensions variances <first variance, second variance>
         std::map<unsigned, std::pair<float, float> > m_id_bb_variance_map;
 
-        bool m_use_global_features;
-        Features* m_globalFeatureDescriptor;
-
-        CustomSVM m_svm; // for global feature classification
-        bool m_svm_error;
-        std::vector<std::string> m_svm_files;
-
         // maps class ids to a vector of global features, number of objects per class = number of global features per class
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
-
-        // all global features as a cloud
         pcl::PointCloud<ISMFeature>::Ptr m_global_features_single_object; // used during detection in single-object-mode
-        pcl::PointCloud<ISMFeature>::Ptr m_all_global_features_cloud; // used only during detection in NON-single-object-mode
 
-        // average radii of each class from training
-        std::map<unsigned, float> m_average_radii;
-
-        std::string m_global_feature_method;
-        int m_k_global_features;
         bool m_single_object_mode;
         int m_global_feature_influence_type;
         float m_global_param_min_svm_score;
@@ -258,9 +182,6 @@ namespace ism3d
         SingleObjectMaxType m_max_type;
         std::string m_max_type_param;
 
-        // used to create FLANN index in FLANN helper
-        std::string m_distanceType;
-
     private:
 
         std::vector<VotingMaximum> filterMaxima(const std::vector<VotingMaximum> &maxima, bool merge = false) const;
@@ -268,21 +189,26 @@ namespace ism3d
 
         VotingMaximum mergeMaxima(const std::vector<VotingMaximum> &max_list) const;
 
-        void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting, unsigned found_class, float score);
-
         static bool sortMaxima(const VotingMaximum&, const VotingMaximum&);
 
         void normalizeWeights(std::vector<VotingMaximum> &maxima);
 
-        std::map<unsigned, std::vector<Vote> > m_votes;
+        std::map<unsigned, std::vector<Vote>> m_votes;
 
         float m_minThreshold;   // retrieve all maxima above the weight threshold
         int m_minVotesThreshold; // retrieve all maxima above the vote threshold
         int m_bestK;            // additionally retrieve only the k best maxima
         bool m_averageRotation;
 
-        std::shared_ptr<FlannHelper> m_flann_helper;
-        bool m_index_created;
+        bool m_use_global_features;
+
+        std::shared_ptr<GlobalClassifier> m_global_classifier;
+        // these values are passed to the global classifier
+        int m_k_global_features;
+        std::string m_global_feature_method;
+        std::string m_svm_path; // path in config to svm models
+        Features* m_global_feature_descriptor;
+
 
         // NOTE: only for debug
         static float state_gt;

@@ -129,6 +129,7 @@ add_library(implicit_shape_model
     voting/voting_mean_shift.cpp
     voting/single_object_mode_helper.cpp
     voting/maxima_handler.cpp
+    voting/global_classifier.cpp
     # h-files
     activation_strategy/activation_strategy_factory.h
     clustering/clustering_factory.h
@@ -142,6 +143,7 @@ add_library(implicit_shape_model
     utils/json_parameter_traits.h
     keypoints/keypoints_factory.h
     voting/voting_factory.h
+    voting/voting_maximum.h
     # external
     third_party/libgdiam-1.3/gdiam.cpp
     third_party/liblzf-3.6/lzf_c.c

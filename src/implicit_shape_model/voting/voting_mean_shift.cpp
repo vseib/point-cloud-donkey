@@ -87,7 +87,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
 
         // suppress or average neighboring maxima (or average shift multiple times)
-        std::shared_ptr<MaximaHandler> maxh = std::make_shared<MaximaHandler>(m_maxima_suppression_type);
+        std::shared_ptr<MaximaHandler> maxh = std::make_shared<MaximaHandler>(m_maxima_suppression_type); // TODO VS replace string by enum type
         maxh->processMaxima(clusterCenters, m_bandwidth, clusters);
     }
     // in single object mode we assume that the whole voting space contains only one object
