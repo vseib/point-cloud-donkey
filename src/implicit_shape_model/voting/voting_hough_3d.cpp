@@ -9,6 +9,7 @@
  */
 
 #include "voting_hough_3d.h"
+#include "maxima_handler.h"
 
 namespace ism3d
 {
@@ -42,25 +43,9 @@ namespace ism3d
         if(m_single_object_mode)
             LOG_WARN("SingleObjectMode is not supported with Hough3D - switch to MeanShift to use it!");
 
-        if(m_radiusType == "Config")
-        {
-            // leave bin size as it is from config
-        }
-        else if(m_radiusType == "FirstDim")
-        {
-            float temp = m_id_bb_dimensions_map.at(classId).first * m_radiusFactor;
-            temp *= 2; // bins are conceptually a "diameter" instead of radius
-            m_binSize = Eigen::Vector3d(temp, temp, temp);
-        }
-        else if(m_radiusType == "SecondDim")
-        {
-            float temp = m_id_bb_dimensions_map.at(classId).second * m_radiusFactor;
-            temp *= 2; // bins are conceptually a "diameter" instead of radius
-            m_binSize = Eigen::Vector3d(temp, temp, temp);
-        }
-
-        // forward bin size to voting class
-        m_radius = m_binSize[0] * 0.5;
+        MaximaHandler::setRadius(m_binSize[0]/2);
+        float temp = MaximaHandler::getSearchDistForClass(classId);
+        m_binSize = Eigen::Vector3d(temp*2, temp*2, temp*2); // bins are conceptually a "diameter" instead of radius
 
         // cast votes into own voting space
         iPostInitConfig();

@@ -147,20 +147,10 @@ namespace ism3d
                                  std::vector<std::vector<float>>&,
                                  unsigned) = 0;
 
-        float getSearchDistForClass(const unsigned class_id) const;
-
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
 
         float m_radius;              // holds the bin size or the bandwith
-
-        std::string m_radiusType; // take value from config or used learned average bounding box dimensions
-        float m_radiusFactor; // factor for radius, in case radius type is NOT Config
-
-        // maps class ids to average pairs of two longest bounding box dimensions <first radius, second radius>
-        std::map<unsigned, std::pair<float, float> > m_id_bb_dimensions_map;
-        // maps class ids to average pairs of two longest bounding box dimensions variances <first variance, second variance>
-        std::map<unsigned, std::pair<float, float> > m_id_bb_variance_map;
 
         // maps class ids to a vector of global features, number of objects per class = number of global features per class
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
@@ -177,11 +167,6 @@ namespace ism3d
         std::string m_max_type_param;
 
     private:
-
-        std::vector<VotingMaximum> filterMaxima(const std::vector<VotingMaximum> &maxima, bool merge = false) const;
-        std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima) const;
-
-        VotingMaximum mergeMaxima(const std::vector<VotingMaximum> &max_list) const;
 
         static bool sortMaxima(const VotingMaximum&, const VotingMaximum&);
 
@@ -202,6 +187,12 @@ namespace ism3d
         std::string m_global_feature_method;
         std::string m_svm_path; // path in config to svm models
         Features* m_global_feature_descriptor;
+
+        // these values are passed to the maxima handler
+        std::string m_radiusType;
+        float m_radiusFactor;
+        std::map<unsigned, std::pair<float, float>> m_dimensions_map;
+        std::map<unsigned, std::pair<float, float>> m_variance_map;
 
         // NOTE: only for debug
         static float state_gt;

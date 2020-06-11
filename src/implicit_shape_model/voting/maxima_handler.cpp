@@ -10,6 +10,12 @@
 
 #include "maxima_handler.h"
 
+std::string ism3d::MaximaHandler::m_radius_type = "";
+float ism3d::MaximaHandler::m_radius_factor = 0.0f;
+float ism3d::MaximaHandler::m_radius = 0.0f;
+std::map<unsigned, std::pair<float, float>> ism3d::MaximaHandler::m_dimensions_map = {};
+std::map<unsigned, std::pair<float, float>> ism3d::MaximaHandler::m_variance_map = {};
+
 namespace ism3d
 {
     MaximaHandler::MaximaHandler()
@@ -198,5 +204,151 @@ namespace ism3d
                 clusters.push_back(shifted);
             }
         }
+    }
+
+
+    std::vector<VotingMaximum> MaximaHandler::filterMaxima(const std::string filter_type, const std::vector<VotingMaximum> &maxima)
+    {
+        if(filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight, dont't merge
+        {
+            return mergeAndFilterMaxima(maxima, false);
+        }
+        else if(filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
+        {
+            return mergeAndFilterMaxima(maxima, true);
+        }
+        else
+        {
+            LOG_ERROR("Invalid maxima filter type specified: " << filter_type << "! No filtering is performed!");
+            return maxima;
+        }
+    }
+
+    std::vector<VotingMaximum> MaximaHandler::mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima, bool merge)
+    {
+        // find and merge maxima of different classes that are closer than bandwith or bin_size
+        std::vector<VotingMaximum> close_maxima;
+        std::vector<VotingMaximum> filtered_maxima;
+        std::vector<bool> dirty_list(maxima.size(), false);
+
+        for(unsigned i = 0; i < maxima.size(); i++)
+        {
+            if(dirty_list.at(i))
+                continue;
+
+            // set adaptive search distance depending on config and class id
+            float search_dist = getSearchDistForClass(maxima.at(i).classId);
+
+            // check distance to other maxima
+            for(unsigned j = i+1; j < maxima.size(); j++)
+            {
+                if(dirty_list.at(j))
+                    continue;
+
+                float dist = (maxima.at(j).position - maxima.at(i).position).norm();
+                float other_search_dist = getSearchDistForClass(maxima.at(j).classId);
+                // only subsume maxima of classes with a smaller or equal search dist
+                if(dist < search_dist && other_search_dist <= search_dist)
+                {
+                    close_maxima.push_back(maxima.at(j));
+                    dirty_list.at(j) = true;
+                }
+            }
+
+            // if some neighbors found, also add itself
+            if(close_maxima.size() > 0)
+            {
+                close_maxima.push_back(maxima.at(i));
+            }
+
+            // merge close maxima of same classes before filtering
+            if(merge && close_maxima.size() > 1) // > 1 because the maximum itself was added
+            {
+                std::vector<VotingMaximum> merged_maxima(maxima.size());
+                std::map<unsigned, std::vector<VotingMaximum>> same_class_ids; // maps a class id to a list of close maxima with that id
+
+                // create max list
+                for(VotingMaximum m : close_maxima)
+                {
+                    unsigned class_id = m.classId;
+                    if(same_class_ids.find(class_id) == same_class_ids.end())
+                    {
+                        same_class_ids.insert({class_id, {m}});
+                    }
+                    else
+                    {
+                        same_class_ids.at(class_id).push_back(m);
+                    }
+                }
+                // merge maxima of same classes
+                for(auto it : same_class_ids)
+                {
+                    VotingMaximum max = mergeMaxima(it.second);
+                    merged_maxima.push_back(max);
+                }
+                close_maxima = merged_maxima;
+            }
+
+            // if a close maximum was found, leave only the one with the highest weight
+            if(close_maxima.size() > 1) // > 1 because the maximum itself was added
+            {
+                VotingMaximum best_max;
+                for(VotingMaximum m : close_maxima)
+                {
+                    if(m.weight > best_max.weight)
+                    {
+                        best_max = m;
+                    }
+                }
+                filtered_maxima.push_back(best_max);
+            }
+            else
+            {
+                filtered_maxima.push_back(maxima.at(i));
+            }
+            close_maxima.clear();
+        }
+        return filtered_maxima;
+    }
+
+
+    VotingMaximum MaximaHandler::mergeMaxima(const std::vector<VotingMaximum> &max_list)
+    {
+        VotingMaximum result;
+        for(VotingMaximum m : max_list)
+        {
+            // NOTE: position and bounding box must be handled before changing weight!
+            result.position = result.position * result.weight + m.position * m.weight;
+            result.position /= (result.weight + m.weight);
+            result.boundingBox.position = result.position;
+            result.boundingBox.size = result.boundingBox.size * result.weight + m.boundingBox.size * m.weight;
+            result.boundingBox.size /= (result.weight + m.weight);
+            boost::math::quaternion<float> rotQuat;
+            Utils::quatWeightedAverage({result.boundingBox.rotQuat, m.boundingBox.rotQuat}, {result.weight, m.weight}, rotQuat);
+            result.boundingBox.rotQuat = rotQuat;
+
+            result.classId = m.classId;
+            result.weight += m.weight;
+            result.voteIndices.insert(result.voteIndices.end(), m.voteIndices.begin(), m.voteIndices.end());
+
+            //TODO VS TEMP FIX THIS! -- should be some kind of average
+            result.globalHypothesis = m.globalHypothesis;
+            result.currentClassHypothesis = m.currentClassHypothesis;
+        }
+        return result;
+    }
+
+    float MaximaHandler::getSearchDistForClass(const unsigned class_id)
+    {
+        // NOTE: m_radius is assigned in derived classes and is related either to the bandwidth or bin size
+        if(m_radius_type == "Config")
+            return m_radius;
+        if(m_radius_type == "FirstDim")
+            return m_dimensions_map.at(class_id).first * m_radius_factor;
+        if(m_radius_type == "SecondDim")
+            return m_dimensions_map.at(class_id).second * m_radius_factor;
+
+        LOG_ERROR("Invalid radius type: " << m_radius_type << "! Using config value instead.");
+        return m_radius;
     }
 }

@@ -45,9 +45,9 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                   std::vector<std::vector<float>>& newVoteWeightsPerCluster, // holds a list of reweighted vote weights per cluster
                                   unsigned classId)
 {
-    // forward bandwith to voting class
-    m_radius = m_bandwidth;
-    m_bandwidth = getSearchDistForClass(classId);
+    // determine bandwidth based on config
+    MaximaHandler::setRadius(m_bandwidth);
+    m_bandwidth = MaximaHandler::getSearchDistForClass(classId);
 
     // basic ideas adapted from
     // https://github.com/daviddoria/vtkMeanShiftClustering/blob/master/vtkMeanShiftClustering.cxx and
@@ -105,7 +105,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
 
         if(m_max_type == SingleObjectMaxType::BANDWIDTH)
         {
-            m_bandwidth = getSearchDistForClass(classId);
+            m_bandwidth = MaximaHandler::getSearchDistForClass(classId);
         }
         if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
         {

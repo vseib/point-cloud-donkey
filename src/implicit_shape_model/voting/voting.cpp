@@ -10,6 +10,7 @@
 
 #include "voting.h"
 #include "voting_factory.h"
+#include "maxima_handler.h"
 #include "../codebook/codeword_distribution.h"
 
 #include <fstream>
@@ -71,6 +72,7 @@ void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsi
 std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                               pcl::PointCloud<pcl::Normal>::ConstPtr &normals)
 {
+    // TODO VS try to move these into maxima_handler.cpp
     // set max type based on parameter value
     if(m_max_type_param == "None" || m_max_type_param == "Default")
         m_max_type = SingleObjectMaxType::DEFAULT;
@@ -80,6 +82,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
     else if(m_max_type_param == "ModelRadiusVotes")
         m_max_type = SingleObjectMaxType::MODEL_RADIUS;
+
+    // forward values to helper function
+    MaximaHandler::setRadiusType(m_radiusType);
+    MaximaHandler::setRadiusFactor(m_radiusFactor);
 
     if (m_votes.size() == 0)
         return std::vector<VotingMaximum>();
@@ -209,19 +215,14 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
     if(!m_single_object_mode)
     {
-        // TODO VS add instances to maxima merging !!!
-        // TODO VS: fix global features if not in single object mode - add global result merging
-        if(m_max_filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight
-            filtered_maxima = filterMaxima(maxima);
-        if(m_max_filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
-            filtered_maxima = mergeAndFilterMaxima(maxima);
+        // TODO VS add instances to maxima merging
+        // TODO VS add global result to maxima merging
+        filtered_maxima = MaximaHandler::filterMaxima(m_max_filter_type, maxima);
     }
-
     maxima = filtered_maxima;
 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-
     // apply normalization: turn weights to probabilities
     normalizeWeights(maxima);
 
@@ -345,138 +346,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     return maxima;
 }
 
-std::vector<VotingMaximum> Voting::mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima) const
-{
-    return filterMaxima(maxima, true);
-}
-
-std::vector<VotingMaximum> Voting::filterMaxima(const std::vector<VotingMaximum> &maxima, bool merge) const
-{
-    // find and merge maxima of different classes that are closer than bandwith or bin_size
-    std::vector<VotingMaximum> close_maxima;
-    std::vector<VotingMaximum> filtered_maxima;
-    std::vector<bool> dirty_list(maxima.size(), false);
-
-    for(unsigned i = 0; i < maxima.size(); i++)
-    {
-        if(dirty_list.at(i))
-            continue;
-
-        // set adaptive search distance depending on config and class id
-        float search_dist = getSearchDistForClass(maxima.at(i).classId);
-
-        // check distance to other maxima
-        for(unsigned j = i+1; j < maxima.size(); j++)
-        {
-            if(dirty_list.at(j))
-                continue;
-
-            float dist = (maxima.at(j).position - maxima.at(i).position).norm();
-            float other_search_dist = getSearchDistForClass(maxima.at(j).classId);
-            // only subsume maxima of classes with a smaller or equal search dist
-            if(dist < search_dist && other_search_dist <= search_dist)
-            {
-                close_maxima.push_back(maxima.at(j));
-                dirty_list.at(j) = true;
-            }
-        }
-
-        // if some neighbors found, also add itself
-        if(close_maxima.size() > 0)
-        {
-            close_maxima.push_back(maxima.at(i));
-        }
-
-        // merge close maxima of same classes before filtering
-        if(merge && close_maxima.size() > 1) // > 1 because the maximum itself was added
-        {
-            std::vector<VotingMaximum> merged_maxima(maxima.size());
-            std::map<unsigned, std::vector<VotingMaximum>> same_class_ids; // maps a class id to a list of close maxima with that id
-
-            // create max list
-            for(VotingMaximum m : close_maxima)
-            {
-                unsigned class_id = m.classId;
-                if(same_class_ids.find(class_id) == same_class_ids.end())
-                {
-                    same_class_ids.insert({class_id, {m}});
-                }
-                else
-                {
-                    same_class_ids.at(class_id).push_back(m);
-                }
-            }
-            // merge maxima of same classes
-            for(auto it : same_class_ids)
-            {
-                VotingMaximum max = mergeMaxima(it.second);
-                merged_maxima.push_back(max);
-            }
-            close_maxima = merged_maxima;
-        }
-
-        // if a close maximum was found, leave only the one with the highest weight
-        if(close_maxima.size() > 1) // > 1 because the maximum itself was added
-        {
-            VotingMaximum best_max;
-            for(VotingMaximum m : close_maxima)
-            {
-                if(m.weight > best_max.weight)
-                {
-                    best_max = m;
-                }
-            }
-            filtered_maxima.push_back(best_max);
-        }
-        else
-        {
-            filtered_maxima.push_back(maxima.at(i));
-        }
-        close_maxima.clear();
-    }
-    return filtered_maxima;
-}
-
-
-VotingMaximum Voting::mergeMaxima(const std::vector<VotingMaximum> &max_list) const
-{
-    VotingMaximum result;
-    for(VotingMaximum m : max_list)
-    {
-        // NOTE: position and bounding box must be handled before changing weight!
-        result.position = result.position * result.weight + m.position * m.weight;
-        result.position /= (result.weight + m.weight);
-        result.boundingBox.position = result.position;
-        result.boundingBox.size = result.boundingBox.size * result.weight + m.boundingBox.size * m.weight;
-        result.boundingBox.size /= (result.weight + m.weight);
-        boost::math::quaternion<float> rotQuat;
-        Utils::quatWeightedAverage({result.boundingBox.rotQuat, m.boundingBox.rotQuat}, {result.weight, m.weight}, rotQuat);
-        result.boundingBox.rotQuat = rotQuat;
-
-        result.classId = m.classId;
-        result.weight += m.weight;
-        result.voteIndices.insert(result.voteIndices.end(), m.voteIndices.begin(), m.voteIndices.end());
-
-        // TEMP FIX THIS! -- should be some kind of average
-        result.globalHypothesis = m.globalHypothesis;
-        result.currentClassHypothesis = m.currentClassHypothesis;
-    }
-    return result;
-}
-
-
-float Voting::getSearchDistForClass(const unsigned class_id) const
-{
-    // NOTE: m_radius is assigned in derived classes and is related either to the bandwidth or bin size
-    float search_dist = 0;
-    if(m_radiusType == "Config")
-        search_dist = m_radius;
-    if(m_radiusType == "FirstDim")
-        search_dist = m_id_bb_dimensions_map.at(class_id).first * m_radiusFactor;
-    if(m_radiusType == "SecondDim")
-        search_dist = m_id_bb_dimensions_map.at(class_id).second * m_radiusFactor;
-    return search_dist;
-}
 
 bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 {
@@ -495,8 +364,8 @@ void Voting::clear()
 
 void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes)
 {
-    m_id_bb_dimensions_map.clear();
-    m_id_bb_variance_map.clear();
+    m_dimensions_map.clear();
+    m_variance_map.clear();
 
     for(auto it : boundingBoxes)
     {
@@ -537,8 +406,8 @@ void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std:
         // compute variance
         float max_var = max_accuSqr - (max_accu*max_accu);
         float med_var = med_accuSqr - (med_accu*med_accu);
-        m_id_bb_dimensions_map.insert({classId, {max_accu, med_accu}});
-        m_id_bb_variance_map.insert({classId, {max_var, med_var}});
+        m_dimensions_map.insert({classId, {max_accu, med_accu}});
+        m_variance_map.insert({classId, {max_var, med_var}});
     }
 }
 
@@ -564,9 +433,9 @@ void Voting::forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointClou
 void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
 {
     // fill in bounding box information
-    int bb_dims_size = m_id_bb_dimensions_map.size();
+    int bb_dims_size = m_dimensions_map.size();
     oa << bb_dims_size;
-    for(auto it : m_id_bb_dimensions_map)
+    for(auto it : m_dimensions_map)
     {
         int classId = it.first;
         float firstDim = it.second.first;
@@ -576,9 +445,9 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
         oa << secondDim;
     }
 
-    int bb_vars_size = m_id_bb_variance_map.size();
+    int bb_vars_size = m_variance_map.size();
     oa << bb_vars_size;
-    for(auto it : m_id_bb_variance_map)
+    for(auto it : m_variance_map)
     {
         int classId = it.first;
         float firstVar = it.second.first;
@@ -620,9 +489,8 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
 bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
 {
     // read bounding box data
-    // fill the data
-    m_id_bb_dimensions_map.clear();
-    m_id_bb_variance_map.clear();
+    m_dimensions_map.clear();
+    m_variance_map.clear();
 
     int bb_dims_size;
     ia >> bb_dims_size;
@@ -634,7 +502,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         ia >> classId;
         ia >> firstDim;
         ia >> secondDim;
-        m_id_bb_dimensions_map.insert({classId, {firstDim, secondDim}});
+        m_dimensions_map.insert({classId, {firstDim, secondDim}});
     }
 
     int bb_vars_size;
@@ -647,8 +515,10 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         ia >> classId;
         ia >> firstVar;
         ia >> secondVar;
-        m_id_bb_variance_map.insert({classId, {firstVar, secondVar}});
+        m_variance_map.insert({classId, {firstVar, secondVar}});
     }
+
+    MaximaHandler::setBoundingBoxMaps(m_dimensions_map, m_variance_map);
 
     // read global features
     if(m_use_global_features)
