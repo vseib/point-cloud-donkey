@@ -352,6 +352,101 @@ namespace ism3d
         }
     }
 
+    void GlobalClassifier::mergeGlobalAndLocalHypotheses(const int merge_function,
+                                                         std::vector<VotingMaximum> &maxima)
+    {
+        // NOTE: types 1, 2 and 3 are for single object mode only // TODO VS add warning
+        if(merge_function == 1 || merge_function == 2)
+        {
+            // type 1: blind belief in good scores
+            // type 2: belief in good scores if global class is among the top classes
+            if(maxima.at(0).globalHypothesis.second > m_min_svm_score)
+            {
+                if(merge_function == 1)
+                    maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
+                else // TODO VS X: else branch is same code as type 3 -- refactor
+                {
+                    float top_weight = maxima.at(0).weight;
+                    int global_class = maxima.at(0).globalHypothesis.first;
+
+                    // check if global class is among the top classes
+                    for(int i = 0; i < maxima.size(); i++)
+                    {
+                        float cur_weight = maxima.at(i).weight;
+                        int cur_class = maxima.at(i).classId;
+
+                        if(cur_weight >= top_weight * m_rate_limit && cur_class == global_class)
+                        {
+                            maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
+                            break;
+                        }
+                        else if(cur_weight < top_weight * m_rate_limit)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else if(merge_function == 3)
+        {
+            // type 3: take global class if it is among the top classes
+            float top_weight = maxima.at(0).weight;
+            int global_class = maxima.at(0).globalHypothesis.first;
+
+            // check if global class is among the top classes
+            for(int i = 0; i < maxima.size(); i++)
+            {
+                float cur_weight = maxima.at(i).weight;
+                int cur_class = maxima.at(i).classId;
+
+                if(cur_weight >= top_weight * m_rate_limit && cur_class == global_class)
+                {
+                    maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
+                    break;
+                }
+                else if(cur_weight < top_weight * m_rate_limit)
+                {
+                    break;
+                }
+            }
+        }
+        // TODO VS: for NON single object mode include maximum.currentClassHypothesis
+        else if(merge_function == 4)
+        {
+            // type 4: upweight consistent results by fixed factor
+            for(VotingMaximum &max : maxima)
+            {
+                if(max.classId == max.globalHypothesis.first)
+                    max.weight *= m_weight_factor;
+            }
+        }
+        else if(merge_function == 5)
+        {
+            // type 5: upweight consistent results depending on weight
+            for(VotingMaximum &max : maxima)
+            {
+                if(max.classId == max.globalHypothesis.first)
+                    max.weight *= 1 + max.globalHypothesis.second;
+            }
+        }
+        else if(merge_function == 6)
+        {
+            // type 6: apply intermediate T-conorm: S(a,b) = a+b-ab
+            for(VotingMaximum &max : maxima)
+            {
+                if(max.classId == max.globalHypothesis.first)
+                {
+                    float w1 = max.weight;
+                    float w2 = max.globalHypothesis.second;
+                    max.weight = w1+w2 - w1*w2;
+                }
+            }
+        }
+    }
+
+
+
     // NOTE: from http://stackoverflow.com/questions/478898/how-to-execute-a-command-and-get-output-of-command-within-c-using-posix
     std::string exec(const char* cmd)
     {

@@ -340,7 +340,6 @@ namespace ism3d
 
     float MaximaHandler::getSearchDistForClass(const unsigned class_id)
     {
-        // NOTE: m_radius is assigned in derived classes and is related either to the bandwidth or bin size
         if(m_radius_type == "Config")
             return m_radius;
         if(m_radius_type == "FirstDim")

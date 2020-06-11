@@ -71,6 +71,16 @@ namespace ism3d
 
         void loadSVMModels(std::string &svm_path);
 
+        void setMergeParams(const float min_svm_score, const float rate_limit, const float weight_factor)
+        {
+            m_min_svm_score = min_svm_score;
+            m_rate_limit = rate_limit;
+            m_weight_factor = weight_factor;
+        }
+
+        void mergeGlobalAndLocalHypotheses(const int merge_function,
+                                           std::vector<VotingMaximum> &maxima);
+
         void setFlannHelper(std::shared_ptr<FlannHelper> fh)
         {
             m_flann_helper = fh;
@@ -114,6 +124,10 @@ namespace ism3d
         std::vector<std::string> m_svm_files;
         std::shared_ptr<FlannHelper> m_flann_helper;
         std::map<unsigned, float> m_average_radii;
+
+        float m_min_svm_score;
+        float m_rate_limit;
+        float m_weight_factor;
     };
 }
 

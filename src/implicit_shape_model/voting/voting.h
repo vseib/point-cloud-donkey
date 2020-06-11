@@ -150,18 +150,10 @@ namespace ism3d
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
 
-        float m_radius;              // holds the bin size or the bandwith
-
         // maps class ids to a vector of global features, number of objects per class = number of global features per class
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
 
-        int m_global_feature_influence_type;
-        float m_global_param_min_svm_score;
-        float m_global_param_rate_limit;
-        float m_global_param_weight_factor;
-
         bool m_single_object_mode;
-
         std::string m_max_filter_type;
         SingleObjectMaxType m_max_type;
         std::string m_max_type_param;
@@ -182,11 +174,17 @@ namespace ism3d
         bool m_use_global_features;
 
         std::shared_ptr<GlobalClassifier> m_global_classifier;
-        // these values are passed to the global classifier
+        // these values are passed to the global classifier ...
+        // ... when model is loaded
         int m_k_global_features;
         std::string m_global_feature_method;
         std::string m_svm_path; // path in config to svm models
         Features* m_global_feature_descriptor;
+        // ... when maxima are detected
+        int m_merge_function;
+        float m_min_svm_score;
+        float m_rate_limit;
+        float m_weight_factor;
 
         // these values are passed to the maxima handler
         std::string m_radiusType;

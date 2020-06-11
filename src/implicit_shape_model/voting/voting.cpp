@@ -38,11 +38,11 @@ Voting::Voting()
 
     addParameter(m_use_global_features, "UseGlobalFeatures", false);
     addParameter(m_global_feature_method, "GlobalFeaturesStrategy", std::string("KNN"));
-    addParameter(m_global_feature_influence_type, "GlobalFeatureInfluenceType", 3);
     addParameter(m_k_global_features, "GlobalFeaturesK", 1);
-    addParameter(m_global_param_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
-    addParameter(m_global_param_rate_limit, "GlobalParamRateLimit", 0.60f);
-    addParameter(m_global_param_weight_factor, "GlobalParamWeightFactor", 1.5f);
+    addParameter(m_merge_function, "GlobalFeatureInfluenceType", 3);
+    addParameter(m_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
+    addParameter(m_rate_limit, "GlobalParamRateLimit", 0.60f);
+    addParameter(m_weight_factor, "GlobalParamWeightFactor", 1.5f);
 }
 
 Voting::~Voting()
@@ -223,102 +223,14 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-    // apply normalization: turn weights to probabilities
-    normalizeWeights(maxima);
+    normalizeWeights(maxima); // apply normalization: turn weights to probabilities
 
     // add global features to result classification
-    if(m_use_global_features) // here we have a sorted list of local maxima, all maxima have a global feature result
+    if(m_use_global_features)
     {
-        // NOTE: types 1, 2 and 3 are for single object mode only // TODO VS add warning
-        if(m_global_feature_influence_type == 1 || m_global_feature_influence_type == 2)
-        {
-            // type 1: blind belief in good scores
-            // type 2: belief in good scores if global class is among the top classes
-            if(maxima.at(0).globalHypothesis.second > m_global_param_min_svm_score)
-            {
-                if(m_global_feature_influence_type == 1)
-                    maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
-                else // TODO VS X: else branch is same code as type 3 -- refactor
-                {
-                    float top_weight = maxima.at(0).weight;
-                    int global_class = maxima.at(0).globalHypothesis.first;
-
-                    // check if global class is among the top classes
-                    for(int i = 0; i < maxima.size(); i++)
-                    {
-                        float cur_weight = maxima.at(i).weight;
-                        int cur_class = maxima.at(i).classId;
-
-                        if(cur_weight >= top_weight * m_global_param_rate_limit && cur_class == global_class)
-                        {
-                            maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
-                            break;
-                        }
-                        else if(cur_weight < top_weight * m_global_param_rate_limit)
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        else if(m_global_feature_influence_type == 3)
-        {
-            // type 3: take global class if it is among the top classes
-            float top_weight = maxima.at(0).weight;
-            int global_class = maxima.at(0).globalHypothesis.first;
-
-            // check if global class is among the top classes
-            for(int i = 0; i < maxima.size(); i++)
-            {
-                float cur_weight = maxima.at(i).weight;
-                int cur_class = maxima.at(i).classId;
-
-                if(cur_weight >= top_weight * m_global_param_rate_limit && cur_class == global_class)
-                {
-                    maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
-                    break;
-                }
-                else if(cur_weight < top_weight * m_global_param_rate_limit)
-                {
-                    break;
-                }
-            }
-        }
-        // TODO VS: for NON single object mode include maximum.currentClassHypothesis
-        else if(m_global_feature_influence_type == 4)
-        {
-            // type 4: upweight consistent results by fixed factor
-            for(VotingMaximum &max : maxima)
-            {
-                if(max.classId == max.globalHypothesis.first)
-                    max.weight *= m_global_param_weight_factor;
-            }
-        }
-        else if(m_global_feature_influence_type == 5)
-        {
-            // type 5: upweight consistent results depending on weight
-            for(VotingMaximum &max : maxima)
-            {
-                if(max.classId == max.globalHypothesis.first)
-                    max.weight *= 1 + max.globalHypothesis.second;
-            }
-        }
-        else if(m_global_feature_influence_type == 6)
-        {
-            // type 6: apply intermediate T-conorm: S(a,b) = a+b-ab
-            for(VotingMaximum &max : maxima)
-            {
-                if(max.classId == max.globalHypothesis.first)
-                {
-                    float w1 = max.weight;
-                    float w2 = max.globalHypothesis.second;
-                    max.weight = w1+w2 - w1*w2;
-                }
-            }
-        }
-
-        // sort maxima and normalize again - global features might have changed weights
+        m_global_classifier->setMergeParams(m_min_svm_score, m_rate_limit, m_weight_factor);
+        m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
+        // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
         normalizeWeights(maxima);
     }
@@ -350,6 +262,20 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 {
     return maxA.weight > maxB.weight;
+}
+
+void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
+{
+    float sum = 0;
+    for(const VotingMaximum &max : maxima)
+    {
+        sum += max.weight;
+    }
+
+    for(VotingMaximum &max : maxima)
+    {
+        max.weight /= sum;
+    }
 }
 
 const std::map<unsigned, std::vector<Voting::Vote> >& Voting::getVotes() const
@@ -411,19 +337,6 @@ void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std:
     }
 }
 
-void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
-{
-    float sum = 0;
-    for(const VotingMaximum &max : maxima)
-    {
-        sum += max.weight;
-    }
-
-    for(VotingMaximum &max : maxima)
-    {
-        max.weight /= sum;
-    }
-}
 
 void Voting::forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures)
 {
