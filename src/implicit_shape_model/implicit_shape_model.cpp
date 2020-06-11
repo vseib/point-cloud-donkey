@@ -60,7 +60,6 @@
 
 #include "classifier/custom_SVM.h"
 #include "utils/distance.h"
-#include "utils/point_cloud_resizing.h"
 #include "utils/normal_orientation.h"
 #include "utils/factory.h"
 #include "utils/exception.h"
@@ -510,8 +509,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     if(m_single_object_mode)
     {
         // to avoid errors if using old config files
-        LOG_FATAL("The parameter for \"single object mode\" must be set inside the \"Voting\" section of the config file. You are using the \"Parameters\" section.");
-        return std::make_tuple(std::vector<VotingMaximum>(), m_processing_times);
+        throw RuntimeException("The parameter for \"single object mode\" must be set inside the \"Voting\" section of the config file. You are using the \"Parameters\" section.");
     }
 
     // measure the time
