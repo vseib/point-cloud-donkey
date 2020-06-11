@@ -87,12 +87,12 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
 
         // suppress or average neighboring maxima (or average shift multiple times)
-        std::shared_ptr<MaximaHandler> maxh = std::make_shared<MaximaHandler>(m_maxima_suppression_type); // TODO VS replace string by enum type
-        maxh->processMaxima(clusterCenters, m_bandwidth, clusters);
+        // TODO VS replace string by enum type
+        MaximaHandler::processMaxima(m_maxima_suppression_type, clusterCenters, m_bandwidth, clusters);
     }
     // in single object mode we assume that the whole voting space contains only one object
     // in such case we do not need mean-shift, but solely estimate the density with differnt
-    // bandwidth depending on the single object mode max type
+    // bandwidths depending on the single object mode max type
     else
     {
         // use object's centroid as query point for search
@@ -109,11 +109,11 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         }
         if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
         {
-            m_bandwidth = SingleObjectModeHelper::getModelRadius(points, query);
+            m_bandwidth = SingleObjectHelper::getModelRadius(points, query);
         }
         if(m_max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
         {
-            m_bandwidth = SingleObjectModeHelper::getVotingSpaceSize(votes, query);
+            m_bandwidth = SingleObjectHelper::getVotingSpaceSize(votes, query);
         }
 
         // single object mode has only one cluster

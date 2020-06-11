@@ -163,8 +163,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                 maximum.boundingBox.rotQuat = rotQuat;
             }
 
-            // in non-single object mode: extract points around maxima region and compute global features
-            // do this for each maximum
+            // in non-single object mode: extract points around each maxima region and compute global features
             if(m_use_global_features && !m_single_object_mode)
             {
                 pcl::PointCloud<PointT>::Ptr segmented_points(new pcl::PointCloud<PointT>());
@@ -181,8 +180,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         }
     }
 
-    // in single object mode: classify global features instead of maxima points
-    // do this only once
+    // in single object mode: compute global features on the whole cloud once
     if(m_use_global_features && m_single_object_mode)
     {
         VotingMaximum global_result;
@@ -197,8 +195,8 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         if(maxima.size() == 0)
         {
             global_result.classId = global_result.globalHypothesis.first;
-            global_result.instanceIds = global_result.instanceIds;
             global_result.weight = global_result.globalHypothesis.second;
+            global_result.instanceIds = global_result.instanceIds;
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
             global_result.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
@@ -207,44 +205,12 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         }
     }
 
-    // TODO VS: globale features bis hierhin geprüft
-    // * derzeit gibt es zwei global results: globalHypothesis und bestThisClassId
-    // ---> refactorn, damit es nur noch eins gibt
-
-
-    // filter maxima
+    // filter maxima if not in single object mode
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
-
-    if(m_single_object_mode)
-    {
-        // TODO VS add instances to maxima merging !!!
-        // TODO VS refactoring - moved this to voting_mean_shift.cpp
-        // TODO VS -- is this also available in hough3d???
-//        pcl::PointCloud<PointNormalT>::Ptr pointsWithNormals(new pcl::PointCloud<PointNormalT>());
-//        pcl::concatenateFields(*points, *normals, *pointsWithNormals);
-
-//        // vote based single maxima computation
-//        if(m_single_object_max_type_str == "VotingSpaceVotes")
-//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::COMPLETE_VOTING_SPACE);
-//        if(m_single_object_max_type_str == "BandwidthVotes")
-//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::BANDWIDTH);
-//        if(m_single_object_max_type_str == "ModelRadiusVotes")
-//            filtered_maxima  = computeSingleMaxPerClass(pointsWithNormals, SingleObjectMaxType::MODEL_RADIUS);
-
-        // in single object mode global results are the same for all maxima
-        if(maxima.size() > 0)
-        {
-            for(VotingMaximum &m : filtered_maxima)
-            {
-                m.globalHypothesis.first = maxima[0].globalHypothesis.first;
-                m.globalHypothesis.second = maxima[0].globalHypothesis.second;
-            }
-        }
-    }
-
-    // TODO VS: fix global features if not in single object mode - add global result merging
     if(!m_single_object_mode)
     {
+        // TODO VS add instances to maxima merging !!!
+        // TODO VS: fix global features if not in single object mode - add global result merging
         if(m_max_filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight
             filtered_maxima = filterMaxima(maxima);
         if(m_max_filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
@@ -758,11 +724,11 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         m_global_classifier->setLoadedFeatures(global_features_cloud);
         m_global_classifier->computeAverageRadii(global_features_map);
         m_global_classifier->loadSVMModels(m_svm_path);
+
         if(m_single_object_mode)
         {
             m_global_classifier->enableSingleObjectMode();
         }
-
     }
     return true;
 }

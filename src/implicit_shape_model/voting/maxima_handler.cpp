@@ -12,25 +12,25 @@
 
 namespace ism3d
 {
-    MaximaHandler::MaximaHandler(std::string type)
+    MaximaHandler::MaximaHandler()
     {
-        m_type = type;
     }
 
-    void MaximaHandler::processMaxima(const std::vector<Eigen::Vector3f>& clusterCenters,
+    void MaximaHandler::processMaxima(const std::string &type,
+                                      const std::vector<Eigen::Vector3f>& clusterCenters,
                                       const float radius,
-                                      std::vector<Eigen::Vector3f>& clusters) const
+                                      std::vector<Eigen::Vector3f>& clusters)
     {
         // retrieve maximum points
-        if(m_type == "Suppress")
+        if(type == "Suppress")
         {
             suppressNeighborMaxima(clusterCenters, radius, clusters);
         }
-        else if(m_type == "Average")
+        else if(type == "Average")
         {
             averageNeighborMaxima(clusterCenters, radius, clusters);
         }
-        else if(m_type == "AverageShift")
+        else if(type == "AverageShift")
         {
             averageShiftNeighborMaxima(clusterCenters, radius, clusters);
         }
@@ -38,7 +38,7 @@ namespace ism3d
 
     void MaximaHandler::suppressNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
                                                const float radius,
-                                               std::vector<Eigen::Vector3f>& clusters) const
+                                               std::vector<Eigen::Vector3f>& clusters)
     {
         std::vector<bool> duplicate(maxima.size());
         duplicate.assign(duplicate.size(), false);
@@ -73,7 +73,7 @@ namespace ism3d
 
     void MaximaHandler::averageNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
                                               const float radius,
-                                              std::vector<Eigen::Vector3f>& clusters) const
+                                              std::vector<Eigen::Vector3f>& clusters)
     {
         std::vector<std::vector<int>> duplicate_indices(maxima.size());
         for(int i = 0; i < duplicate_indices.size(); i++)
@@ -136,7 +136,7 @@ namespace ism3d
 
     void MaximaHandler::averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
                                                    const float radius,
-                                                   std::vector<Eigen::Vector3f>& clusters) const
+                                                   std::vector<Eigen::Vector3f>& clusters)
     {
         std::vector<std::vector<int>> duplicate_indices(maxima.size());
         for(int i = 0; i < duplicate_indices.size(); i++)

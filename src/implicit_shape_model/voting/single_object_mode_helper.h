@@ -8,15 +8,15 @@
  *
  */
 
-#ifndef SINGLE_OBJECT_MODE_HELPERS_H
-#define SINGLE_OBJECT_MODE_HELPERS_H
+#ifndef SINGLE_OBJECT_HELPERS_H
+#define SINGLE_OBJECT_HELPERS_H
 
 #include "../utils/utils.h"
 #include "voting.h"
 
 namespace ism3d
 {
-    class SingleObjectModeHelper
+    class SingleObjectHelper
     {
     public:
         static float getModelRadius(pcl::PointCloud<PointT>::ConstPtr &points,
@@ -26,9 +26,9 @@ namespace ism3d
                                         const PointT &query);
 
     private:
-        SingleObjectModeHelper();
-        ~SingleObjectModeHelper();
+        SingleObjectHelper();
+        ~SingleObjectHelper();
     };
 }
 
-#endif // SINGLE_OBJECT_MODE_HELPERS_H
+#endif // SINGLE_OBJECT_HELPERS_H

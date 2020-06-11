@@ -25,29 +25,28 @@ namespace ism3d
     {
 
     public:
-        MaximaHandler(std::string type);
+        MaximaHandler();
         virtual ~MaximaHandler(){}
 
-        void processMaxima(const std::vector<Eigen::Vector3f>& clusterCenters,
+        static void processMaxima(const std::string &type,
+                           const std::vector<Eigen::Vector3f>& clusterCenters,
                            const float radius,
-                           std::vector<Eigen::Vector3f>& clusters) const;
+                           std::vector<Eigen::Vector3f>& clusters);
 
     private:
 
         // only the first maximum in the radius is retained
-        void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&,
+        static void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&,
                                     const float radius,
-                                    std::vector<Eigen::Vector3f>&) const;
+                                    std::vector<Eigen::Vector3f>&);
         // the average of the maxima in the radius is retained
-        void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&,
+        static void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&,
                                    const float radius,
-                                   std::vector<Eigen::Vector3f>&) const;
+                                   std::vector<Eigen::Vector3f>&);
         // the average of the maxima and its [neighbor's neighbor's ...] neighbors in the radius is retained
-        void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&,
+        static void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&,
                                         const float radius,
-                                        std::vector<Eigen::Vector3f>&) const;
-
-        std::string m_type;
+                                        std::vector<Eigen::Vector3f>&);
     };
 }
 
