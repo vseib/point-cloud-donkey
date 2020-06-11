@@ -110,6 +110,8 @@ namespace ism3d
         pcl::PointCloud<ISMFeature>::ConstPtr computeGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr points,
                                                                     const pcl::PointCloud<pcl::Normal>::ConstPtr normals);
 
+        void useHighRankedGlobalHypothesis(std::vector<VotingMaximum> &maxima);
+
         bool m_index_created;
         bool m_single_object_mode;
         bool m_svm_error;
