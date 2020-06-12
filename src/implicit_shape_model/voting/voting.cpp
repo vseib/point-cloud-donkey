@@ -384,6 +384,7 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
                 // save descriptor
                 oa << feat.descriptor;
                 oa << feat.globalDescriptorRadius;
+                oa << feat.instanceId;
             }
         }
     }
@@ -462,13 +463,15 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
                     ia >> descriptor;
                     float radius;
                     ia >> radius;
+                    unsigned instanceId;
+                    ia >> instanceId;
 
-                    // TODO VS load and store instance label in global features
                     ISMFeature ism_feature;
                     ism_feature.referenceFrame = referenceFrame;
                     ism_feature.descriptor = descriptor;
                     ism_feature.globalDescriptorRadius =  radius;
                     ism_feature.classId = classId;
+                    ism_feature.instanceId = instanceId;
                     temp_cloud->push_back(ism_feature);
                     global_features_cloud->push_back(ism_feature);
                     descriptor_length = ism_feature.descriptor.size(); // are all the same just overwrite
