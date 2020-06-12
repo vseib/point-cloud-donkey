@@ -31,12 +31,13 @@ namespace ism3d
             position = Eigen::Vector3f(0, 0, 0);
             weight = 0;
             classId = -1;
-            instanceIds = {std::numeric_limits<unsigned>::max()};
+            unsigned max_value = std::numeric_limits<unsigned>::max();
+            instanceIds = {max_value};
             boundingBox.size = Eigen::Vector3f(0,0,0);
             boundingBox.position = position;
             boundingBox.rotQuat = boost::math::quaternion<float>(1, 0, 0, 0);
-            globalHypothesis = {-1, -1};
-            currentClassHypothesis = {-1, -1};
+            globalHypothesis = {max_value, -1};
+            currentClassHypothesis = {max_value, -1};
         }
 
         Eigen::Vector3f position;
@@ -46,9 +47,17 @@ namespace ism3d
         Utils::BoundingBox boundingBox;
         std::vector<int> voteIndices;
 
+        struct GlobalHypothesis
+        {
+            unsigned classId;
+            float classWeight;
+            unsigned instanceId;
+            float instanceWeight;
+        };
+
         // TODO VS temp for testing: as soon as it is final include it in maxima merging: look for all occurences of TEMP FIX THIS!
-        std::pair<int, float> globalHypothesis; // pair of: class_id and score
-        std::pair<int, float> currentClassHypothesis; // pair of: this class_id and score
+        GlobalHypothesis globalHypothesis; // pair of: class_id and score
+        GlobalHypothesis currentClassHypothesis; // pair of: this class_id and score
     };
 }
 

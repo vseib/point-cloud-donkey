@@ -431,7 +431,7 @@ int main(int argc, char **argv)
                                     if(maxima.size() > 0)
                                     {
                                         classId = maxima.at(0).classId;
-                                        classIdglobal = maxima.at(0).globalHypothesis.first;
+                                        classIdglobal = maxima.at(0).globalHypothesis.classId;
                                     }
 
                                     // check for classification including non-best maxima

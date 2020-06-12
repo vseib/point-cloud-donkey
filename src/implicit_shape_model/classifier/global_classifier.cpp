@@ -212,7 +212,6 @@ namespace ism3d
                 // classic KNN approach
                 num_all_entries += indices[0].size(); // NOTE: is not necessaraly k, because only (k-x) might have been found
                 // loop over results
-
                 for(int i = 0; i < indices[0].size(); i++)
                 {
                     // insert result
@@ -225,8 +224,8 @@ namespace ism3d
                 }
             }
 
-            std::pair<unsigned, float> global_result = {maximum.classId, 0}; // pair of class id and score
             // determine score based on all votes
+            VotingMaximum::GlobalHypothesis global_result = {maximum.classId, 0}; // pair of class id and score
             unsigned max_occurences = 0;
             if(m_single_object_mode)
             {
@@ -236,19 +235,19 @@ namespace ism3d
                     if(it.second.num_occurences > max_occurences)
                     {
                         max_occurences = it.second.num_occurences;
-                        global_result.first = it.first;
+                        global_result.classId = it.first;
                     }
                 }
                 // compute score for best class (NOTE: determining best class based on score did not work well)
-                GlobalResultAccu gra = max_global_voting.at(global_result.first);
-                global_result.second = gra.score_sum / gra.num_occurences;
+                GlobalResultAccu gra = max_global_voting.at(global_result.classId);
+                global_result.classWeight = gra.score_sum / gra.num_occurences;
             }
             else // determine score based on current class
             {
                 if(max_global_voting.find(maximum.classId) != max_global_voting.end())
                 {
                     GlobalResultAccu gra = max_global_voting.at(maximum.classId);
-                    global_result.second = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
+                    global_result.classWeight = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
                 }
             }
 
@@ -321,7 +320,7 @@ namespace ism3d
 
             // assign global result
             float cur_score = m_single_object_mode ? 0 : svm_response.all_scores.at(maximum.classId);
-            maximum.globalHypothesis = {svm_response.label, svm_response.score};
+            maximum.globalHypothesis = {(unsigned)svm_response.label, svm_response.score};
             maximum.currentClassHypothesis = {maximum.classId, cur_score};
         }
     }
@@ -363,15 +362,15 @@ namespace ism3d
         if(merge_function == 1)
         {
             // type 1: blind belief in good scores
-            if(maxima.at(0).globalHypothesis.second > m_min_svm_score)
+            if(maxima.at(0).globalHypothesis.classWeight > m_min_svm_score)
             {
-                maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
+                maxima.at(0).classId = maxima.at(0).globalHypothesis.classId;
             }
         }
         else if(merge_function == 2) // this method's name in the phd thesis: fm2
         {
             // type 2: belief in good scores if global class is among the top classes
-            if(maxima.at(0).globalHypothesis.second > m_min_svm_score)
+            if(maxima.at(0).globalHypothesis.classWeight > m_min_svm_score)
             {
                 useHighRankedGlobalHypothesis(maxima);
             }
@@ -387,7 +386,7 @@ namespace ism3d
             // type 4: upweight consistent results by fixed factor
             for(VotingMaximum &max : maxima)
             {
-                if(max.classId == max.globalHypothesis.first)
+                if(max.classId == max.globalHypothesis.classId)
                     max.weight *= m_weight_factor;
             }
         }
@@ -396,8 +395,8 @@ namespace ism3d
             // type 5: upweight consistent results depending on weight
             for(VotingMaximum &max : maxima)
             {
-                if(max.classId == max.globalHypothesis.first)
-                    max.weight *= 1 + max.globalHypothesis.second;
+                if(max.classId == max.globalHypothesis.classId)
+                    max.weight *= 1 + max.globalHypothesis.classWeight;
             }
         }
         else if(merge_function == 6)  // this method's name in the phd thesis: fm5
@@ -405,10 +404,10 @@ namespace ism3d
             // type 6: apply intermediate T-conorm: S(a,b) = a+b-ab
             for(VotingMaximum &max : maxima)
             {
-                if(max.classId == max.globalHypothesis.first)
+                if(max.classId == max.globalHypothesis.classId)
                 {
                     float w1 = max.weight;
-                    float w2 = max.globalHypothesis.second;
+                    float w2 = max.globalHypothesis.classWeight;
                     max.weight = w1+w2 - w1*w2;
                 }
             }
@@ -422,7 +421,7 @@ namespace ism3d
     void GlobalClassifier::useHighRankedGlobalHypothesis(std::vector<VotingMaximum> &maxima)
     {
         float top_weight = maxima.at(0).weight;
-        int global_class = maxima.at(0).globalHypothesis.first;
+        int global_class = maxima.at(0).globalHypothesis.classId;
 
         // check if global class is among the top classes
         for(int i = 0; i < maxima.size(); i++)
@@ -432,7 +431,7 @@ namespace ism3d
 
             if(cur_weight >= top_weight * m_rate_limit && cur_class == global_class)
             {
-                maxima.at(0).classId = maxima.at(0).globalHypothesis.first;
+                maxima.at(0).classId = maxima.at(0).globalHypothesis.classId;
                 break;
             }
             else if(cur_weight < top_weight * m_rate_limit)

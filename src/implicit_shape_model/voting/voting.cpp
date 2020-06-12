@@ -190,9 +190,9 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         // if no maxima found in single object mode, use global hypothesis and fill in values
         if(maxima.size() == 0)
         {
-            global_result.classId = global_result.globalHypothesis.first;
-            global_result.weight = global_result.globalHypothesis.second;
-            global_result.instanceIds = global_result.instanceIds;
+            global_result.classId = global_result.globalHypothesis.classId;
+            global_result.weight = global_result.globalHypothesis.classWeight;
+            global_result.instanceIds = global_result.instanceIds; // TODO VS
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
             global_result.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
@@ -241,8 +241,8 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         LOG_INFO("maximum " << i << ", class: " << max.classId <<
                  ", instances: " << ostr.str() <<
                  ", weight: " << max.weight <<
-                 ", glob: (" << max.globalHypothesis.first << ", " << max.globalHypothesis.second << ")" <<
-                 ", this: (" << max.currentClassHypothesis.first << ", " << max.currentClassHypothesis.second << ")" <<
+                 ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
+                 ", this: (" << max.currentClassHypothesis.classId << ", " << max.currentClassHypothesis.classWeight << ")" <<
                  ", num votes: " << max.voteIndices.size());
     }
     return maxima;
