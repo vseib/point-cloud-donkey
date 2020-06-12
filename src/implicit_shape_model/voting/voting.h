@@ -19,7 +19,7 @@
 #include "../utils/utils.h"
 #include "../utils/json_object.h"
 #include "../utils/ism_feature.h"
-#include "global_classifier.h"
+#include "../classifier/global_classifier.h"
 
 // TODO VS X: clean up
 // - there are multiple global feature members

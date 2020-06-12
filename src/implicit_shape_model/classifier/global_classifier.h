@@ -17,9 +17,8 @@
 #include "../features/features.h"
 #include "../utils/ism_feature.h"
 #include "../utils/flann_helper.h"
-// TODO VS move this class to that folder later
-#include "../classifier/custom_SVM.h"
-#include "voting_maximum.h"
+#include "../voting/voting_maximum.h"
+#include "custom_SVM.h"
 
 #define PCL_NO_PRECOMPILE
 #include <pcl/point_types.h>
