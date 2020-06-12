@@ -10,6 +10,7 @@
 
 #include "maxima_handler.h"
 
+ism3d::SingleObjectMaxType ism3d::MaximaHandler::m_max_type = ism3d::SingleObjectMaxType::DEFAULT;
 std::string ism3d::MaximaHandler::m_radius_type = "";
 float ism3d::MaximaHandler::m_radius_factor = 0.0f;
 float ism3d::MaximaHandler::m_radius = 0.0f;

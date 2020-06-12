@@ -72,18 +72,8 @@ void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsi
 std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                               pcl::PointCloud<pcl::Normal>::ConstPtr &normals)
 {
-    // TODO VS try to move these into maxima_handler.cpp
-    // set max type based on parameter value
-    if(m_max_type_param == "None" || m_max_type_param == "Default")
-        m_max_type = SingleObjectMaxType::DEFAULT;
-    else if(m_max_type_param == "BandwidthVotes")
-        m_max_type = SingleObjectMaxType::BANDWIDTH;
-    else if(m_max_type_param == "VotingSpaceVotes")
-        m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
-    else if(m_max_type_param == "ModelRadiusVotes")
-        m_max_type = SingleObjectMaxType::MODEL_RADIUS;
-
     // forward values to helper function
+    MaximaHandler::setSingleObjectMaxType(m_max_type_param);
     MaximaHandler::setRadiusType(m_radiusType);
     MaximaHandler::setRadiusFactor(m_radiusFactor);
 

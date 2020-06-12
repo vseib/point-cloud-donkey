@@ -18,6 +18,14 @@
 
 namespace ism3d
 {
+    enum class SingleObjectMaxType
+    {
+        DEFAULT,    // default means no special treatment
+        COMPLETE_VOTING_SPACE,
+        BANDWIDTH,
+        MODEL_RADIUS
+    };
+
     /**
      * @brief The MaximaHandler class
      * Allows to filter maxima according to some strategy.
@@ -29,6 +37,24 @@ namespace ism3d
     public:
         MaximaHandler();
         virtual ~MaximaHandler(){}
+
+        static void setSingleObjectMaxType(const std::string max_type_param)
+        {
+            // set max type based on parameter value
+            if(max_type_param == "None" || max_type_param == "Default")
+                m_max_type = SingleObjectMaxType::DEFAULT;
+            else if(max_type_param == "BandwidthVotes")
+                m_max_type = SingleObjectMaxType::BANDWIDTH;
+            else if(max_type_param == "VotingSpaceVotes")
+                m_max_type = SingleObjectMaxType::COMPLETE_VOTING_SPACE;
+            else if(max_type_param == "ModelRadiusVotes")
+                m_max_type = SingleObjectMaxType::MODEL_RADIUS;
+            else
+            {
+                LOG_WARN("Invalid single object maximum type: " << max_type_param << "! Using default instead.");
+                m_max_type = SingleObjectMaxType::DEFAULT;
+            }
+        }
 
         static void setRadiusType(const std::string radius_type)
         {
@@ -63,6 +89,8 @@ namespace ism3d
 
         // -------------- these methods determine how maxima are treated after mean-shift ------------------
         static std::vector<VotingMaximum> filterMaxima(const std::string filter_type, const std::vector<VotingMaximum> &maxima);
+
+        static SingleObjectMaxType m_max_type;
 
     private:
 

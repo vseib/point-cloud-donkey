@@ -30,15 +30,6 @@
 
 namespace ism3d
 {
-    enum class SingleObjectMaxType
-    {
-        DEFAULT,    // default means no special treatment
-        COMPLETE_VOTING_SPACE,
-        BANDWIDTH,
-        MODEL_RADIUS
-    };
-
-
     /**
      * @brief The Voting class
      * Provides an abstract interface for the voting process in which object occurrences will
@@ -151,11 +142,10 @@ namespace ism3d
         bool iLoadData(boost::archive::binary_iarchive &ia);
 
         // maps class ids to a vector of global features, number of objects per class = number of global features per class
-        std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > m_global_features; // used only during training
+        std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> m_global_features; // used only during training
 
         bool m_single_object_mode;
         std::string m_max_filter_type;
-        SingleObjectMaxType m_max_type;
         std::string m_max_type_param;
 
     private:

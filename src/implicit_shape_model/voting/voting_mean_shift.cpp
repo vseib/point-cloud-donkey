@@ -77,7 +77,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     // 1) not single object mode, max type doesn't matter --> perform mean-shift to find maxima
     // 2) single object mode only with default max type   --> perform mean-shift to find maxima
     //    (this effectively disables single object mode for local features, but not for global ones)
-    if(!m_single_object_mode || (m_single_object_mode && m_max_type == SingleObjectMaxType::DEFAULT))
+    if(!m_single_object_mode || (m_single_object_mode && MaximaHandler::m_max_type == SingleObjectMaxType::DEFAULT))
     {
         // create seed points using binning strategy
         std::vector<Voting::Vote> seeds = createSeeds(votes, iGetSeedsRange());
@@ -103,15 +103,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         query.y = centr[1];
         query.z = centr[2];
 
-        if(m_max_type == SingleObjectMaxType::BANDWIDTH)
+        if(MaximaHandler::m_max_type == SingleObjectMaxType::BANDWIDTH)
         {
             m_bandwidth = MaximaHandler::getSearchDistForClass(classId);
         }
-        if(m_max_type == SingleObjectMaxType::MODEL_RADIUS)
+        if(MaximaHandler::m_max_type == SingleObjectMaxType::MODEL_RADIUS)
         {
             m_bandwidth = SingleObjectHelper::getModelRadius(points, query);
         }
-        if(m_max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
+        if(MaximaHandler::m_max_type == SingleObjectMaxType::COMPLETE_VOTING_SPACE)
         {
             m_bandwidth = SingleObjectHelper::getVotingSpaceSize(votes, query);
         }
