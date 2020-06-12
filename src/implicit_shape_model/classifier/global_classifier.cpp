@@ -181,147 +181,203 @@ namespace ism3d
         if(m_global_feature_method == "KNN")
         {
             LOG_INFO("starting global classification with knn");
-            std::map<unsigned, GlobalResultAccu> max_global_voting; // maps class id to struct with number of occurences and score
-            int num_all_entries = 0;
-
-            // find nearest neighbors to current global features in learned data
-            // NOTE: some global features produce more than 1 descriptor per object, hence the loop
-            for(ISMFeature query_feature : global_features->points)
-            {
-                // insert the query point
-                flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
-                for(int i = 0; i < query_feature.descriptor.size(); i++)
-                {
-                    query[0][i] = query_feature.descriptor.at(i);
-                }
-
-                // search
-                std::vector<std::vector<int>> indices;
-                std::vector<std::vector<float>> distances;
-                if(m_flann_helper->getDistType() == "Euclidean")
-                {
-                    m_flann_helper->getIndexL2()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-                }
-                else if(m_flann_helper->getDistType() == "ChiSquared")
-                {
-                    m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
-                }
-
-                delete[] query.ptr();
-
-                // classic KNN approach
-                num_all_entries += indices[0].size(); // NOTE: is not necessaraly k, because only (k-x) might have been found
-                // loop over results
-                for(int i = 0; i < indices[0].size(); i++)
-                {
-                    // insert result
-                    ISMFeature temp = m_global_features->at(indices[0].at(i));
-                    float dist_squared = distances[0].at(i);
-                    const float sigma = 0.1;
-                    const float denom = 2 * sigma * sigma;
-                    float score = std::exp(-dist_squared/denom);
-                    insertGlobalResult(max_global_voting, temp.classId, score);
-                }
-            }
-
-            // determine score based on all votes
-            VotingMaximum::GlobalHypothesis global_result = {maximum.classId, 0}; // pair of class id and score
-            unsigned max_occurences = 0;
-            if(m_single_object_mode)
-            {
-                // find class with most occurences
-                for(auto it : max_global_voting)
-                {
-                    if(it.second.num_occurences > max_occurences)
-                    {
-                        max_occurences = it.second.num_occurences;
-                        global_result.classId = it.first;
-                    }
-                }
-                // compute score for best class (NOTE: determining best class based on score did not work well)
-                GlobalResultAccu gra = max_global_voting.at(global_result.classId);
-                global_result.classWeight = gra.score_sum / gra.num_occurences;
-            }
-            else // determine score based on current class
-            {
-                if(max_global_voting.find(maximum.classId) != max_global_voting.end())
-                {
-                    GlobalResultAccu gra = max_global_voting.at(maximum.classId);
-                    global_result.classWeight = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
-                }
-            }
-
-            // assign global result
-            maximum.globalHypothesis = global_result;
-            maximum.currentClassHypothesis = global_result;
+            classifyWithKNN(global_features, maximum);
         }
         else if(m_global_feature_method == "SVM")
         {
             LOG_INFO("starting global classification with svm");
-            CustomSVM::SVMResponse svm_response;
-            std::vector<CustomSVM::SVMResponse> all_responses; // in case one object has multiple global features
-            // NOTE: some global features produce more than 1 descriptor per object, hence the loop
-            for(ISMFeature query_feature : global_features->points)
-            {
-                // convert to SVM data format
-                std::vector<float> data_raw = query_feature.descriptor;
-                float data[data_raw.size()];
-                for(unsigned i = 0; i < data_raw.size(); i++)
-                {
-                    data[i] = data_raw.at(i);
-                }
-                cv::Mat svm_input_data(1, data_raw.size(), CV_32FC1, data);
+            classifyWithSVM(global_features, maximum);
+            // SVM does not support instance labels, so we have to get it from KNN classifier
+            VotingMaximum instance_maximum;
+            instance_maximum.classId = maximum.classId;
+            classifyWithKNN(global_features, instance_maximum);
+            // fill in instance result into actual maximum
+            maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
+            maximum.globalHypothesis.instanceWeight = instance_maximum.globalHypothesis.instanceWeight;
+        }
+    }
 
-                CustomSVM::SVMResponse temp_response = m_svm.predictUnifyScore(svm_input_data, m_svm_files);
-                all_responses.push_back(temp_response);
+    void GlobalClassifier::classifyWithKNN(pcl::PointCloud<ISMFeature>::ConstPtr global_features,
+                                           VotingMaximum &maximum)
+    {
+        std::map<unsigned, GlobalResultAccu> max_global_voting; // maps class id to struct with number of occurences and score
+
+        // find nearest neighbors to current global features in learned data
+        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
+        for(ISMFeature query_feature : global_features->points)
+        {
+            // insert the query point
+            flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
+            for(int i = 0; i < query_feature.descriptor.size(); i++)
+            {
+                query[0][i] = query_feature.descriptor.at(i);
             }
 
-            // check if several responses are available
-            if(all_responses.size() > 1)
+            // search
+            std::vector<std::vector<int>> indices;
+            std::vector<std::vector<float>> distances;
+            if(m_flann_helper->getDistType() == "Euclidean")
             {
-                std::map<unsigned, GlobalResultAccu> global_result_per_class;
-                for(const CustomSVM::SVMResponse &resp : all_responses)
-                {
-                    insertGlobalResult(global_result_per_class, (unsigned) resp.label, resp.score);
-                }
+                m_flann_helper->getIndexL2()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
+            }
+            else if(m_flann_helper->getDistType() == "ChiSquared")
+            {
+                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
+            }
 
-                int best_class = 0;
-                int best_occurences = 0;
-                for(const auto it : global_result_per_class)
+            delete[] query.ptr();
+
+            // classic KNN approach
+            // loop over results
+            for(int i = 0; i < indices[0].size(); i++)
+            {
+                // insert result
+                ISMFeature temp = m_global_features->at(indices[0].at(i));
+                float dist_squared = distances[0].at(i);
+                const float sigma = 0.1;
+                const float denom = 2 * sigma * sigma;
+                float score = std::exp(-dist_squared/denom);
+                insertGlobalResult(max_global_voting, temp.classId, temp.instanceId, score);
+            }
+        }
+
+        // determine score based on all votes
+        VotingMaximum::GlobalHypothesis global_result = {maximum.classId, 0}; // pair of class id and score
+        unsigned max_occurences = 0;
+        if(m_single_object_mode)
+        {
+            // find class with most occurences
+            for(auto it : max_global_voting)
+            {
+                GlobalResultAccu gra = it.second;
+                if(gra.num_occurences > max_occurences)
                 {
-                    // NOTE: what if there are 2 equal classes?
-                    if(it.second.num_occurences > best_occurences) // find highest number of occurences
+                    max_occurences = gra.num_occurences;
+                    global_result.classId = it.first;
+                }
+            }
+            // use best class and compute score (NOTE: determining best class based on score did not work well)
+            GlobalResultAccu gra = max_global_voting.at(global_result.classId);
+            global_result.classWeight = gra.score_sum / gra.num_occurences;
+
+            // find instance with most occurences
+            max_occurences = 0;
+            for(auto it : gra.instance_ids)
+            {
+                std::pair<int, float> elem = it.second;
+                if(elem.first > max_occurences)
+                {
+                    max_occurences = elem.first;
+                    global_result.instanceId = it.first;
+                }
+            }
+            std::pair<int, float> elem = gra.instance_ids.at(global_result.instanceId);
+            global_result.instanceWeight = elem.second / elem.first;
+        }
+        else
+        {
+            // determine score based on current class
+            if(max_global_voting.find(maximum.classId) != max_global_voting.end())
+            {
+                GlobalResultAccu gra = max_global_voting.at(maximum.classId);
+                global_result.classWeight = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
+
+                // find instance with most occurences
+                max_occurences = 0;
+                for(auto it : gra.instance_ids)
+                {
+                    std::pair<int, float> elem = it.second;
+                    if(elem.first > max_occurences)
                     {
-                        best_occurences = it.second.num_occurences;
-                        best_class = it.first;
+                        max_occurences = elem.first;
+                        global_result.instanceId = it.first;
                     }
                 }
+                std::pair<int, float> elem = gra.instance_ids.at(global_result.instanceId);
+                global_result.instanceWeight = elem.second / elem.first;
+            }
+        }
 
-                // find best class in list of responses with "best" (highest) score
-                float best_score = std::numeric_limits<float>::min();
-                CustomSVM::SVMResponse best_response = all_responses.at(0); // init with first value
-                for(int i = 0; i < all_responses.size(); i++)
+        // assign global result
+        maximum.globalHypothesis = global_result;
+    }
+
+    void GlobalClassifier::classifyWithSVM(pcl::PointCloud<ISMFeature>::ConstPtr global_features,
+                                           VotingMaximum &maximum)
+    {
+        CustomSVM::SVMResponse svm_response;
+        std::vector<CustomSVM::SVMResponse> all_responses; // in case one object has multiple global features
+        // NOTE: some global features produce more than 1 descriptor per object, hence the loop
+        for(ISMFeature query_feature : global_features->points)
+        {
+            // convert to SVM data format
+            std::vector<float> data_raw = query_feature.descriptor;
+            float data[data_raw.size()];
+            for(unsigned i = 0; i < data_raw.size(); i++)
+            {
+                data[i] = data_raw.at(i);
+            }
+            cv::Mat svm_input_data(1, data_raw.size(), CV_32FC1, data);
+
+            CustomSVM::SVMResponse temp_response = m_svm.predictUnifyScore(svm_input_data, m_svm_files);
+            all_responses.push_back(temp_response);
+        }
+
+        // check if several responses are available
+        if(all_responses.size() > 1)
+        {
+            std::map<unsigned, GlobalResultAccu> global_result_per_class;
+            for(const CustomSVM::SVMResponse &resp : all_responses)
+            {
+                // for now passing class label as instance label, will be replaced later
+                insertGlobalResult(global_result_per_class, (unsigned) resp.label, resp.score, (unsigned) resp.label);
+            }
+
+            int best_class = 0;
+            int best_occurences = 0;
+            for(const auto it : global_result_per_class)
+            {
+                // NOTE: what if there are 2 equal classes?
+                if(it.second.num_occurences > best_occurences) // find highest number of occurences
                 {
-                    if(all_responses.at(i).label == best_class)
+                    best_occurences = it.second.num_occurences;
+                    best_class = it.first;
+                }
+            }
+
+            // find best class in list of responses with "best" (highest) score
+            float best_score = std::numeric_limits<float>::min();
+            CustomSVM::SVMResponse best_response = all_responses.at(0); // init with first value
+            for(int i = 0; i < all_responses.size(); i++)
+            {
+                if(all_responses.at(i).label == best_class)
+                {
+                    if(all_responses.at(i).score > best_score)
                     {
-                        if(all_responses.at(i).score > best_score)
-                        {
-                            best_score = all_responses.at(i).score;
-                            best_response = all_responses.at(i);
-                        }
+                        best_score = all_responses.at(i).score;
+                        best_response = all_responses.at(i);
                     }
                 }
-                svm_response = best_response;
             }
-            else if(all_responses.size() == 1)
-            {
-                svm_response = all_responses.at(0);
-            }
+            svm_response = best_response;
+        }
+        else if(all_responses.size() == 1)
+        {
+            svm_response = all_responses.at(0);
+        }
 
-            // assign global result
-            float cur_score = m_single_object_mode ? 0 : svm_response.all_scores.at(maximum.classId);
-            maximum.globalHypothesis = {(unsigned)svm_response.label, svm_response.score};
-            maximum.currentClassHypothesis = {maximum.classId, cur_score};
+        // assign global result
+        if(m_single_object_mode)
+        {
+            // just get the best overall result
+            maximum.globalHypothesis.classId = (unsigned)svm_response.label;
+            maximum.globalHypothesis.classWeight = svm_response.score;
+        }
+        else
+        {
+            // get the result for current class id
+            maximum.globalHypothesis.classId = maximum.classId;
+            maximum.globalHypothesis.classWeight = svm_response.all_scores.at(maximum.classId);
         }
     }
 
@@ -334,8 +390,9 @@ namespace ism3d
     }
 
     void GlobalClassifier::insertGlobalResult(std::map<unsigned, ism3d::GlobalResultAccu> &max_global_voting,
-                                    unsigned found_class,
-                                    float score) const
+                                            unsigned found_class,
+                                            unsigned instance_id,
+                                            float score) const
     {
         if(max_global_voting.find(found_class) != max_global_voting.end())
         {
@@ -343,11 +400,13 @@ namespace ism3d
             GlobalResultAccu &prev = max_global_voting.at(found_class);
             prev.num_occurences++;
             prev.score_sum += score;
+            prev.insertInstanceLabel(instance_id, score);
         }
         else
         {
             // not found
-            max_global_voting.insert({found_class, {1,score} });
+            GlobalResultAccu gra = GlobalResultAccu(1, score, instance_id);
+            max_global_voting.insert({found_class, gra});
         }
     }
 

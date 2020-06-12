@@ -180,7 +180,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     if(m_use_global_features && m_single_object_mode)
     {
         VotingMaximum global_result;
-        // TODO VS: global classification does not use instance labels so far
         m_global_classifier->classify(points, normals, global_result);
 
         // add global result to all maxima if in single object mode
@@ -192,7 +191,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         {
             global_result.classId = global_result.globalHypothesis.classId;
             global_result.weight = global_result.globalHypothesis.classWeight;
-            global_result.instanceIds = global_result.instanceIds; // TODO VS
+            global_result.instanceIds = {global_result.globalHypothesis.instanceId};
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
             global_result.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
@@ -242,7 +241,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                  ", instances: " << ostr.str() <<
                  ", weight: " << max.weight <<
                  ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
-                 ", this: (" << max.currentClassHypothesis.classId << ", " << max.currentClassHypothesis.classWeight << ")" <<
                  ", num votes: " << max.voteIndices.size());
     }
     return maxima;

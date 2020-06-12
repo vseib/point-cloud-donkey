@@ -37,7 +37,6 @@ namespace ism3d
             boundingBox.position = position;
             boundingBox.rotQuat = boost::math::quaternion<float>(1, 0, 0, 0);
             globalHypothesis = {max_value, -1};
-            currentClassHypothesis = {max_value, -1};
         }
 
         Eigen::Vector3f position;
@@ -57,7 +56,6 @@ namespace ism3d
 
         // TODO VS temp for testing: as soon as it is final include it in maxima merging: look for all occurences of TEMP FIX THIS!
         GlobalHypothesis globalHypothesis; // pair of: class_id and score
-        GlobalHypothesis currentClassHypothesis; // pair of: this class_id and score
     };
 }
 

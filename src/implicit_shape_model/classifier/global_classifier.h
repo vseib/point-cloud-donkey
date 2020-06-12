@@ -32,14 +32,33 @@ namespace ism3d
     // represents an accumulated global result for a single class
     struct GlobalResultAccu
     {
-        GlobalResultAccu(unsigned num_occurences, float score)
+        GlobalResultAccu(unsigned num_occurences, float score, unsigned instance_id)
         {
             this->num_occurences = num_occurences;
             this->score_sum = score;
+            insertInstanceLabel(instance_id, score);
+        }
+
+        void insertInstanceLabel(unsigned instance_id, float score)
+        {
+            if(instance_ids.find(instance_id) != instance_ids.end())
+            {
+                // found
+                std::pair<int, float> &prev = instance_ids.at(instance_id);
+                prev.first++;
+                prev.second += score;
+            }
+            else
+            {
+                // not found
+                instance_ids.insert({instance_id, {1,score}});
+            }
         }
 
         unsigned num_occurences;
         float score_sum;
+        // id --> pair of num_occurences and score_sum
+        std::map<unsigned, std::pair<int, float>> instance_ids;
     };
 
     /**
@@ -102,8 +121,15 @@ namespace ism3d
 
 
     private:
+
+        void classifyWithKNN(pcl::PointCloud<ISMFeature>::ConstPtr global_features,
+                             VotingMaximum &maximum);
+
+        void classifyWithSVM(pcl::PointCloud<ISMFeature>::ConstPtr global_features,
+                             VotingMaximum &maximum);
+
         void insertGlobalResult(std::map<unsigned, GlobalResultAccu> &max_global_voting,
-                                unsigned found_class,
+                                unsigned found_class, unsigned instance_id,
                                 float score) const;
 
         pcl::PointCloud<ISMFeature>::ConstPtr computeGlobalFeatures(const pcl::PointCloud<PointT>::ConstPtr points,

@@ -334,7 +334,6 @@ namespace ism3d
 
             //TODO VS TEMP FIX THIS! -- should be some kind of average
             result.globalHypothesis = m.globalHypothesis;
-            result.currentClassHypothesis = m.currentClassHypothesis;
         }
         return result;
     }
