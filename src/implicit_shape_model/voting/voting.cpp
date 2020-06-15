@@ -524,9 +524,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         }
 
         // create flann index
-        // TODO VS simplify constructor call, e.g. first argument is descriptor_length
-        std::shared_ptr<FlannHelper> fh = std::make_shared<FlannHelper>(
-                    global_features_cloud->at(0).descriptor.size(), global_features_cloud->size());
+        std::shared_ptr<FlannHelper> fh = std::make_shared<FlannHelper>(descriptor_length, global_features_cloud->size());
         fh->createDataset(global_features_cloud);
         // NOTE: index will be build when the first object is recognized - otherwise parameters are not initialized from config, but with default values
         //fh->buildIndex(m_distanceType, m_num_kd_trees);

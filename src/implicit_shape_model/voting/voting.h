@@ -21,13 +21,6 @@
 #include "../utils/ism_feature.h"
 #include "../classifier/global_classifier.h"
 
-// TODO VS X: clean up
-// - there are multiple global feature members
-// - there are two setter functions for global features used in ism.cpp
-// - this class is for voting, but is now additionally used for global features and maxima merging
-// - pointer to global descriptor calculation is set here
-
-
 namespace ism3d
 {
     /**

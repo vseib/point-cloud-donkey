@@ -63,7 +63,8 @@ namespace ism3d
 
     /**
      * @brief The GlobalClassifier class
-     * TODO VS add description
+     * This class wrapps a classifier for global feature descriptors. The classifier can be KNN or SVM.
+     * Instance labels are only available by calling the KNN classifier (which is done also if SVM is selected).
      */
     class GlobalClassifier
     {

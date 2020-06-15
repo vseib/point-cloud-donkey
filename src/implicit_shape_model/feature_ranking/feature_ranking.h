@@ -32,7 +32,6 @@ namespace ism3d
             : public JSONObject
     {
 
-    // TODO VS: don't use these typedefs anymore - wait for a refactored data type then examine again!
     typedef std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> FeatureMapT;
     typedef std::map<unsigned, std::vector<std::pair<int, float>>> ScoringMapT;
 

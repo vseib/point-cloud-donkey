@@ -22,7 +22,7 @@ namespace ism3d
                                        int k_global)
     {
         m_feature_algorithm = global_descriptor;
-        m_global_feature_method = method; // TODO VS replace by enum
+        m_global_feature_method = method;
         m_k_global_features = k_global;
 
         m_single_object_mode = false;
