@@ -112,6 +112,7 @@ namespace ism3d
         // -------------- these methods determine how maxima are treated after mean-shift ------------------
         static std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima, bool merge);
         static VotingMaximum mergeMaxima(const std::vector<VotingMaximum> &max_list);
+        static VotingMaximum::GlobalHypothesis mergeGlobalHypotheses(const std::vector<VotingMaximum::GlobalHypothesis> &global_hyps);
 
         static std::string m_radius_type;  // take value from config or used learned average bounding box dimensions
         static float m_radius_factor;  // factor for radius, in case radius type is NOT Config

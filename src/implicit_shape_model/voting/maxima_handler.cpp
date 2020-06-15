@@ -315,8 +315,10 @@ namespace ism3d
 
     VotingMaximum MaximaHandler::mergeMaxima(const std::vector<VotingMaximum> &max_list)
     {
+        std::vector<VotingMaximum::GlobalHypothesis> global_hyps;
+
         VotingMaximum result;
-        for(VotingMaximum m : max_list)
+        for(const VotingMaximum &m : max_list)
         {
             // NOTE: position and bounding box must be handled before changing weight!
             result.position = result.position * result.weight + m.position * m.weight;
@@ -331,11 +333,81 @@ namespace ism3d
             result.classId = m.classId;
             result.weight += m.weight;
             result.voteIndices.insert(result.voteIndices.end(), m.voteIndices.begin(), m.voteIndices.end());
+            result.instanceIds.insert(result.instanceIds.end(), m.instanceIds.begin(), m.instanceIds.end());
 
-            //TODO VS TEMP FIX THIS! -- should be some kind of average
-            result.globalHypothesis = m.globalHypothesis;
+            // accumulate global hypotheses and merge afterwards
+            global_hyps.push_back(m.globalHypothesis);
         }
+
+        result.globalHypothesis = mergeGlobalHypotheses(global_hyps);
+
         return result;
+    }
+
+    VotingMaximum::GlobalHypothesis MaximaHandler::mergeGlobalHypotheses(
+            const std::vector<VotingMaximum::GlobalHypothesis> &global_hyps)
+    {
+        std::map<unsigned,float> global_weights;
+        // accumulate weights for each id
+        for(auto &gh : global_hyps)
+        {
+            if(global_weights.find(gh.classId) != global_weights.end())
+            {
+                global_weights.at(gh.classId) += gh.classWeight;
+            }
+            else
+            {
+                global_weights.insert({gh.classId, gh.classWeight});
+            }
+        }
+
+        // find class with hightest weight
+        unsigned max_id;
+        float max_weight = std::numeric_limits<float>::min();
+        for(auto &r : global_weights)
+        {
+            if(r.second > max_weight)
+            {
+                max_weight = r.second;
+                max_id = r.first;
+            }
+        }
+
+        // find instance of highest class with highest score
+        global_weights.clear();
+        for(auto &gh : global_hyps)
+        {
+            if(gh.classId == max_id)
+            {
+                if(global_weights.find(gh.instanceId) != global_weights.end())
+                {
+                    global_weights.at(gh.instanceId) += gh.instanceWeight;
+                }
+                else
+                {
+                    global_weights.insert({gh.instanceId, gh.instanceWeight});
+                }
+            }
+        }
+
+        VotingMaximum::GlobalHypothesis global_result;
+        global_result.classId = max_id;
+        global_result.classWeight = max_weight;
+
+        // find instance with hightest score
+        max_weight = std::numeric_limits<float>::min();
+        for(auto &r : global_weights)
+        {
+            if(r.second > max_weight)
+            {
+                max_weight = r.second;
+                max_id = r.first;
+            }
+        }
+
+        global_result.instanceId = max_id;
+        global_result.instanceWeight = max_weight;
+        return global_result;
     }
 
     float MaximaHandler::getSearchDistForClass(const unsigned class_id)
