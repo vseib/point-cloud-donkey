@@ -32,7 +32,7 @@ namespace ism3d
             weight = 0;
             classId = -1;
             unsigned max_value = std::numeric_limits<unsigned>::max();
-            instanceIds = {max_value};
+            instanceId = max_value;
             boundingBox.size = Eigen::Vector3f(0,0,0);
             boundingBox.position = position;
             boundingBox.rotQuat = boost::math::quaternion<float>(1, 0, 0, 0);
@@ -42,7 +42,13 @@ namespace ism3d
         Eigen::Vector3f position;
         float weight;
         unsigned classId;
-        std::vector<unsigned> instanceIds;
+        unsigned instanceId; // currently with max votes
+        float instanceWeight;
+
+        // TODO VS temp for testing
+        unsigned instanceIdAlt; // alternative: with max weight
+        float instanceWeightAlt;
+
         Utils::BoundingBox boundingBox;
         std::vector<int> voteIndices;
 
@@ -54,8 +60,7 @@ namespace ism3d
             float instanceWeight;
         };
 
-        // TODO VS temp for testing: as soon as it is final include it in maxima merging: look for all occurences of TEMP FIX THIS!
-        GlobalHypothesis globalHypothesis; // pair of: class_id and score
+        GlobalHypothesis globalHypothesis;
     };
 }
 

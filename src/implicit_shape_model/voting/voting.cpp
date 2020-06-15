@@ -14,7 +14,6 @@
 #include "../codebook/codeword_distribution.h"
 
 #include <fstream>
-#include <sstream>
 
 #define PCL_NO_PRECOMPILE
 #include <pcl/point_types.h>
@@ -117,9 +116,55 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             if (clusterVotes.size() == 0)
                 continue;
 
+            // determine instance id based on all ids and corresponding vote weights
+            // TODO VS refactor later
+            // option 1: maximum number of votes
+            std::map<unsigned, unsigned> instance_votes;
+            // option 2: maximum weight
+            std::map<unsigned, float> instance_weights;
+            for(unsigned idx = 0; idx < reweightedClusterVotes.size(); idx++)
+            {
+                float weight = reweightedClusterVotes[idx];
+                unsigned instance_id = instanceIds[i][idx];
+
+                if(instance_votes.find(instance_id) != instance_votes.end())
+                {
+                    instance_votes.at(instance_id) += 1;
+                    instance_weights.at(instance_id) += weight;
+                }
+                else
+                {
+                    instance_votes.insert({instance_id, 1});
+                    instance_weights.insert({instance_id, weight});
+                }
+            }
+            // find max value
+            unsigned max_id_votes;
+            unsigned best_votes = 0;
+            unsigned max_id_weights;
+            float best_weight = 0;
+            for(auto it : instance_votes)
+            {
+                unsigned num_votes = it.second;
+                float weight = instance_weights[it.first];
+                if(num_votes > best_votes)
+                {
+                    best_votes = num_votes;
+                    max_id_votes = it.first;
+                }
+                if(weight > best_weight)
+                {
+                    best_weight = weight;
+                    max_id_weights = it.first;
+                }
+            }
+
             VotingMaximum maximum;
             maximum.classId = classId;
-            maximum.instanceIds = instanceIds[i];
+            maximum.instanceId = max_id_votes;
+            maximum.instanceWeight = instance_weights[max_id_votes];
+            maximum.instanceIdAlt = max_id_weights;
+            maximum.instanceWeightAlt = instance_weights[max_id_weights];
             maximum.position = clusters[i];
             maximum.weight = maximaValues[i];
             maximum.voteIndices = voteIndices[i];
@@ -191,7 +236,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         {
             global_result.classId = global_result.globalHypothesis.classId;
             global_result.weight = global_result.globalHypothesis.classWeight;
-            global_result.instanceIds = {global_result.globalHypothesis.instanceId};
+            global_result.instanceId = global_result.globalHypothesis.instanceId;
             Eigen::Vector4d centroid;
             pcl::compute3DCentroid(*points, centroid);
             global_result.position = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
@@ -204,8 +249,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
     if(!m_single_object_mode)
     {
-        // TODO VS add instances to maxima merging
-        // TODO VS add global result to maxima merging
         filtered_maxima = MaximaHandler::filterMaxima(m_max_filter_type, maxima);
     }
     maxima = filtered_maxima;
@@ -231,15 +274,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     for (int i = 0; i < (int)maxima.size(); i++)
     {
         const VotingMaximum& max = maxima[i];
-        std::ostringstream ostr;
-        for(auto elem : max.instanceIds)
-        {
-            ostr << elem << " ";
-        }
-        ostr << "\b"; // move cursor one position back (to overwrite last space)
         LOG_INFO("maximum " << i << ", class: " << max.classId <<
-                 ", instances: " << ostr.str() <<
                  ", weight: " << max.weight <<
+                 ", instanceByVote: " << max.instanceId << " (" << max.instanceWeight << ")" <<
+                 ", instanceByWeight: " << max.instanceIdAlt << " (" << max.instanceWeightAlt << ")" <<
                  ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
                  ", num votes: " << max.voteIndices.size());
     }

@@ -424,6 +424,7 @@ namespace ism3d
             if(maxima.at(0).globalHypothesis.classWeight > m_min_svm_score)
             {
                 maxima.at(0).classId = maxima.at(0).globalHypothesis.classId;
+                maxima.at(0).instanceId = maxima.at(0).globalHypothesis.instanceId;
             }
         }
         else if(merge_function == 2) // this method's name in the phd thesis: fm2
@@ -439,7 +440,6 @@ namespace ism3d
             // type 3: take global class if it is among the top classes
             useHighRankedGlobalHypothesis(maxima);
         }
-        // TODO VS: for NON single object mode include maximum.currentClassHypothesis
         else if(merge_function == 4) // this method's name in the phd thesis: fm3
         {
             // type 4: upweight consistent results by fixed factor
@@ -447,6 +447,8 @@ namespace ism3d
             {
                 if(max.classId == max.globalHypothesis.classId)
                     max.weight *= m_weight_factor;
+                if(max.instanceId == max.globalHypothesis.instanceId)
+                    max.instanceWeight *= m_weight_factor;
             }
         }
         else if(merge_function == 5) // this method's name in the phd thesis: fm4
@@ -456,6 +458,8 @@ namespace ism3d
             {
                 if(max.classId == max.globalHypothesis.classId)
                     max.weight *= 1 + max.globalHypothesis.classWeight;
+                if(max.instanceId == max.globalHypothesis.instanceId)
+                    max.instanceWeight *= 1 + max.globalHypothesis.instanceWeight;
             }
         }
         else if(merge_function == 6)  // this method's name in the phd thesis: fm5
@@ -468,6 +472,13 @@ namespace ism3d
                     float w1 = max.weight;
                     float w2 = max.globalHypothesis.classWeight;
                     max.weight = w1+w2 - w1*w2;
+
+                    if(max.instanceId == max.globalHypothesis.instanceId)
+                    {
+                        w1 = max.instanceWeight;
+                        w2 = max.globalHypothesis.instanceWeight;
+                        max.instanceWeight = w1+w2 - w1*w2;
+                    }
                 }
             }
         }
@@ -491,6 +502,7 @@ namespace ism3d
             if(cur_weight >= top_weight * m_rate_limit && cur_class == global_class)
             {
                 maxima.at(0).classId = maxima.at(0).globalHypothesis.classId;
+                maxima.at(0).instanceId = maxima.at(0).globalHypothesis.instanceId;
                 break;
             }
             else if(cur_weight < top_weight * m_rate_limit)
