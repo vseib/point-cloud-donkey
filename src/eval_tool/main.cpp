@@ -340,6 +340,7 @@ int main(int argc, char **argv)
                     int numCorrectClasses = 0;
                     int numCorrectInstances = 0;
                     int numCorrectInstancesAlt = 0;
+                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracaHelper; // maps class id to pair <correct, total>
 
                     int numCorrectGlobal = 0;
                     int numBothCorrect = 0;
@@ -369,9 +370,7 @@ int main(int argc, char **argv)
 
                     if (pointClouds.size() == gt_class_ids.size())
                     {
-                        // TODO VS: include instance labels in output file
                         boost::timer::cpu_timer timer;
-
                         std::map<std::string, double> times;
                         for(unsigned i = 0; i < pointClouds.size(); i++)
                         {
@@ -390,7 +389,6 @@ int main(int argc, char **argv)
                             else
                             {
                                 //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
-
                                 // write detected maxima to detection log file
                                 if (variables.count("output"))
                                 {
@@ -464,7 +462,33 @@ int main(int argc, char **argv)
                                     // normal classifier
                                     if(((int)trueID) == classId)
                                     {
+                                        // correct classification
                                         numCorrectClasses++;
+                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        {
+                                            // pair <correct, total>
+                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            res.first++;
+                                            res.second++;
+                                        }
+                                        else
+                                        {
+                                            averageAccuracaHelper.insert({trueID, {1,1}});
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // wrong classification
+                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        {
+                                            // pair <correct, total>
+                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            res.second++;
+                                        }
+                                        else
+                                        {
+                                            averageAccuracaHelper.insert({trueID, {0,1}});
+                                        }
                                     }
                                     // instance recognition
                                     if(((int)trueInstanceID) == instanceId)
@@ -510,15 +534,26 @@ int main(int argc, char **argv)
                         summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
                         summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
 
+                        float avg_pc_acc = 0;
+                        for(const auto &elem : averageAccuracaHelper)
+                        {
+                            const std::pair<unsigned, unsigned> &p = elem.second;
+                            avg_pc_acc += (float)p.first/p.second;
+                        }
+                        avg_pc_acc /= averageAccuracaHelper.size();
+
                         // complete and close summary file
-                        summaryFile << "\n\n result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
+                        summaryFile << std::endl << std::endl;
+                        summaryFile << " Accuracy: " << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %, Average per Class Accuracy: " <<
+                                       avg_pc_acc*100.0f << " %" << std::endl << std::endl;
+                        summaryFile << " result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
                                     << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
                                     << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " result_alt: " << numCorrectInstancesAlt << " of " << pointClouds.size() << " instances recognized correctly ("
                                     << ((float)numCorrectInstancesAlt/pointClouds.size())*100.0f << " %)\n";
 
-                        summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " shapes classified correctly with global descriptors ("
+                        summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
                                     << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
                         summaryFile << " both correct: " << numBothCorrect << " (" << ((float)numBothCorrect/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " only global correct: " << numOnlyGlobalCorrect << " (" << ((float)numOnlyGlobalCorrect/pointClouds.size())*100.0f << " %)\n\n\n";
