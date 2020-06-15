@@ -293,16 +293,22 @@ bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
 {
     float sum = 0;
+    float sum_instance = 0;
+    float sum_instanceAlt = 0;
     float sum_global = 0;
     for(const VotingMaximum &max : maxima)
     {
         sum += max.weight;
+        sum_instance += max.instanceWeight;
+        sum_instanceAlt += max.instanceWeightAlt;
         sum_global += max.globalHypothesis.classWeight;
     }
 
     for(VotingMaximum &max : maxima)
     {
         max.weight /= sum;
+        max.instanceWeight /= sum_instance;
+        max.instanceWeightAlt /= sum_instanceAlt;
         max.globalHypothesis.classWeight /= sum_global;
     }
 }
