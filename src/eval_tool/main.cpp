@@ -329,7 +329,8 @@ int main(int argc, char **argv)
                     // prepare summary
                     std::ofstream summaryFile;
                     int numCorrectClasses = 0;
-                    int numCorrect80 = 0;
+                    int numCorrectInstances = 0;
+                    int numCorrectInstancesAlt = 0;
 
                     int numCorrectGlobal = 0;
                     int numBothCorrect = 0;
@@ -368,6 +369,7 @@ int main(int argc, char **argv)
                             // detect
                             std::string pointCloud = pointClouds.at(i);
                             unsigned trueID = gt_class_ids.at(i);
+                            unsigned trueInstanceID = gt_instance_ids.at(i);
                             std::vector<ism3d::VotingMaximum> maxima;
 
                             std::cout << "Processing file: " << pointCloud << std::endl;
@@ -398,8 +400,9 @@ int main(int argc, char **argv)
 
                                         std::ofstream file;
                                         file.open(outFileName.c_str(), std::ios::out);
-                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud << ", ground truth class ID: " << trueID << "\n";
-                                        file << "number, classID, weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z \n";
+                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
+                                             << ", ground truth class: " << trueID << ", ground truth instance: " << trueInstanceID << std::endl;
+                                        file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
 
                                         for (int i = 0; i < (int)maxima.size(); i++)
                                         {
@@ -408,6 +411,8 @@ int main(int argc, char **argv)
                                             file << i << ", ";
                                             file << maximum.classId << ", ";
                                             file << maximum.weight << ", ";
+                                            file << maximum.instanceId << ", ";
+                                            file << maximum.instanceWeight << ", ";
                                             file << maximum.voteIndices.size() << ", ";
                                             file << maximum.position[0] << ", ";
                                             file << maximum.position[1] << ", ";
@@ -427,23 +432,15 @@ int main(int argc, char **argv)
                                     // writing summary file
                                     int classId = -1;
                                     int classIdglobal = -1;
-                                    int classId80 = -1;
+                                    int instanceId = -1;
+                                    int instanceIdAlt = -1;
                                     if(maxima.size() > 0)
                                     {
                                         classId = maxima.at(0).classId;
                                         classIdglobal = maxima.at(0).globalHypothesis.classId;
+                                        instanceId = maxima.at(0).instanceId;
+                                        instanceIdAlt = maxima.at(0).instanceIdAlt;
                                     }
-
-                                    // check for classification including non-best maxima
-                                    for (int i = 0; i < (int)maxima.size(); i++)
-                                    {
-                                        const ism3d::VotingMaximum& maximum = maxima[i];
-                                        if(maximum.weight < maxima[0].weight * 0.8) break;
-
-                                        classId80 = maximum.classId;
-                                        if(classId80 == trueID) break;
-                                    }
-
 
                                     // only display additional classifiers if they are different from normal classification
                                     summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
@@ -460,9 +457,14 @@ int main(int argc, char **argv)
                                     {
                                         numCorrectClasses++;
                                     }
-                                    if(((int)trueID) == classId80)
+                                    // instance recognition
+                                    if(((int)trueInstanceID) == instanceId)
                                     {
-                                        numCorrect80++;
+                                        numCorrectInstances++;
+                                    }
+                                    if(((int)trueInstanceID) == instanceIdAlt)
+                                    {
+                                        numCorrectInstancesAlt++;
                                     }
                                     // global classifier
                                     if(((int)trueID) == classIdglobal)
@@ -500,10 +502,12 @@ int main(int argc, char **argv)
                         summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
 
                         // complete and close summary file
-                        summaryFile << "\n\n result: " << numCorrectClasses << " of " << pointClouds.size() << " shapes classified correctly ("
+                        summaryFile << "\n\n result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
                                     << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
-                        summaryFile << " result: " << numCorrect80 << " of " << pointClouds.size() << " shapes classified correctly ("
-                                    << ((float)numCorrect80/pointClouds.size())*100.0f << " %) [above 80% of top result's score]\n";
+                        summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
+                                    << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
+                        summaryFile << " result_alt: " << numCorrectInstancesAlt << " of " << pointClouds.size() << " instances recognized correctly ("
+                                    << ((float)numCorrectInstancesAlt/pointClouds.size())*100.0f << " %)\n";
 
                         summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " shapes classified correctly with global descriptors ("
                                     << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
