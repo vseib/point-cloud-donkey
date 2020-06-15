@@ -323,7 +323,16 @@ int main(int argc, char **argv)
                     {
                         pointClouds = filenames;
                         gt_class_ids = class_labels;
+                    }
+
+                    // instance ids must be filled even if testing with class labels only
+                    if(instance_labels.size() > 0)
+                    {
                         gt_instance_ids = instance_labels;
+                    }
+                    else
+                    {
+                        gt_instance_ids = class_labels;
                     }
 
                     // prepare summary
