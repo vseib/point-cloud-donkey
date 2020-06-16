@@ -41,11 +41,16 @@
 
 bool write_log_to_files = false;
 bool log_info = true;
-// TODO VS write these maps to files to have same mappings during testing
+
 std::map<std::string, unsigned> class_labels_map;
 std::map<std::string, unsigned> instance_labels_map;
+std::map<unsigned, std::string> class_labels_rmap;
+std::map<unsigned, std::string> instance_labels_rmap;
 
-unsigned convertLabel(std::string& label, std::map<std::string, unsigned>& labels_map)
+
+unsigned convertLabel(std::string& label,
+                      std::map<std::string, unsigned>& labels_map,
+                      std::map<unsigned, std::string>& labels_rmap)
 {
     if(labels_map.find(label) != labels_map.end())
     {
@@ -55,6 +60,7 @@ unsigned convertLabel(std::string& label, std::map<std::string, unsigned>& label
     {
         size_t cur_size = labels_map.size();
         labels_map.insert({label, cur_size});
+        labels_rmap.insert({cur_size, label});
         return cur_size;
     }
 }
@@ -141,8 +147,8 @@ int main(int argc, char **argv)
                 {
                     if (file[0] == '#') continue; // allows to comment out lines
                     filenames.push_back(file);
-                    unsigned converted_class_label = convertLabel(class_label, class_labels_map);
-                    unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map);
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+                    unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
                     class_labels.push_back(converted_class_label);
                     instance_labels.push_back(converted_instance_label);
                 }
@@ -154,7 +160,7 @@ int main(int argc, char **argv)
                 infile >> class_label;
 
                 filenames.push_back(file);
-                unsigned converted_class_label = convertLabel(class_label, class_labels_map);
+                unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
 
                 class_labels.push_back(converted_class_label);
                 // read remaining lines
@@ -162,7 +168,7 @@ int main(int argc, char **argv)
                 {
                     if (file[0] == '#') continue; // allows to comment out lines
                     filenames.push_back(file);
-                    unsigned converted_class_label = convertLabel(class_label, class_labels_map);
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
                     class_labels.push_back(converted_class_label);
                 }
             }
@@ -256,6 +262,8 @@ int main(int argc, char **argv)
 
                 // train
                 ism.train();
+                // store labels in the model object file
+                ism.setLabels(class_labels_rmap, instance_labels_rmap);
 
                 // write the ism data
                 if (variables.count("inplace"))
@@ -313,6 +321,10 @@ int main(int argc, char **argv)
                     std::vector<std::string> pointClouds;
                     std::vector<unsigned> gt_class_ids;
                     std::vector<unsigned> gt_instance_ids;
+
+                    // not used here, but might be needed some day
+                    class_labels_rmap = ism.getClassLabels();
+                    instance_labels_rmap = ism.getInstanceLabels();
 
                     if(variables.count("pointclouds")) // input directly from command line
                     {

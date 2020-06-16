@@ -161,6 +161,27 @@ namespace ism3d
          */
         void setLogging(bool l);
 
+        /**
+         * @brief setLabels Sets class and instance labels as members to be safed for later use
+         * @param class_labels the map with class labels used during training
+         * @param instance_labels the map with instance labels used during training
+         */
+        void setLabels(std::map<unsigned, std::string> &class_labels, std::map<unsigned, std::string> &instance_labels)
+        {
+            m_class_labels = class_labels;
+            m_instance_labels = instance_labels;
+        }
+
+        std::map<unsigned, std::string> getClassLabels()
+        {
+            return m_class_labels;
+        }
+
+        std::map<unsigned, std::string> getInstanceLabels()
+        {
+            return m_instance_labels;
+        }
+
 
         // signals
         boost::signals2::signal<void(pcl::PointCloud<PointT>::ConstPtr)> m_signalPointCloud;
@@ -256,6 +277,9 @@ namespace ism3d
 
         std::shared_ptr<FlannHelper> m_flann_helper;
         bool m_index_created;
+
+        std::map<unsigned, std::string> m_class_labels;
+        std::map<unsigned, std::string> m_instance_labels;
 
         // TODO VS temp
         static int m_counter;
