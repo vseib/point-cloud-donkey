@@ -91,6 +91,8 @@ protected:
     std::vector<std::shared_ptr<Codeword> > activate(const ISMFeature&,
                                                        const std::vector<std::shared_ptr<Codeword> >& ) const
     {
+        std::vector<std::shared_ptr<Codeword> > activatedCodewords;
+        return activatedCodewords;
     }
 
 private:
