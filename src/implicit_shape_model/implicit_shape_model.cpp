@@ -281,10 +281,10 @@ void ImplicitShapeModel::train()
             if (has_normals) {
                 const PointNormalT& firstNormal = model->at(0);
                 if (firstNormal.normal_x == 0 && firstNormal.normal_y == 0 && firstNormal.normal_z == 0 ||
-                        pcl_isnan(firstNormal.normal_x) ||
-                        pcl_isnan(firstNormal.normal_y) ||
-                        pcl_isnan(firstNormal.normal_z) ||
-                        pcl_isnan(firstNormal.curvature)
+                        std::isnan(firstNormal.normal_x) ||
+                        std::isnan(firstNormal.normal_y) ||
+                        std::isnan(firstNormal.normal_z) ||
+                        std::isnan(firstNormal.curvature)
                         )
                     has_normals = false;
             }
@@ -529,8 +529,8 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
         if (firstNormal.normal_x == 0 &&
                 firstNormal.normal_y == 0 &&
                 firstNormal.normal_z == 0 ||
-                pcl_isnan(firstNormal.normal_x) ||
-                pcl_isnan(firstNormal.curvature)
+                std::isnan(firstNormal.normal_x) ||
+                std::isnan(firstNormal.curvature)
                 )
             hasNormals = false;
     }
