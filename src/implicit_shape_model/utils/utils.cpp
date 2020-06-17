@@ -568,7 +568,7 @@ namespace ism3d
         }
     }
 
-    bool Utils::quatWeightedAverage(const std::vector<boost::math::quaternion<float> >& quaternions,
+    void Utils::quatWeightedAverage(const std::vector<boost::math::quaternion<float> >& quaternions,
                                     const std::vector<float>& weights,
                                     boost::math::quaternion<float>& result)
     {

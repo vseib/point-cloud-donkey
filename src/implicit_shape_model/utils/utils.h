@@ -106,7 +106,7 @@ namespace ism3d
         static void quatRotate(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point);
         static void quatRotateInv(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point);
         static void quatGetRotationTo(boost::math::quaternion<float>& quat, const Eigen::Vector3f& src, const Eigen::Vector3f& dest);
-        static bool quatWeightedAverage(const std::vector<boost::math::quaternion<float> >&,
+        static void quatWeightedAverage(const std::vector<boost::math::quaternion<float> >&,
                                         const std::vector<float>&,
                                         boost::math::quaternion<float>&);
 
