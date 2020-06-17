@@ -63,6 +63,7 @@ add_library(implicit_shape_model
     activation_strategy/activation_strategy_knn.cpp
     activation_strategy/activation_strategy_inn.cpp
     classifier/custom_SVM.cpp
+    classifier/global_classifier.cpp
     clustering/clustering.cpp
     clustering/clustering_agglomerative.cpp
     clustering/clustering_kmeans.cpp
@@ -128,6 +129,7 @@ add_library(implicit_shape_model
     voting/voting_hough_3d.cpp
     voting/voting_mean_shift.cpp
     voting/single_object_mode_helper.cpp
+    voting/maxima_handler.cpp
     # h-files
     activation_strategy/activation_strategy_factory.h
     clustering/clustering_factory.h
@@ -141,6 +143,7 @@ add_library(implicit_shape_model
     utils/json_parameter_traits.h
     keypoints/keypoints_factory.h
     voting/voting_factory.h
+    voting/voting_maximum.h
     # external
     third_party/libgdiam-1.3/gdiam.cpp
     third_party/liblzf-3.6/lzf_c.c

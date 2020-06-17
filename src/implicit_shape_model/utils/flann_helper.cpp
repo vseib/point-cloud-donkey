@@ -64,16 +64,7 @@ void FlannHelper::buildIndex(std::string dist_type, int kd_trees)
         m_index = std::make_shared<flann::Index<flann::ChiSquareDistance<float>>>(dataset, flann::KDTreeIndexParams(kd_trees));
         (std::static_pointer_cast<flann::Index<flann::ChiSquareDistance<float>>>(m_index))->buildIndex();
     }
-    if(dist_type == "Hellinger")
-    {
-        m_index = std::make_shared<flann::Index<flann::HellingerDistance<float>>>(dataset, flann::KDTreeIndexParams(kd_trees));
-        (std::static_pointer_cast<flann::Index<flann::HellingerDistance<float>>>(m_index))->buildIndex();
-    }
-    if(dist_type == "HistIntersection")
-    {
-        m_index = std::make_shared<flann::Index<flann::HistIntersectionDistance<float>>>(dataset, flann::KDTreeIndexParams(kd_trees));
-        (std::static_pointer_cast<flann::Index<flann::HistIntersectionDistance<float>>>(m_index))->buildIndex();
-    }
+
     m_index_created = true;
     m_dist_type = dist_type;
 }
@@ -86,16 +77,6 @@ std::shared_ptr<flann::Index<flann::L2<float>>> FlannHelper::getIndexL2()
 std::shared_ptr<flann::Index<flann::ChiSquareDistance<float>>> FlannHelper::getIndexChi()
 {
     return std::static_pointer_cast<flann::Index<flann::ChiSquareDistance<float>>>(m_index);
-}
-
-std::shared_ptr<flann::Index<flann::HellingerDistance<float>>> FlannHelper::getIndexHel()
-{
-    return std::static_pointer_cast<flann::Index<flann::HellingerDistance<float>>>(m_index);
-}
-
-std::shared_ptr<flann::Index<flann::HistIntersectionDistance<float>>> FlannHelper::getIndexHist()
-{
-    return std::static_pointer_cast<flann::Index<flann::HistIntersectionDistance<float>>>(m_index);
 }
 
 }

@@ -43,8 +43,9 @@ namespace ism3d
                          const std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
-                         std::vector<std::vector<int> >&,
-                         std::vector<std::vector<float> >&,
+                         std::vector<std::vector<unsigned>> &,
+                         std::vector<std::vector<int>>&,
+                         std::vector<std::vector<float>>&,
                          unsigned);
         float iGetSeedsRange() const;
         void iDoMeanShift(const std::vector<Voting::Vote>&,
@@ -57,16 +58,6 @@ namespace ism3d
                               std::vector<float>&,
                               const std::vector<Voting::Vote>&,
                               pcl::search::KdTree<PointT>::Ptr& search);
-
-        // only the first maximum in the radius is retained
-        void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
-        // the average of the maxima in the radius is retained
-        void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
-        // the average of the maxima and its [neighbor's neighbor's ...] neighbors in the radius is retained
-        void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                  std::vector<Eigen::Vector3f>&) const;
 
     private:
         bool computeMeanShift(const std::vector<Voting::Vote>&,

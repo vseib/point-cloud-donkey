@@ -38,6 +38,7 @@ namespace ism3d
         //   1) global features during detection
         //   2) local features during training (weights computation)
         int classId;
+        unsigned instanceId;
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     } EIGEN_ALIGN16;

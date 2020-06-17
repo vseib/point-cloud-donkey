@@ -12,7 +12,7 @@
 
 namespace ism3d
 {
-    float SingleObjectModeHelper::getModelRadius(pcl::PointCloud<PointT>::ConstPtr &points,
+    float SingleObjectHelper::getModelRadius(pcl::PointCloud<PointT>::ConstPtr &points,
                                                  const PointT &query)
     {
         // find distance of farthest point from centroid
@@ -25,7 +25,7 @@ namespace ism3d
         return model_radius;
     }
 
-    float SingleObjectModeHelper::getVotingSpaceSize(const std::vector<Voting::Vote>& votes,
+    float SingleObjectHelper::getVotingSpaceSize(const std::vector<Voting::Vote>& votes,
                                                      const PointT &query)
     {
         float max_dist = 0;

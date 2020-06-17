@@ -73,44 +73,6 @@ namespace ism3d
     private:
         DistanceType distance;
     };
-
-    /**
-     * @brief The DistanceHellinger struct
-     * The hellinger distance class.
-     */
-    struct DistanceHellinger
-            : public Distance
-    {
-        typedef flann::HellingerDistance<typename Distance::ElementType> DistanceType;
-
-        std::string getType() const;
-        static std::string getTypeStatic();
-
-    protected:
-        float getDistance(const std::vector<float>&, const std::vector<float>&) const;
-
-    private:
-        DistanceType distance;
-    };
-
-    /**
-     * @brief The DistanceHistIntersection struct
-     * The histogram intersection distance class.
-     */
-    struct DistanceHistIntersection
-            : public Distance
-    {
-        typedef flann::HistIntersectionDistance<typename Distance::ElementType> DistanceType;
-
-        std::string getType() const;
-        static std::string getTypeStatic();
-
-    protected:
-        float getDistance(const std::vector<float>&, const std::vector<float>&) const;
-
-    private:
-        DistanceType distance;
-    };
 }
 
 #endif // ISM3D_DISTANCE_H

@@ -3,7 +3,7 @@
  *
  * Full text: https://opensource.org/licenses/BSD-3-Clause
  *
- * Copyright (c) 2018, Viktor Seib
+ * Copyright (c) 2020, Viktor Seib
  * All rights reserved.
  *
  */
@@ -36,7 +36,6 @@ namespace ism3d
 
     void CodewordDistribution::addCodeword(const std::shared_ptr<Codeword>& codeword,
                                            const ISMFeature& feature,
-                                           unsigned classId,
                                            const Utils::BoundingBox& boundingBox)
     {
         if (!codeword.get())
@@ -57,7 +56,8 @@ namespace ism3d
 
         // update activation distribution
         m_votes.push_back(vote);
-        m_classIds.push_back(classId);
+        m_class_ids.push_back(feature.classId);
+        m_instance_ids.push_back(feature.instanceId);
 
         m_features.push_back(feature);
         m_modelCenters.push_back(center);
@@ -82,7 +82,7 @@ namespace ism3d
     {
         LOG_ASSERT(m_votes.size() == m_weights.size());
         LOG_ASSERT(m_votes.size() == m_boundingBoxes.size());
-        LOG_ASSERT(m_votes.size() == m_classIds.size());
+        LOG_ASSERT(m_votes.size() == m_class_ids.size());
 
         float dist = (*distance)(m_codeword->getData(), feature.descriptor);
 
@@ -90,7 +90,8 @@ namespace ism3d
         for (int i = 0; i < (int)m_votes.size(); i++)
         {
             const Eigen::Vector3f& vote = m_votes[i];
-            unsigned classId = m_classIds[i];
+            unsigned classId = m_class_ids[i];
+            unsigned instanceId = m_instance_ids[i];
 
             // find weight for class
             std::map<unsigned, float>::const_iterator it = m_classWeights.find(classId);
@@ -132,18 +133,12 @@ namespace ism3d
                 continue;
             }
 
-            //LOG_ASSERT(weight >= 0.0f);
-            //LOG_ASSERT(weight <= 1.0f);
-            if(weight < 0 || weight > 1)
-            {
-                //LOG_ERROR("weight: " << weight << ", sigma: " << classSigma << ", dist: " << dist );
-            }
-
             if (weight < std::numeric_limits<float>::epsilon())
                 continue;
 
             // cast vote into voting space
-            castVote(vote, feature.referenceFrame, feature, m_boundingBoxes[i], weight, classId, voting, m_codeword->getId());
+            castVote(vote, feature.referenceFrame, feature, m_boundingBoxes[i],
+                     weight, classId, instanceId, voting, m_codeword->getId());
         }
     }
 
@@ -153,6 +148,7 @@ namespace ism3d
                                         Utils::BoundingBox boundingBox,
                                         float weight,
                                         unsigned classId,
+                                        unsigned instanceId,
                                         Voting& voting,
                                         int codewordId) const
     {
@@ -166,7 +162,7 @@ namespace ism3d
         Utils::getRotQuaternion(refFrame, rotQuat);
         boundingBox.rotQuat = boundingBox.rotQuat * rotQuat;
 
-        voting.vote(center, weight, classId, keyPos, boundingBox, codewordId);
+        voting.vote(center, weight, classId, instanceId, keyPos, boundingBox, codewordId);
     }
 
     void CodewordDistribution::computeWeights()
@@ -251,7 +247,8 @@ namespace ism3d
         }
 
         m_votes.insert(m_votes.end(), distribution->m_votes.begin(), distribution->m_votes.end());
-        m_classIds.insert(m_classIds.end(), distribution->m_classIds.begin(), distribution->m_classIds.end());
+        m_class_ids.insert(m_class_ids.end(), distribution->m_class_ids.begin(), distribution->m_class_ids.end());
+        m_instance_ids.insert(m_instance_ids.end(), distribution->m_instance_ids.begin(), distribution->m_instance_ids.end());
         m_boundingBoxes.insert(m_boundingBoxes.end(), distribution->m_boundingBoxes.begin(), distribution->m_boundingBoxes.end());
         m_originalVotes.insert(m_originalVotes.end(), distribution->m_originalVotes.begin(), distribution->m_originalVotes.end());
         m_features.insert(m_features.end(), distribution->m_features.begin(), distribution->m_features.end());
@@ -297,13 +294,18 @@ namespace ism3d
 
     const std::vector<unsigned>& CodewordDistribution::getClassIds() const
     {
-        return m_classIds;
+        return m_class_ids;
+    }
+
+    const std::vector<unsigned>& CodewordDistribution::getInstanceIds() const
+    {
+        return m_instance_ids;
     }
 
     bool CodewordDistribution::hasClassId(unsigned classId) const
     {
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            unsigned id = m_classIds[i];
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            unsigned id = m_class_ids[i];
             if (id == classId)
                 return true;
         }
@@ -313,8 +315,8 @@ namespace ism3d
     std::vector<unsigned> CodewordDistribution::getDistinctClassIds() const
     {
         std::vector<unsigned> classIds;
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            unsigned classId = m_classIds[i];
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            unsigned classId = m_class_ids[i];
             if (std::find(classIds.begin(), classIds.end(), classId) == classIds.end())
                 classIds.push_back(classId);
         }
@@ -334,8 +336,8 @@ namespace ism3d
     int CodewordDistribution::getNumVotesForClass(unsigned classId) const
     {
         int numVotes = 0;
-        for (int i = 0; i < (int)m_classIds.size(); i++) {
-            if (m_classIds[i] == classId)
+        for (int i = 0; i < (int)m_class_ids.size(); i++) {
+            if (m_class_ids[i] == classId)
                 numVotes++;
         }
         return numVotes;
@@ -355,7 +357,8 @@ namespace ism3d
         }
 
         oa << m_weights;
-        oa << m_classIds;
+        oa << m_class_ids;
+        oa << m_instance_ids;
 
         int class_weights_size = m_classWeights.size();
         oa << class_weights_size;
@@ -404,7 +407,8 @@ namespace ism3d
 
         m_votes.clear();
         m_weights.clear();
-        m_classIds.clear();
+        m_class_ids.clear();
+        m_instance_ids.clear();
         m_classWeights.clear();
         m_boundingBoxes.clear();
 
@@ -421,7 +425,8 @@ namespace ism3d
         }
 
         ia >> m_weights;
-        ia >> m_classIds;
+        ia >> m_class_ids;
+        ia >> m_instance_ids;
 
         int weights_size;
         ia >> weights_size;
@@ -450,125 +455,6 @@ namespace ism3d
             ia >> z;
             bbox.rotQuat = boost::math::quaternion<float>(quat1, quat2, quat3, quat4);
             bbox.size = Eigen::Vector3f(x,y,z);
-            m_boundingBoxes.push_back(bbox);
-        }
-
-        return true;
-    }
-
-    Json::Value CodewordDistribution::iDataToJson() const
-    {
-        Json::Value data(Json::objectValue);
-
-        Json::Value jsonVotes(Json::arrayValue);
-        for (int i = 0; i < (int)m_votes.size(); i++)
-            jsonVotes.append(Utils::vector3fToJson(m_votes[i]));
-
-        Json::Value jsonWeights(Json::arrayValue);
-        for (int i = 0; i < (int)m_weights.size(); i++)
-            jsonWeights.append(Json::Value(m_weights[i]));
-
-        Json::Value jsonClassIds(Json::arrayValue);
-        for (int i = 0; i < (int)m_classIds.size(); i++)
-            jsonClassIds.append(Json::Value(m_classIds[i]));
-
-        Json::Value jsonClassWeights(Json::arrayValue);
-        for (std::map<unsigned, float>::const_iterator it = m_classWeights.begin(); it != m_classWeights.end(); it++) {
-            int classId = it->first;
-            float weight = it->second;
-            Json::Value weightEntry(Json::objectValue);
-            weightEntry["ClassId"] = Json::Value(classId);
-            weightEntry["Weight"] = Json::Value(weight);
-            jsonClassWeights.append(weightEntry);
-        }
-
-        Json::Value jsonBoundingBoxes(Json::arrayValue);
-        for (int i = 0; i < (int)m_boundingBoxes.size(); i++) {
-            const Utils::BoundingBox& bbox = m_boundingBoxes[i];
-            Json::Value jsonBoundingBox(Json::objectValue);
-
-            jsonBoundingBox["Quat"] = Utils::quatToJson(bbox.rotQuat);
-            jsonBoundingBox["Size"] = Utils::vector3fToJson(bbox.size);
-
-            jsonBoundingBoxes.append(jsonBoundingBox);
-        }
-
-        data["Codeword"] = m_codeword->dataToJson();
-        data["Votes"] = jsonVotes;
-        data["Weights"] = jsonWeights;
-        data["ClassIds"] = jsonClassIds;
-        data["ClassWeights"] = jsonClassWeights;
-        data["BoundingBoxes"] = jsonBoundingBoxes;
-
-        return data;
-    }
-
-    bool CodewordDistribution::iDataFromJson(const Json::Value& object)
-    {
-        const Json::Value *jsonCodeword = &(object["Codeword"]);
-        const Json::Value *jsonVotes = &(object["Votes"]);
-        const Json::Value *jsonWeights = &(object["Weights"]);
-        const Json::Value *jsonClassIds = &(object["ClassIds"]);
-        const Json::Value *jsonClassWeights = &(object["ClassWeights"]);
-        const Json::Value *jsonBoundingBoxes = &(object["BoundingBoxes"]);
-
-        if (jsonCodeword->isNull() || !jsonCodeword->isObject() ||
-                jsonVotes->isNull() || !jsonVotes->isArray() ||
-                jsonWeights->isNull() || !jsonWeights->isArray() ||
-                jsonClassIds->isNull() || !jsonClassIds->isArray() ||
-                jsonClassWeights->isNull() || !jsonClassWeights->isArray() ||
-                jsonBoundingBoxes->isNull() || !jsonBoundingBoxes->isArray())
-            return false;
-
-        m_codeword = std::shared_ptr<Codeword>(Factory<Codeword>::create(*jsonCodeword));
-        if (!m_codeword.get() || !m_codeword->dataFromJson(*jsonCodeword))
-            return false;
-
-        m_votes.clear();
-        m_weights.clear();
-        m_classIds.clear();
-        m_boundingBoxes.clear();
-
-        for (int i = 0; i < (int)jsonVotes->size(); i++) {
-            Eigen::Vector3f vector;
-            if (!Utils::jsonToVector3f((*jsonVotes)[i], vector))
-                return false;
-            m_votes.push_back(vector);
-        }
-
-        for (int i = 0; i < (int)jsonWeights->size(); i++) {
-            Json::Value jsonWeight = (*jsonWeights)[i];
-            if (!jsonWeight.isNumeric())
-                return false;
-            m_weights.push_back(jsonWeight.asFloat());
-        }
-
-        for (int i = 0; i < (int)jsonClassIds->size(); i++) {
-            Json::Value jsonClassId = (*jsonClassIds)[i];
-            if (!jsonClassId.isInt())
-                return false;
-            m_classIds.push_back(jsonClassId.asUInt());
-        }
-
-        m_classWeights.clear();
-        for (int i = 0; i < jsonClassWeights->size(); i++) {
-            Json::Value weightEntry = (*jsonClassWeights)[i];
-            int classId = weightEntry["ClassId"].asUInt();
-            float weight = weightEntry["Weight"].asFloat();
-            m_classWeights[classId] = weight;
-        }
-
-        for (int i = 0; i < (int)jsonBoundingBoxes->size(); i++) {
-            const Json::Value& boundingBox = (*jsonBoundingBoxes)[i];
-            if (!boundingBox.isObject())
-                return false;
-
-            Utils::BoundingBox bbox;
-
-            if (!Utils::jsonToQuat(boundingBox["Quat"], bbox.rotQuat) ||
-                    !Utils::jsonToVector3f(boundingBox["Size"], bbox.size))
-                return false;
-
             m_boundingBoxes.push_back(bbox);
         }
 

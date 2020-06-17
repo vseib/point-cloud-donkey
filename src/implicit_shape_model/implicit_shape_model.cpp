@@ -1,7 +1,7 @@
 /*
  * BSD 3-Clause License
  *
- * Copyright (c) 2018, Viktor Seib, Norman Link
+ * Copyright (c) 2020, Viktor Seib, Norman Link
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -60,7 +60,6 @@
 
 #include "classifier/custom_SVM.h"
 #include "utils/distance.h"
-#include "utils/point_cloud_resizing.h"
 #include "utils/normal_orientation.h"
 #include "utils/factory.h"
 #include "utils/exception.h"
@@ -149,20 +148,22 @@ void ImplicitShapeModel::init()
 
 void ImplicitShapeModel::clear()
 {
-    m_trainingModelsFilenames.clear();
-    m_trainingModelHasNormals.clear();
+    m_training_objects_filenames.clear();
+    m_training_objects_instance_ids.clear();
+    m_training_objects_has_normals.clear();
     m_codebook->clear();
     m_clustering->clear();
     m_voting->clear();
 }
 
-bool ImplicitShapeModel::addTrainingModel(const std::string& filename, unsigned classId)
+bool ImplicitShapeModel::addTrainingModel(const std::string& filename, unsigned class_id, unsigned instance_id)
 {
-    LOG_INFO("adding training model with class id " << classId);
+    LOG_INFO("adding training model with class id " << class_id << " and instance id " << instance_id);
 
     // add model
-    m_trainingModelsFilenames[classId].push_back(filename);
-    m_trainingModelHasNormals[classId].push_back(true); // NOTE: optimistic assumption, needs to be checked later
+    m_training_objects_filenames[class_id].push_back(filename);
+    m_training_objects_instance_ids[class_id].push_back(instance_id);
+    m_training_objects_has_normals[class_id].push_back(true); // NOTE: optimistic assumption, needs to be checked later
     return true;
 }
 
@@ -210,7 +211,7 @@ void ImplicitShapeModel::train()
     // clear data
     m_codebook->clear();
 
-    if (m_trainingModelsFilenames.size() == 0) {
+    if (m_training_objects_filenames.size() == 0) {
         LOG_WARN("no training models found");
         return;
     }
@@ -225,23 +226,28 @@ void ImplicitShapeModel::train()
     std::map<unsigned, std::vector<Utils::BoundingBox>> boundingBoxes;
 
     // compute features for all models and all classes
-    for (auto it = m_trainingModelsFilenames.begin(); it != m_trainingModelsFilenames.end(); it++)
+    for (auto it = m_training_objects_filenames.begin(); it != m_training_objects_filenames.end(); it++)
     {
-        unsigned classId = it->first;
+        unsigned class_id = it->first;
 
-        LOG_ASSERT(m_trainingModelsFilenames.size() == m_trainingModelHasNormals.size());
+        LOG_ASSERT(m_training_objects_filenames.size() == m_training_objects_has_normals.size());
+        LOG_ASSERT(m_training_objects_filenames.size() == m_training_objects_instance_ids.size());
 
-        const std::vector<std::string>& model_filenames = it->second;
-        const std::vector<bool>& modelsHaveNormals = m_trainingModelHasNormals[classId];
+        const std::vector<std::string>& cloud_filenames = it->second;
+        const std::vector<unsigned>& cloud_instance_ids = m_training_objects_instance_ids[class_id];
+        const std::vector<bool>& clouds_have_normals = m_training_objects_has_normals[class_id];
 
-        LOG_ASSERT(model_filenames.size() == modelsHaveNormals.size());
+        LOG_ASSERT(cloud_filenames.size() == clouds_have_normals.size());
+        LOG_ASSERT(cloud_filenames.size() == cloud_instance_ids.size());
 
         LOG_INFO("----------------------------------------------------------------");
-        LOG_INFO("training class " << classId << " with " << model_filenames.size() << " objects");
+        LOG_INFO("training class " << class_id << " with " << cloud_filenames.size() << " objects");
 
-        for (int j = 0; j < (int)model_filenames.size(); j++)
+        for (int j = 0; j < (int)cloud_filenames.size(); j++)
         {
-            pcl::PointCloud<PointNormalT>::Ptr model = loadPointCloud(model_filenames[j]);
+            LOG_INFO("training class " << class_id << ", current file " << j+1 << " of " << cloud_filenames.size() << ": " << cloud_filenames[j]);
+            pcl::PointCloud<PointNormalT>::Ptr model = loadPointCloud(cloud_filenames[j]);
+            unsigned instance_id = cloud_instance_ids[j];
 
             if(m_setColorToZero)
             {
@@ -255,24 +261,24 @@ void ImplicitShapeModel::train()
             }
 
             // compute bounding box
-            Utils::BoundingBox boundingBox;
+            Utils::BoundingBox bounding_box;
             if (m_bbType == "MVBB")
-                boundingBox = Utils::computeMVBB<PointNormalT>(model);
+                bounding_box = Utils::computeMVBB<PointNormalT>(model);
             else if (m_bbType == "AABB")
-                boundingBox = Utils::computeAABB<PointNormalT>(model);
+                bounding_box = Utils::computeAABB<PointNormalT>(model);
             else
                 throw BadParamExceptionType<std::string>("invalid bounding box type", m_bbType);
 
             if(m_enable_signals)
             {
                 timer.stop();
-                m_signalBoundingBox(boundingBox);
+                m_signalBoundingBox(bounding_box);
                 timer.resume();
             }
 
             // check first normal
-            bool hasNormals = modelsHaveNormals[j];
-            if (hasNormals) {
+            bool has_normals = clouds_have_normals[j];
+            if (has_normals) {
                 const PointNormalT& firstNormal = model->at(0);
                 if (firstNormal.normal_x == 0 && firstNormal.normal_y == 0 && firstNormal.normal_z == 0 ||
                         pcl_isnan(firstNormal.normal_x) ||
@@ -280,29 +286,41 @@ void ImplicitShapeModel::train()
                         pcl_isnan(firstNormal.normal_z) ||
                         pcl_isnan(firstNormal.curvature)
                         )
-                    hasNormals = false;
+                    has_normals = false;
             }
 
             // compute features
             pcl::PointCloud<ISMFeature>::ConstPtr model_features;
             pcl::PointCloud<ISMFeature>::ConstPtr global_features;
-            std::tie(model_features, global_features, std::ignore, std::ignore) = computeFeatures(model, hasNormals, timer, timer, true);
+            std::tie(model_features, global_features, std::ignore, std::ignore) = computeFeatures(model, has_normals, timer, timer, true);
 
             // check for NAN features
-            pcl::PointCloud<ISMFeature>::Ptr modelFeatures_cleaned = removeNaNFeatures(model_features);
-            pcl::PointCloud<ISMFeature>::Ptr globalFeatures_cleaned = removeNaNFeatures(global_features);
+            pcl::PointCloud<ISMFeature>::Ptr model_features_cleaned = removeNaNFeatures(model_features);
+            pcl::PointCloud<ISMFeature>::Ptr global_features_cleaned = removeNaNFeatures(global_features);
+
+            // insert labels into features
+            for(ISMFeature& ismf : model_features_cleaned->points)
+            {
+                ismf.classId = class_id;
+                ismf.instanceId = instance_id;
+            }
+            for(ISMFeature& ismf : global_features_cleaned->points)
+            {
+                ismf.classId = class_id;
+                ismf.instanceId = instance_id;
+            }
 
             if(m_enable_signals)
             {
                 timer.stop();
-                m_signalFeatures(modelFeatures_cleaned);
+                m_signalFeatures(model_features_cleaned);
                 timer.resume();
             }
 
             // concatenate features
-            features[classId].push_back(modelFeatures_cleaned);
-            globalFeatures[classId].push_back(globalFeatures_cleaned);
-            boundingBoxes[classId].push_back(boundingBox);
+            features[class_id].push_back(model_features_cleaned);
+            globalFeatures[class_id].push_back(global_features_cleaned);
+            boundingBoxes[class_id].push_back(bounding_box);
         }
     }
 
@@ -320,23 +338,22 @@ void ImplicitShapeModel::train()
     // forward global feature to voting class to store them
     m_voting->forwardGlobalFeatures(globalFeatures);
 
-    LOG_INFO("computing feature ranking"); // TODO VS: avoid copying features for ranking
+    LOG_INFO("computing feature ranking");
     // remove features with low scores
-    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > features_ranked;
+    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> features_ranked;
     pcl::PointCloud<ISMFeature>::Ptr allFeatures_ranked(new pcl::PointCloud<ISMFeature>());
-    std::vector<unsigned> allFeatureClasses_ranked;
 
-    std::tie(features_ranked, allFeatures_ranked, allFeatureClasses_ranked) =
+    std::tie(features_ranked, allFeatures_ranked) =
             (*m_featureRanking)(features, m_num_kd_trees, m_flann_exact_match);
 
     // cluster descriptors and extract cluster centers
     LOG_INFO("clustering");
     (*m_clustering)(allFeatures_ranked, m_distance);
-    const std::vector<std::vector<float> > clusterCenters = m_clustering->getClusterCenters();
+    const std::vector<std::vector<float>> clusterCenters = m_clustering->getClusterCenters();
     const std::vector<int> clusterIndices = m_clustering->getClusterIndices();
 
     // compute which cluster indices are assigned which feature indices
-    std::vector<std::vector<int> > clusters(clusterCenters.size()); // each position: list of feature indices of a cluster
+    std::vector<std::vector<int>> clusters(clusterCenters.size()); // each position: list of feature indices of a cluster
     for (int i = 0; i < (int)allFeatures_ranked->size(); i++)
     {
         int clusterIndex = clusterIndices[i]; // this index indicates which cluster the feature i belongs to
@@ -346,18 +363,13 @@ void ImplicitShapeModel::train()
     // in that case, clusters at each position have size == 1
     LOG_ASSERT(clusterIndices.size() == allFeatures_ranked->size());
 
-
-    // create codewords and add them to the codebook - NOTE: if no clustering is used: a codeword is just one feature and its center vector
+    // create codewords and add them to the codebook - NOTE: if no clustering is used: a codeword
+    // is just one feature and its center vector
     LOG_INFO("creating codewords");
-    std::vector<std::shared_ptr<Codeword> > codewords;
+    std::vector<std::shared_ptr<Codeword>> codewords;
     for (int i = 0; i < (int)clusterCenters.size(); i++)
     {
         std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f)); // init with uniform weights
-
-        for (int j = 0; j < (int)clusters[i].size(); j++)
-        {
-            codeword->addFeature(allFeatureClasses_ranked[clusters[i][j]]);
-        }
         codewords.push_back(codeword);
     }
 
@@ -369,20 +381,11 @@ void ImplicitShapeModel::train()
     // create index depending on distance type
     if(m_distance->getType() == "Euclidean")
     {
-        // TODO VS do I still need the m_distance object???
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexL2(), m_flann_exact_match);
     }
     else if(m_distance->getType() == "ChiSquared")
     {
         m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexChi(), m_flann_exact_match);
-    }
-    else if(m_distance->getType() == "Hellinger")
-    {
-        m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexHel(), m_flann_exact_match);
-    }
-    else if(m_distance->getType() == "HistIntersection")
-    {
-        m_codebook->activate(codewords, features_ranked, boundingBoxes, m_distance, *m_flann_helper->getIndexHist(), m_flann_exact_match);
     }
 
     if(m_enable_signals)
@@ -503,15 +506,20 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
         LOG_WARN("point cloud is empty");
         return std::make_tuple(std::vector<VotingMaximum>(), m_processing_times);
     }
+    if(m_single_object_mode)
+    {
+        // to avoid errors if using old config files
+        throw RuntimeException("The parameter for \"single object mode\" must be set inside the \"Voting\" section of the config file. You are using the \"Parameters\" section.");
+    }
 
     // measure the time
     boost::timer::cpu_timer timer;
     boost::timer::cpu_timer timer_features;
 
     // filter out nan points
-    std::vector<int> dummy;
+    std::vector<int> unused;
     pcl::PointCloud<PointNormalT>::Ptr points(new pcl::PointCloud<PointNormalT>());
-    pcl::removeNaNFromPointCloud(*points_in, *points, dummy);
+    pcl::removeNaNFromPointCloud(*points_in, *points, unused);
     points->is_dense = false;
 
     // check first normal
@@ -529,15 +537,13 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     // compute features
     pcl::PointCloud<ISMFeature>::ConstPtr features;
-    pcl::PointCloud<ISMFeature>::ConstPtr globalFeatures;
     pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaN;
     pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN;
     boost::timer::cpu_timer timer_normals;
     timer_normals.stop();
     boost::timer::cpu_timer timer_keypoints;
     timer_keypoints.stop();
-    std::tie(features, globalFeatures, pointsWithoutNaN, normalsWithoutNaN) = computeFeatures(points, hasNormals, timer_normals, timer_keypoints,
-                                                                                              m_single_object_mode);
+    std::tie(features, std::ignore, pointsWithoutNaN, normalsWithoutNaN) = computeFeatures(points, hasNormals, timer_normals, timer_keypoints, false);
     m_processing_times["normals"] += getElapsedTime(timer_normals, "milliseconds");
     m_processing_times["keypoints"] += getElapsedTime(timer_keypoints, "milliseconds");
     m_processing_times["features"] -= getElapsedTime(timer_normals, "milliseconds");
@@ -545,7 +551,6 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     // check for NAN features
     pcl::PointCloud<ISMFeature>::Ptr features_cleaned = removeNaNFeatures(features);
-    pcl::PointCloud<ISMFeature>::Ptr globalFeatures_cleaned = removeNaNFeatures(globalFeatures);
     m_processing_times["features"] += getElapsedTime(timer_features, "milliseconds");
 
     if(m_enable_signals)
@@ -582,15 +587,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     {
         m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexChi(), m_flann_exact_match);
     }
-    // TODO VS: remove hellinger and histintersection everywhere
-    else if(m_distance->getType() == "Hellinger")
-    {
-        m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexHel(), m_flann_exact_match);
-    }
-    else if(m_distance->getType() == "HistIntersection")
-    {
-        m_codebook->castVotes(features_cleaned, m_distance, *m_voting, *m_flann_helper->getIndexHist(), m_flann_exact_match);
-    }
+
     m_processing_times["voting"] += getElapsedTime(timer_voting, "milliseconds");
 
     // analyze voting spaces - only for debug
@@ -599,9 +596,6 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     {
         all_votings = analyzeVotingSpacesForDebug(m_voting->getVotes(), points);
     }
-
-    // forward global feature to voting class in single object mode
-    if(m_single_object_mode) m_voting->setGlobalFeatures(globalFeatures_cleaned);
 
     LOG_INFO("finding maxima");
     boost::timer::cpu_timer timer_maxima;
@@ -965,6 +959,22 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
     m_clustering->saveData(oa);
     m_voting->saveData(oa);
     m_featureRanking->saveData(oa);
+
+    // store label maps
+    unsigned size = m_class_labels.size();
+    oa << size;
+    for(auto it : m_class_labels)
+    {
+        std::string label = it.second;
+        oa << label;
+    }
+    size = m_instance_labels.size();
+    oa << size;
+    for(auto it : m_instance_labels)
+    {
+        std::string label = it.second;
+        oa << label;
+    }
 }
 
 bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
@@ -976,7 +986,8 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    // TODO VS: this is necessary since objects are created before config is read in json_object.cpp
+    // this is necessary since objects are created before config is read in json_object.cpp
+    // forward svm path as it might have been manually changed in config
     m_voting->setSVMPath(m_svm_path);
 
     // init data for objects
@@ -992,94 +1003,23 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    return true;
-}
-
-Json::Value ImplicitShapeModel::iDataToJson() const
-{
-    Json::Value data(Json::objectValue);
-    data["Codebook"] = m_codebook->dataToJson();
-    data["Keypoints"] = m_keypointsDetector->dataToJson();
-    data["Features"] = m_featureDescriptor->dataToJson();
-    data["GlobalFeatures"] = m_globalFeatureDescriptor->dataToJson();
-    data["Clustering"] = m_clustering->dataToJson();
-    data["Voting"] = m_voting->dataToJson();
-    data["FeatureWeighting"] = m_featureRanking->dataToJson();
-    return data;
-}
-
-bool ImplicitShapeModel::iDataFromJson(const Json::Value& object)
-{
-    const Json::Value *codebook = &(object["Codebook"]);
-    const Json::Value *keypoints = &(object["Keypoints"]);
-    const Json::Value *features = &(object["Features"]);
-    const Json::Value *global_features = &(object["GlobalFeatures"]);
-    const Json::Value *clustering = &(object["Clustering"]);
-    const Json::Value *voting = &(object["Voting"]);
-    const Json::Value *feature_ranking = &(object["FeatureWeighting"]);
-
-    if (codebook->isNull() || !codebook->isObject() ||
-            keypoints->isNull() || !keypoints->isObject() ||
-            features->isNull() || !features->isObject() ||
-            clustering->isNull() || !clustering->isObject() ||
-            voting->isNull() || !voting->isObject()) {
-        LOG_ERROR("could not find necessary json entries");
-        return false;
-    }
-
-    // for backward compatibility the following objects give an error, but do not return false
-    if(feature_ranking->isNull() || !feature_ranking->isObject())
+    // load original labels
+    unsigned size;
+    ia >> size;
+    m_class_labels.clear();
+    for(unsigned i = 0; i < size; i++)
     {
-        LOG_ERROR("could not find \"FeatureWeighting\" object in json file");
+        std::string label;
+        ia >> label;
+        m_class_labels.insert({i, label});
     }
-
-    // handle global features separately to be able to use old configs and trained files
-    bool use_dummy = false;
-    Json::Value dummy(Json::objectValue);
-    dummy["Type"] = Json::Value("Dummy");
-
-    if (global_features->isNull() || !global_features->isObject())
+    ia >> size;
+    m_instance_labels.clear();
+    for(unsigned i = 0; i < size; i++)
     {
-        use_dummy = true;
-        LOG_WARN("No global features available in data file, using Dummy global feature!");
-    }
-
-
-    // objects have to be initialized already
-    if (!m_codebook || !m_keypointsDetector || !m_featureDescriptor || !m_globalFeatureDescriptor ||
-            !m_clustering || !m_voting || !m_featureRanking) {
-        LOG_ERROR("object is not initialized");
-        return false;
-    }
-
-    // descriptor needs to have the same type
-    Json::Value featureType = (*features)["Type"];
-    Json::Value globalFeatureType = use_dummy ? dummy["Type"] : (*global_features)["Type"];
-
-    if (featureType.isNull() || !featureType.isString() ||
-            globalFeatureType.isNull() || !globalFeatureType.isString() ) {
-        LOG_ERROR("invalid feature type");
-        return false;
-    }
-
-    std::string typeStr = featureType.asString();
-    if (typeStr != m_featureDescriptor->getType())
-        throw RuntimeException("Cannot change local descriptor type after learning.");
-
-    std::string typeStrGlobal = globalFeatureType.asString();
-    if (typeStrGlobal != m_globalFeatureDescriptor->getType())
-        throw RuntimeException("Cannot change global descriptor type after learning.");
-
-    // init data for objects
-    if (!m_codebook->dataFromJson(*codebook) ||
-            !m_keypointsDetector->dataFromJson(*keypoints) ||
-            !m_featureDescriptor->dataFromJson(*features) ||
-            !m_globalFeatureDescriptor->dataFromJson(*global_features) ||
-            !m_clustering->dataFromJson(*clustering) ||
-            !m_voting->dataFromJson(*voting) ||
-            !m_featureRanking->dataFromJson(*feature_ranking)) {
-        LOG_ERROR("could not create child objects");
-        return false;
+        std::string label;
+        ia >> label;
+        m_instance_labels.insert({i, label});
     }
     return true;
 }
@@ -1093,10 +1033,6 @@ void ImplicitShapeModel::iPostInitConfig()
         m_distance = new DistanceEuclidean;
     else if (m_distanceType == DistanceChiSquared::getTypeStatic())
         m_distance = new DistanceChiSquared;
-    else if (m_distanceType == DistanceHellinger::getTypeStatic())
-        m_distance = new DistanceHellinger;
-    else if (m_distanceType == DistanceHistIntersection::getTypeStatic())
-        m_distance = new DistanceHistIntersection;
     else
         throw RuntimeException("invalid distance type: " + m_distanceType);
 

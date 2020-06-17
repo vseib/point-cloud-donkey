@@ -223,36 +223,6 @@ namespace ism3d
         return iLoadData(ia);
     }
 
-    Json::Value JSONObject::dataToJson() const
-    {
-        Json::Value object(Json::objectValue);
-
-        // get object data
-        Json::Value data = iDataToJson();
-        if (!data.isNull())
-            object["Data"] = data;
-
-        // add a type attribute
-        std::string type = getType();
-        if (type.length() > 0) {
-            object["Type"] = Json::Value(type);
-        }
-
-        return object;
-    }
-
-    bool JSONObject::dataFromJson(const Json::Value& object)
-    {
-        const Json::Value *data = &(object["Data"]);
-        if (!data->isNull() && data->isObject())
-        {
-            if (!iDataFromJson(*data))
-                return false;
-        }
-
-        return true;
-    }
-
     Json::Value JSONObject::iChildConfigsToJson() const
     {
         Json::Value object(Json::nullValue);
@@ -275,16 +245,7 @@ namespace ism3d
         return true;
     }
 
-    Json::Value JSONObject::iDataToJson() const
-    {
-        Json::Value object(Json::nullValue);
-        return object;
-    }
 
-    bool JSONObject::iDataFromJson(const Json::Value&)
-    {
-        return true;
-    }
 
     void JSONObject::iPostInitConfig()
     {

@@ -240,7 +240,7 @@ namespace ism3d
 
     template<typename T>
     Utils::BoundingBox Utils::computeMVBB(const typename pcl::PointCloud<T>::ConstPtr &model)
-    {       
+    {
         // remove nan points to avoid infinite loops
         typename pcl::PointCloud<T>::Ptr cloud(new pcl::PointCloud<T>());
         std::vector<int> indices;

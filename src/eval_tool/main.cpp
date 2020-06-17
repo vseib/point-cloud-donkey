@@ -42,6 +42,28 @@
 bool write_log_to_files = false;
 bool log_info = true;
 
+std::map<std::string, unsigned> class_labels_map;
+std::map<std::string, unsigned> instance_labels_map;
+std::map<unsigned, std::string> class_labels_rmap;
+std::map<unsigned, std::string> instance_labels_rmap;
+
+
+unsigned convertLabel(std::string& label,
+                      std::map<std::string, unsigned>& labels_map,
+                      std::map<unsigned, std::string>& labels_rmap)
+{
+    if(labels_map.find(label) != labels_map.end())
+    {
+        return labels_map[label];
+    }
+    else
+    {
+        size_t cur_size = labels_map.size();
+        labels_map.insert({label, cur_size});
+        labels_rmap.insert({cur_size, label});
+        return cur_size;
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -87,7 +109,8 @@ int main(int argc, char **argv)
     else {
 
         std::vector<std::string> filenames;
-        std::vector<unsigned> labels;
+        std::vector<unsigned> class_labels;
+        std::vector<unsigned> instance_labels;
         std::string mode = "";
 
         if(variables.count("inputfile"))
@@ -98,19 +121,55 @@ int main(int argc, char **argv)
             // parse input
             std::ifstream infile(input_file);
             std::string file;
-            std::string label;
+            std::string class_label;
+            std::string instance_label;
+            bool using_instances = false;
 
-            while(infile >> file >> label)
+            // special treatment of first line: determine mode
+            infile >> file;
+            infile >> class_label;
+            infile >> instance_label;
+
+            if(file == "#" && (class_label == "train" || class_label == "test"))
             {
-                // special treatment of first line: determine mode
-                if(file == "#" && (label == "train" || label == "test"))
+                mode = class_label;
+                if (instance_label == "inst")
                 {
-                    mode = label;
+                    using_instances = true;
                 }
-                else // other lines contain a filename and a label
+            }
+
+            // process remaining lines
+            if (using_instances)
+            {
+                // other lines contain a filename, a class label and an instance label
+                while(infile >> file >> class_label >> instance_label)
                 {
+                    if (file[0] == '#') continue; // allows to comment out lines
                     filenames.push_back(file);
-                    labels.push_back(std::stoul(label));
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+                    unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
+                    class_labels.push_back(converted_class_label);
+                    instance_labels.push_back(converted_instance_label);
+                }
+            }
+            else
+            {
+                // if no instances are used, the first filename has already been read into variable "instance_label"
+                file = instance_label;
+                infile >> class_label;
+
+                filenames.push_back(file);
+                unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+
+                class_labels.push_back(converted_class_label);
+                // read remaining lines
+                while(infile >> file >> class_label)
+                {
+                    if (file[0] == '#') continue; // allows to comment out lines
+                    filenames.push_back(file);
+                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+                    class_labels.push_back(converted_class_label);
                 }
             }
         }
@@ -151,33 +210,45 @@ int main(int argc, char **argv)
 
                 // add the training models to the ism
                 if ((variables.count("models") && variables.count("classes")) ||
-                        (filenames.size() > 0 && labels.size() > 0))
+                        (filenames.size() > 0 && class_labels.size() > 0))
                 {
                     std::vector<std::string> models;
-                    std::vector<unsigned> classIds;
+                    std::vector<unsigned> class_ids;
+                    std::vector<unsigned> instance_ids;
 
                     if(variables.count("models")) // input directly from command line
                     {
                         models = variables["models"].as<std::vector<std::string> >();
-                        classIds = variables["classes"].as<std::vector<unsigned> >();
+                        class_ids = variables["classes"].as<std::vector<unsigned> >();
+                        instance_ids = class_ids; // NOTE: instance training not supported on direct command line input
                     }
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         models = filenames;
-                        classIds = labels;
+                        class_ids = class_labels;
+                        // instance ids must be filled even if training with class labels only
+                        if(instance_labels.size() > 0)
+                        {
+                            instance_ids = instance_labels;
+                        }
+                        else
+                        {
+                            instance_ids = class_labels;
+                        }
                     }
 
-                    if (models.size() == classIds.size())
+                    if (models.size() == class_ids.size())
                     {
                         for (int i = 0; i < (int)models.size(); i++)
                         {
                             std::string filename = models[i];
-                            unsigned classId = classIds[i];
+                            unsigned class_id = class_ids[i];
+                            unsigned instance_id = instance_ids[i];
 
                             // add the training model to the ISM
-                            if (!ism.addTrainingModel(filename, classId))
+                            if (!ism.addTrainingModel(filename, class_id, instance_id))
                             {
-                                std::cerr << "could not add training model: " << filename << ", class " << classId << std::endl;
+                                std::cerr << "could not add training model: " << filename << ", class " << class_id << std::endl;
                                 return 1;
                             }
                         }
@@ -191,6 +262,8 @@ int main(int argc, char **argv)
 
                 // train
                 ism.train();
+                // store labels in the model object file
+                ism.setLabels(class_labels_rmap, instance_labels_rmap);
 
                 // write the ism data
                 if (variables.count("inplace"))
@@ -243,26 +316,43 @@ int main(int argc, char **argv)
                     return 1;
                 }
                 else if ((variables.count("pointclouds") && variables.count("groundtruth")) ||
-                         (filenames.size() > 0 && labels.size() > 0))  // load pointclouds and groundtruth
+                         (filenames.size() > 0 && class_labels.size() > 0))  // load pointclouds and groundtruth
                 {
                     std::vector<std::string> pointClouds;
-                    std::vector<unsigned> groundtruth;
+                    std::vector<unsigned> gt_class_ids;
+                    std::vector<unsigned> gt_instance_ids;
+
+                    // not used here, but might be needed some day
+                    class_labels_rmap = ism.getClassLabels();
+                    instance_labels_rmap = ism.getInstanceLabels();
 
                     if(variables.count("pointclouds")) // input directly from command line
                     {
                         pointClouds = variables["pointclouds"].as<std::vector<std::string> >();
-                        groundtruth = variables["groundtruth"].as<std::vector<unsigned> >();
+                        gt_class_ids = variables["groundtruth"].as<std::vector<unsigned> >();
                     }
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         pointClouds = filenames;
-                        groundtruth = labels;
+                        gt_class_ids = class_labels;
+                    }
+
+                    // instance ids must be filled even if testing with class labels only
+                    if(instance_labels.size() > 0)
+                    {
+                        gt_instance_ids = instance_labels;
+                    }
+                    else
+                    {
+                        gt_instance_ids = class_labels;
                     }
 
                     // prepare summary
                     std::ofstream summaryFile;
                     int numCorrectClasses = 0;
-                    int numCorrect80 = 0;
+                    int numCorrectInstances = 0;
+                    int numCorrectInstancesAlt = 0;
+                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracaHelper; // maps class id to pair <correct, total>
 
                     int numCorrectGlobal = 0;
                     int numBothCorrect = 0;
@@ -276,7 +366,7 @@ int main(int argc, char **argv)
                         std::string command = "mkdir ";
                         std::string folder = variables["output"].as<std::string>();
                         command.append(folder);
-                        int unused = std::system(command.c_str());
+                        std::ignore = std::system(command.c_str());
                         sleep(1);
 
                         // summary file
@@ -290,16 +380,16 @@ int main(int argc, char **argv)
                         std::cerr << "no output file specified, detected maxima will not be saved" << std::endl;
                     }
 
-                    if (pointClouds.size() == groundtruth.size())
+                    if (pointClouds.size() == gt_class_ids.size())
                     {
                         boost::timer::cpu_timer timer;
-
                         std::map<std::string, double> times;
                         for(unsigned i = 0; i < pointClouds.size(); i++)
                         {
                             // detect
                             std::string pointCloud = pointClouds.at(i);
-                            unsigned trueID = groundtruth.at(i);
+                            unsigned trueID = gt_class_ids.at(i);
+                            unsigned trueInstanceID = gt_instance_ids.at(i);
                             std::vector<ism3d::VotingMaximum> maxima;
 
                             std::cout << "Processing file: " << pointCloud << std::endl;
@@ -311,7 +401,6 @@ int main(int argc, char **argv)
                             else
                             {
                                 //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
-
                                 // write detected maxima to detection log file
                                 if (variables.count("output"))
                                 {
@@ -330,8 +419,9 @@ int main(int argc, char **argv)
 
                                         std::ofstream file;
                                         file.open(outFileName.c_str(), std::ios::out);
-                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud << ", ground truth class ID: " << trueID << "\n";
-                                        file << "number, classID, weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z \n";
+                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
+                                             << ", ground truth class: " << trueID << ", ground truth instance: " << trueInstanceID << std::endl;
+                                        file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
 
                                         for (int i = 0; i < (int)maxima.size(); i++)
                                         {
@@ -340,6 +430,8 @@ int main(int argc, char **argv)
                                             file << i << ", ";
                                             file << maximum.classId << ", ";
                                             file << maximum.weight << ", ";
+                                            file << maximum.instanceId << ", ";
+                                            file << maximum.instanceWeight << ", ";
                                             file << maximum.voteIndices.size() << ", ";
                                             file << maximum.position[0] << ", ";
                                             file << maximum.position[1] << ", ";
@@ -359,23 +451,15 @@ int main(int argc, char **argv)
                                     // writing summary file
                                     int classId = -1;
                                     int classIdglobal = -1;
-                                    int classId80 = -1;
+                                    int instanceId = -1;
+                                    int instanceIdAlt = -1;
                                     if(maxima.size() > 0)
                                     {
                                         classId = maxima.at(0).classId;
-                                        classIdglobal = maxima.at(0).globalHypothesis.first;
+                                        classIdglobal = maxima.at(0).globalHypothesis.classId;
+                                        instanceId = maxima.at(0).instanceId;
+                                        instanceIdAlt = maxima.at(0).instanceIdAlt;
                                     }
-
-                                    // check for classification including non-best maxima
-                                    for (int i = 0; i < (int)maxima.size(); i++)
-                                    {
-                                        const ism3d::VotingMaximum& maximum = maxima[i];
-                                        if(maximum.weight < maxima[0].weight * 0.8) break;
-
-                                        classId80 = maximum.classId;
-                                        if(classId80 == trueID) break;
-                                    }
-
 
                                     // only display additional classifiers if they are different from normal classification
                                     summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
@@ -390,11 +474,42 @@ int main(int argc, char **argv)
                                     // normal classifier
                                     if(((int)trueID) == classId)
                                     {
+                                        // correct classification
                                         numCorrectClasses++;
+                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        {
+                                            // pair <correct, total>
+                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            res.first++;
+                                            res.second++;
+                                        }
+                                        else
+                                        {
+                                            averageAccuracaHelper.insert({trueID, {1,1}});
+                                        }
                                     }
-                                    if(((int)trueID) == classId80)
+                                    else
                                     {
-                                        numCorrect80++;
+                                        // wrong classification
+                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        {
+                                            // pair <correct, total>
+                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            res.second++;
+                                        }
+                                        else
+                                        {
+                                            averageAccuracaHelper.insert({trueID, {0,1}});
+                                        }
+                                    }
+                                    // instance recognition
+                                    if(((int)trueInstanceID) == instanceId)
+                                    {
+                                        numCorrectInstances++;
+                                    }
+                                    if(((int)trueInstanceID) == instanceIdAlt)
+                                    {
+                                        numCorrectInstancesAlt++;
                                     }
                                     // global classifier
                                     if(((int)trueID) == classIdglobal)
@@ -431,13 +546,26 @@ int main(int argc, char **argv)
                         summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
                         summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
 
-                        // complete and close summary file
-                        summaryFile << "\n\n result: " << numCorrectClasses << " of " << pointClouds.size() << " shapes classified correctly ("
-                                    << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
-                        summaryFile << " result: " << numCorrect80 << " of " << pointClouds.size() << " shapes classified correctly ("
-                                    << ((float)numCorrect80/pointClouds.size())*100.0f << " %) [above 80% of top result's score]\n";
+                        float avg_pc_acc = 0;
+                        for(const auto &elem : averageAccuracaHelper)
+                        {
+                            const std::pair<unsigned, unsigned> &p = elem.second;
+                            avg_pc_acc += (float)p.first/p.second;
+                        }
+                        avg_pc_acc /= averageAccuracaHelper.size();
 
-                        summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " shapes classified correctly with global descriptors ("
+                        // complete and close summary file
+                        summaryFile << std::endl << std::endl;
+                        summaryFile << " Accuracy: " << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %, Average per Class Accuracy: " <<
+                                       avg_pc_acc*100.0f << " %" << std::endl << std::endl;
+                        summaryFile << " result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
+                                    << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
+                        summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
+                                    << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
+                        summaryFile << " result_alt: " << numCorrectInstancesAlt << " of " << pointClouds.size() << " instances recognized correctly ("
+                                    << ((float)numCorrectInstancesAlt/pointClouds.size())*100.0f << " %)\n";
+
+                        summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
                                     << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
                         summaryFile << " both correct: " << numBothCorrect << " (" << ((float)numBothCorrect/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " only global correct: " << numOnlyGlobalCorrect << " (" << ((float)numOnlyGlobalCorrect/pointClouds.size())*100.0f << " %)\n\n\n";
@@ -448,13 +576,13 @@ int main(int argc, char **argv)
                     }
                     else
                     {
-                        std::cerr << "number of pointclouds does not match the number of groundtruth ids" << std::endl;
+                        std::cerr << "number of point clouds does not match the number of groundtruth ids" << std::endl;
                         return 1;
                     }
                 }
                 else
                 {
-                    std::cerr << "number of pointclouds arguments does not match the number of groundtruth id arguments" << std::endl;
+                    std::cerr << "number of point clouds arguments does not match the number of groundtruth id arguments" << std::endl;
                     return 1;
                 }
             }

@@ -68,23 +68,12 @@ namespace ism3d
 
         float getWeight() const;
 
-        /**
-         * @brief add a feature position to this codeword when it has been activated
-         * @param classId the class id of the feature
-         * @param weight weight of the descriptor that this featurePos belongs to
-         */
-        void addFeature(unsigned classId);
-
         const std::vector<Eigen::Vector3f>& getFeaturePositions() const;
-        const std::vector<unsigned>& getFeatureClasses() const;
 
     protected:
 
         void iSaveData(boost::archive::binary_oarchive &oa) const;
         bool iLoadData(boost::archive::binary_iarchive &ia);
-
-        Json::Value iDataToJson() const;
-        bool iDataFromJson(const Json::Value&);
 
     private:
         static int m_maxId;
@@ -92,7 +81,6 @@ namespace ism3d
         float m_weight; // descriptor weight
         std::vector<float> m_data; // this is the descriptor
         int m_numFeatures;
-        std::vector<unsigned> m_featureClasses;
     };
 }
 

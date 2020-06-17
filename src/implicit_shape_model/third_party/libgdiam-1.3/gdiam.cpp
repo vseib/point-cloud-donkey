@@ -1771,12 +1771,12 @@ void  convex_hull_mca( vec_point_2d  & in, vec_point_2d  & out )
     }
     if (minmax != minmin)
         out.push_back(in[minmin]);  // push  joining endpoint onto stack
-#ifndef GDIAM_QUIET
-    std::vector<point2d_ptr>::iterator it;
-    for(it = out.begin(); it != out.end(); it++){
-        std::cout << "point: " << (*it)->x << "," << (*it)->y << "\n";
-    }
-#endif
+//#ifndef GDIAM_QUIET
+//    std::vector<point2d_ptr>::iterator it;
+//    for(it = out.begin(); it != out.end(); it++){
+//        std::cout << "point: " << (*it)->x << "," << (*it)->y << "\n";
+//    }
+//#endif
 
 }
 
@@ -2024,8 +2024,8 @@ public:
     void  compute_min_bbox( vec_point_2d   & points,
                             bbox_2d_info   & min_bbox,
                             gdiam_real  & min_area ) {
-        convex_hull( points, ch );
-        //convex_hull_mca( points, ch ); // TODO VS: test this version
+        //convex_hull( points, ch ); // VS NOTE: works fine with CAD data, but fails with Kinect data
+        convex_hull_mca( points, ch ); // VS NOTE: switched to this version for Kinect data
         compute_min_bbox_inner( min_bbox, min_area );
     }
 

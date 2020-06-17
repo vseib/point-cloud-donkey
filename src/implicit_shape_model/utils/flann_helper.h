@@ -51,8 +51,6 @@ public:
     // TODO make this nicer
     std::shared_ptr<flann::Index<flann::L2<float>>> getIndexL2();
     std::shared_ptr<flann::Index<flann::ChiSquareDistance<float>>> getIndexChi();
-    std::shared_ptr<flann::Index<flann::HellingerDistance<float>>> getIndexHel();
-    std::shared_ptr<flann::Index<flann::HistIntersectionDistance<float>>> getIndexHist();
 
     std::shared_ptr<void> m_index;
 
