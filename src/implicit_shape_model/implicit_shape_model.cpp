@@ -44,7 +44,7 @@
 #include <pcl/common/centroid.h>
 
 #include <fstream>
-#include <chrono>
+#include <boost/chrono.hpp>
 
 #include <iostream>
 #include <omp.h>
