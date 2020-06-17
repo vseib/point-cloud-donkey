@@ -256,6 +256,7 @@ namespace ism3d
                     global_result.classId = it.first;
                 }
             }
+            // TODO VS fix nan scores
             // use best class and compute score (NOTE: determining best class based on score did not work well)
             GlobalResultAccu gra = max_global_voting.at(global_result.classId);
             global_result.classWeight = gra.score_sum / gra.num_occurences;
