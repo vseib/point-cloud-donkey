@@ -65,9 +65,9 @@ pcl::PointCloud<ISMFeature>::ConstPtr Features::operator()(pcl::PointCloud<Point
         unsigned missedFrames = 0;
         for (int i = 0; i < (int)referenceFrames->size(); i++) {
             const pcl::ReferenceFrame& frame = referenceFrames->at(i);
-            if (pcl_isfinite (frame.x_axis[0]) &&
-                    pcl_isfinite (frame.y_axis[0]) &&
-                    pcl_isfinite (frame.z_axis[0])) {
+            if (std::isfinite (frame.x_axis[0]) &&
+                    std::isfinite (frame.y_axis[0]) &&
+                    std::isfinite (frame.z_axis[0])) {
                 cleanReferenceFrames->push_back(frame);
                 cleanKeypoints->push_back(keypoints->at(i));
             }

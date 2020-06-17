@@ -67,7 +67,7 @@ namespace ism3d
         for (int i = 0; i < (int)referenceFrames->size(); i++)
         {
             const pcl::ReferenceFrame& frame = referenceFrames->at(i);
-            if (pcl_isfinite (frame.x_axis[0]) && pcl_isfinite (frame.y_axis[0]) && pcl_isfinite (frame.z_axis[0]))
+            if (std::isfinite (frame.x_axis[0]) && std::isfinite (frame.y_axis[0]) && std::isfinite (frame.z_axis[0]))
             {
                 // use inverted z-axis of reference frame as normal
                 float curv = normals->at(i).curvature;
