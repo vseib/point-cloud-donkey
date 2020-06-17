@@ -8,10 +8,10 @@ set(CMAKE_BUILD_TYPE Release)
 set(USE_VCGLIB false)
 
 #find boost
-find_package(Boost REQUIRED COMPONENTS system timer signals date_time program_options serialization)
+find_package(Boost REQUIRED COMPONENTS system timer date_time program_options serialization)
 
 # find pcl
-find_package(PCL 1.8 REQUIRED)
+find_package(PCL REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -27,8 +27,8 @@ if(PCL_FOUND)
 endif()
 
 # find vtk
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
+#find_package(VTK REQUIRED)
+#include(${VTK_USE_FILE})
 
 # optional vcglib
 if(USE_VCGLIB)
@@ -153,5 +153,5 @@ add_library(implicit_shape_model
 )
 
 # link library with dependencies
-target_link_libraries(implicit_shape_model ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${OpenCV_LIBS} ${VTK_LIBRARIES} ${ZLIB_LIBRARIES}
-    gomp jsoncpp log4cxx)
+target_link_libraries(implicit_shape_model ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${OpenCV_LIBS} #${VTK_LIBRARIES}
+    ${ZLIB_LIBRARIES} gomp jsoncpp log4cxx)
