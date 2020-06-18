@@ -142,25 +142,37 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
         }
 
         // compute the mean distance between all class-specific features and their activated codewords
-        double sum = 0;
-        std::vector<double> distances;
+        // NOTE: for large datasets this will take a very long time and use huge amounts of memory
+        //       in most cases, using partial computation will be enough, this is controlled by max_num_elements
+        float sum = 0;
+        std::vector<float> distances;
+        int max_num_elements = 100000;
+        int counter = 0;
+        bool break_both = false;
         for (const ISMFeature& feature : allModelFeatures)
         {
             for(const std::shared_ptr<Codeword>& codeword : allActivatedCodewords)
             {
-                double d = (*distance)(feature.descriptor, codeword->getData());
+                float d = (*distance)(feature.descriptor, codeword->getData());
                 sum += d;
                 distances.push_back(d);
+                if(++counter == max_num_elements)
+                {
+                    break_both = true;
+                    break;
+                }
             }
+            if(break_both) break;
         }
-        int num = allModelFeatures.size()*allActivatedCodewords.size();
-        double mean = sum / num; // mean of distances between all features and all activated codewords inside the class
+        // mean of distances between all features and all activated codewords inside the class
+        int num = max_num_elements; //allModelFeatures.size()*allActivatedCodewords.size();
+        float mean = sum / num;
 
         // compute the corresponding class-specific variance
-        double variance = 0;
-        for (const double &dist : distances)
+        float variance = 0;
+        for (const float &dist : distances)
         {
-            double diff = dist - mean;
+            float diff = dist - mean;
             variance += diff * diff;
         }
         variance /= num - 1;
