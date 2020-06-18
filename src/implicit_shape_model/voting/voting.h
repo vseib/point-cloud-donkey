@@ -111,7 +111,8 @@ namespace ism3d
         // set when FLANN index for local features is created in ImplicitShapeModel.cpp
         void setDistanceType(std::string type)
         {
-            m_global_classifier->setDistanceType(type);
+            if(m_use_global_features)
+                m_global_classifier->setDistanceType(type);
         }
 
         void setSVMPath(std::string path)
