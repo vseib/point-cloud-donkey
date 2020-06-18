@@ -960,21 +960,22 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
     m_voting->saveData(oa);
     m_featureRanking->saveData(oa);
 
-    // store label maps
-    unsigned size = m_class_labels.size();
-    oa << size;
-    for(auto it : m_class_labels)
-    {
-        std::string label = it.second;
-        oa << label;
-    }
-    size = m_instance_labels.size();
-    oa << size;
-    for(auto it : m_instance_labels)
-    {
-        std::string label = it.second;
-        oa << label;
-    }
+    // TODO VS temporarily disabled
+//    // store label maps
+//    unsigned size = m_class_labels.size();
+//    oa << size;
+//    for(auto it : m_class_labels)
+//    {
+//        std::string label = it.second;
+//        oa << label;
+//    }
+//    size = m_instance_labels.size();
+//    oa << size;
+//    for(auto it : m_instance_labels)
+//    {
+//        std::string label = it.second;
+//        oa << label;
+//    }
 }
 
 bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
@@ -1003,24 +1004,25 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    // load original labels
-    unsigned size;
-    ia >> size;
-    m_class_labels.clear();
-    for(unsigned i = 0; i < size; i++)
-    {
-        std::string label;
-        ia >> label;
-        m_class_labels.insert({i, label});
-    }
-    ia >> size;
-    m_instance_labels.clear();
-    for(unsigned i = 0; i < size; i++)
-    {
-        std::string label;
-        ia >> label;
-        m_instance_labels.insert({i, label});
-    }
+    // TODO VS temporarily disabled
+//    // load original labels
+//    unsigned size;
+//    ia >> size;
+//    m_class_labels.clear();
+//    for(unsigned i = 0; i < size; i++)
+//    {
+//        std::string label;
+//        ia >> label;
+//        m_class_labels.insert({i, label});
+//    }
+//    ia >> size;
+//    m_instance_labels.clear();
+//    for(unsigned i = 0; i < size; i++)
+//    {
+//        std::string label;
+//        ia >> label;
+//        m_instance_labels.insert({i, label});
+//    }
     return true;
 }
 
