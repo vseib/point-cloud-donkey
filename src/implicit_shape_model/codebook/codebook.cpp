@@ -90,8 +90,20 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
             continue;
         }
 
+        // these vectors are used to accumulate processed data for variance computation per class
         std::vector<ISMFeature> allModelFeatures;
         std::vector<std::shared_ptr<Codeword>> allActivatedCodewords;
+
+        // NOTE: using ALL features and codewords with large datasets will take a very long time and use
+        //       huge amounts of memory; in most cases, using partial computation will be enough, this is
+        //       controlled by max_elements
+        // count features of this class
+        int num_features = 0;
+        for (int i = 0; i < (int)classModelFeatures.size(); i++)
+        {
+            num_features += classModelFeatures[i]->size();
+        }
+        int max_elements = sqrt(num_features);
 
         // for every model in the class
         for (int i = 0; i < (int)classModelFeatures.size(); i++)
@@ -136,21 +148,16 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
                     // add the codeword to the distribution
                     m_distribution[codeword->getId()]->addCodeword(codeword, feature, boundingBox);
                 }
-                allActivatedCodewords.insert(allActivatedCodewords.end(), activatedCodewords.begin(), activatedCodewords.end());
+                if(allActivatedCodewords.size() < max_elements)
+                    allActivatedCodewords.insert(allActivatedCodewords.end(), activatedCodewords.begin(), activatedCodewords.end());
             }
-            allModelFeatures.insert(allModelFeatures.end(), modelFeatures->begin(), modelFeatures->end());
+            if(allModelFeatures.size() < max_elements)
+                allModelFeatures.insert(allModelFeatures.end(), modelFeatures->begin(), modelFeatures->end());
         }
 
         // compute the mean distance between all class-specific features and their activated codewords
-        // NOTE: for large datasets this will take a very long time and use huge amounts of memory
-        //       in most cases, using partial computation will be enough, this is controlled by max_elements
         float sum = 0;
         std::vector<float> distances;
-        int max_elements = 100000;
-        int max_elements_per_iteration = (int)sqrt(max_elements);
-        int counter = 0;
-        int iteration_counter = 0; // allows to distribute computations amongst different features
-        bool break_both = false;
         for (const ISMFeature& feature : allModelFeatures)
         {
             for(const std::shared_ptr<Codeword>& codeword : allActivatedCodewords)
@@ -158,21 +165,11 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
                 float d = (*distance)(feature.descriptor, codeword->getData());
                 sum += d;
                 distances.push_back(d);
-                if(++counter == max_elements)
-                {
-                    break_both = true;
-                    break;
-                }
-                if(++iteration_counter == max_elements_per_iteration)
-                {
-                    iteration_counter = 0;
-                    break;
-                }
             }
-            if(break_both) break;
         }
+
         // mean of distances between all features and all activated codewords inside the class
-        int num = max_elements; //allModelFeatures.size()*allActivatedCodewords.size();
+        int num = allModelFeatures.size()*allActivatedCodewords.size();
         float mean = sum / num;
 
         // compute the corresponding class-specific variance
