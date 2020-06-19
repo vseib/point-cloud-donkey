@@ -258,6 +258,7 @@ void ImplicitShapeModel::train()
         {
             LOG_INFO("training class " << class_id << ", current file " << j+1 << " of " << cloud_filenames.size() << ": " << cloud_filenames[j]);
             pcl::PointCloud<PointNormalT>::Ptr model = loadPointCloud(cloud_filenames[j]);
+            model->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
 
             if(m_set_color_to_zero)
@@ -700,7 +701,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         }
         filtered->width = points->width;
         filtered->height = points->height;
-        filtered->is_dense = points->is_dense;
+        filtered->is_dense = false;
         points = filtered;
     }
     if(m_use_statistical_outlier_removal)
@@ -708,6 +709,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         // filter cloud to remove outliers
         LOG_INFO("performing statistical outlier removal");
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
         m_stat_outlier_rem.setInputCloud(points);
         m_stat_outlier_rem.filter(*filtered);
         points = filtered;
@@ -717,6 +719,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         // filter cloud to remove outliers
         LOG_INFO("performing radius outlier removal");
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
         m_radius_outlier_rem.setInputCloud(points);
         m_radius_outlier_rem.filter(*filtered);
         points = filtered;
@@ -726,6 +729,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         // filter cloud to get a uniform point distribution
         LOG_INFO("performing voxel filtering");
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
         m_voxel_filtering.setInputCloud(points);
         m_voxel_filtering.filter(*filtered);
         points = filtered;
