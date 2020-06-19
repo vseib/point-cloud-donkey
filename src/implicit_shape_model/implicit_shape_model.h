@@ -53,6 +53,7 @@
 #include "voting/voting.h"
 
 #define PCL_NO_PRECOMPILE
+#include <pcl/surface/mls.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/search.h>
 #include <Eigen/Core>
@@ -238,6 +239,7 @@ namespace ism3d
 
         void trainSVM(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features);
 
+        pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointNormal> m_MLSSmoothing;
         pcl::VoxelGrid<PointNormalT> m_voxelFiltering;
         Codebook* m_codebook;
         Keypoints* m_keypointsDetector;
@@ -252,8 +254,14 @@ namespace ism3d
         std::map<unsigned, std::vector<bool>> m_training_objects_has_normals;
         Distance* m_distance;
         std::string m_distanceType;
+
+        // parameters for preprocessing
+        bool m_useSmoothing;
+        int m_polynomialOrder;
+        float m_smoothingRadius;
         bool m_useVoxelFiltering;
         float m_voxelLeafSize;
+
         float m_normalRadius;
         int m_consistentNormalsK;
         int m_consistentNormalsMethod;

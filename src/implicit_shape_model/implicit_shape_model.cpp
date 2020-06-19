@@ -82,9 +82,14 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
     log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
 
-    addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
+    // parameters for preprocessing
     addParameter(m_useVoxelFiltering, "UseVoxelFiltering", false);
-    addParameter(m_voxelLeafSize, "VoxelLeafSize", 0.01f);
+    addParameter(m_voxelLeafSize, "VoxelLeafSize", 0.0015f);
+    addParameter(m_useSmoothing, "UseSmoothing", false);
+    addParameter(m_polynomialOrder, "SmoothingPolynomialOrder", 1);
+    addParameter(m_smoothingRadius, "SmoothingRadius", 0.01f);
+
+    addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
     addParameter(m_normalRadius, "NormalRadius", 0.05f);
     addParameter(m_consistentNormalsK, "ConsistentNormalsK", 10);
     addParameter(m_consistentNormalsMethod, "ConsistentNormalsMethod", 2);
@@ -651,7 +656,43 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
                                     bool hasNormals, boost::timer::cpu_timer& timer_normals, boost::timer::cpu_timer& timer_keypoints,
                                     bool compute_global)
 {
-    if (m_useVoxelFiltering) {
+    if(m_useSmoothing)
+    {
+        // smooth cloud to remove noise in normal's orientation
+        LOG_INFO("performing MLS smoothing");
+        pcl::PointCloud<pcl::PointNormal>::Ptr output(new pcl::PointCloud<pcl::PointNormal>());
+        // copy data for a compatible point type
+        pcl::PointCloud<pcl::PointXYZ>::Ptr input(new pcl::PointCloud<pcl::PointXYZ>());
+        for(int i = 0; i < points->size(); i++)
+        {
+            const PointNormalT &p = points->at(i);
+            pcl::PointXYZ point = pcl::PointXYZ(p.x, p.y, p.z);
+            input->push_back(point);
+        }
+        input->width = points->width;
+        input->height = points->height;
+        input->is_dense = points->is_dense;
+
+        m_MLSSmoothing.setInputCloud(input);
+        m_MLSSmoothing.process(*output);
+        // copy resulting geometric data
+        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        for(int i = 0; i < points->size(); i++)
+        {
+            const pcl::PointNormal &fp = output->at(i);
+            PointNormalT point = points->at(i);
+            point.x = fp.x;
+            point.y = fp.y;
+            point.z = fp.z;
+            filtered->push_back(point);
+        }
+        filtered->width = points->width;
+        filtered->height = points->height;
+        filtered->is_dense = points->is_dense;
+        points = filtered;
+    }
+    if(m_useVoxelFiltering)
+    {
         // filter cloud to get a uniform point distribution
         LOG_INFO("performing voxel filtering");
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
@@ -1038,7 +1079,12 @@ void ImplicitShapeModel::iPostInitConfig()
     else
         throw RuntimeException("invalid distance type: " + m_distanceType);
 
-    m_voxelFiltering.setLeafSize(m_voxelLeafSize, m_voxelLeafSize, m_voxelLeafSize);
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+    m_MLSSmoothing.setSearchMethod(tree);
+    m_MLSSmoothing.setComputeNormals(false);
+    m_MLSSmoothing.setPolynomialOrder(m_polynomialOrder);
+    m_MLSSmoothing.setSearchRadius(m_smoothingRadius);
+    m_voxelFiltering.setLeafSize(m_voxelLeafSize, m_voxelLeafSize, m_voxelLeafSize);  
 
     // m_numThreads == 0 is the default, so don't change anything
     if (m_numThreads > 0)
