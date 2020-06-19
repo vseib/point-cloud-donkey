@@ -683,7 +683,13 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         m_mls_smoothing.process(*output);
         // copy resulting geometric data
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
-        for(int i = 0; i < points->size(); i++)
+        unsigned common_size = points->size();
+        // size should stay the same, but often it does not
+        if(output->size() < points->size())
+        {
+            common_size = output->size();
+        }
+        for(int i = 0; i < common_size; i++)
         {
             const pcl::PointNormal &fp = output->at(i);
             PointNormalT point = points->at(i);
