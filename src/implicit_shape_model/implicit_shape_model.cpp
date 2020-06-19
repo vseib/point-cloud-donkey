@@ -86,9 +86,12 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     addParameter(m_use_smoothing, "UseSmoothing", false);
     addParameter(m_polynomial_order, "SmoothingPolynomialOrder", 1);
     addParameter(m_smoothing_radius, "SmoothingRadius", 0.01f);
-    addParameter(m_use_statistical_outlier_removal, "UseOutlierRemoval", false);
+    addParameter(m_use_statistical_outlier_removal, "UseStatisticalOutlierRemoval", false);
     addParameter(m_som_mean_k, "OutlierRemovalMeanK", 20);
     addParameter(m_som_std_dev_mul, "OutlierRemovalStddevMul", 2.0f);
+    addParameter(m_use_radius_outlier_removal, "UseRadiusOutlierRemoval", false);
+    addParameter(m_ror_min_neighbors, "OutlierRemovalMinNeighbors", 10);
+    addParameter(m_ror_radius, "OutlierRemovalRadius", 0.005f);
     addParameter(m_use_voxel_viltering, "UseVoxelFiltering", false);
     addParameter(m_voxel_leaf_size, "VoxelLeafSize", 0.0015f);
 
@@ -703,6 +706,15 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         m_stat_outlier_rem.filter(*filtered);
         points = filtered;
     }
+    if(m_use_radius_outlier_removal)
+    {
+        // filter cloud to remove outliers
+        LOG_INFO("performing radius outlier removal");
+        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        m_radius_outlier_rem.setInputCloud(points);
+        m_radius_outlier_rem.filter(*filtered);
+        points = filtered;
+    }
     if(m_use_voxel_viltering)
     {
         // filter cloud to get a uniform point distribution
@@ -1098,6 +1110,8 @@ void ImplicitShapeModel::iPostInitConfig()
     m_mls_smoothing.setSearchRadius(m_smoothing_radius);
     m_stat_outlier_rem.setMeanK(m_som_mean_k);
     m_stat_outlier_rem.setStddevMulThresh(m_som_std_dev_mul);
+    m_radius_outlier_rem.setRadiusSearch(m_ror_radius);
+    m_radius_outlier_rem.setMinNeighborsInRadius(m_ror_min_neighbors);
     m_voxel_filtering.setLeafSize(m_voxel_leaf_size, m_voxel_leaf_size, m_voxel_leaf_size);
 
     // m_numThreads == 0 is the default, so don't change anything

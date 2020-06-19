@@ -55,6 +55,7 @@
 #define PCL_NO_PRECOMPILE
 #include <pcl/surface/mls.h>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/search.h>
 #include <Eigen/Core>
@@ -242,6 +243,7 @@ namespace ism3d
 
         pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointNormal> m_mls_smoothing;
         pcl::StatisticalOutlierRemoval<PointNormalT> m_stat_outlier_rem;
+        pcl::RadiusOutlierRemoval<PointNormalT> m_radius_outlier_rem;
         pcl::VoxelGrid<PointNormalT> m_voxel_filtering;
         Codebook* m_codebook;
         Keypoints* m_keypoints_detector;
@@ -264,6 +266,9 @@ namespace ism3d
         bool m_use_statistical_outlier_removal;
         int m_som_mean_k;
         float m_som_std_dev_mul;
+        bool m_use_radius_outlier_removal;
+        int m_ror_min_neighbors;
+        float m_ror_radius;
         bool m_use_voxel_viltering;
         float m_voxel_leaf_size;
 
