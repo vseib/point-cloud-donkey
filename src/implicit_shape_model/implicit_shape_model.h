@@ -239,15 +239,15 @@ namespace ism3d
 
         void trainSVM(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features);
 
-        pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointNormal> m_MLSSmoothing;
-        pcl::VoxelGrid<PointNormalT> m_voxelFiltering;
+        pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointNormal> m_mls_smoothing;
+        pcl::VoxelGrid<PointNormalT> m_voxel_filtering;
         Codebook* m_codebook;
-        Keypoints* m_keypointsDetector;
-        Features* m_featureDescriptor;
-        Features* m_globalFeatureDescriptor;
+        Keypoints* m_keypoints_detector;
+        Features* m_feature_descriptor;
+        Features* m_global_feature_descriptor;
         Clustering* m_clustering;
         Voting* m_voting;
-        FeatureRanking* m_featureRanking;
+        FeatureRanking* m_feature_ranking;
 
         std::map<unsigned, std::vector<std::string>> m_training_objects_filenames;
         std::map<unsigned, std::vector<unsigned>> m_training_objects_instance_ids;
@@ -256,20 +256,20 @@ namespace ism3d
         std::string m_distanceType;
 
         // parameters for preprocessing
-        bool m_useSmoothing;
-        int m_polynomialOrder;
-        float m_smoothingRadius;
-        bool m_useVoxelFiltering;
-        float m_voxelLeafSize;
+        bool m_use_smoothing;
+        int m_polynomial_order;
+        float m_smoothing_radius;
+        bool m_use_voxel_viltering;
+        float m_voxel_leaf_size;
 
-        float m_normalRadius;
-        int m_consistentNormalsK;
-        int m_consistentNormalsMethod;
-        int m_numThreads;
-        std::string m_bbType;
-        bool m_setColorToZero;
-        bool m_enableVotingAnalysis;
-        std::string m_votingAnalysisOutputPath;
+        float m_normal_radius;
+        int m_consistent_normals_k;
+        int m_consistent_normals_method;
+        int m_num_threads;
+        std::string m_bb_type;
+        bool m_set_color_to_zero;
+        bool m_enable_voting_analysis;
+        std::string m_voting_analysis_output_path;
         bool m_svm_auto_train;
         double m_svm_param_c;
         double m_svm_param_gamma;

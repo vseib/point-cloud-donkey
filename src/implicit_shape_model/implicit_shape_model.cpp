@@ -83,21 +83,21 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
 
     // parameters for preprocessing
-    addParameter(m_useVoxelFiltering, "UseVoxelFiltering", false);
-    addParameter(m_voxelLeafSize, "VoxelLeafSize", 0.0015f);
-    addParameter(m_useSmoothing, "UseSmoothing", false);
-    addParameter(m_polynomialOrder, "SmoothingPolynomialOrder", 1);
-    addParameter(m_smoothingRadius, "SmoothingRadius", 0.01f);
+    addParameter(m_use_voxel_viltering, "UseVoxelFiltering", false);
+    addParameter(m_voxel_leaf_size, "VoxelLeafSize", 0.0015f);
+    addParameter(m_use_smoothing, "UseSmoothing", false);
+    addParameter(m_polynomial_order, "SmoothingPolynomialOrder", 1);
+    addParameter(m_smoothing_radius, "SmoothingRadius", 0.01f);
 
     addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
-    addParameter(m_normalRadius, "NormalRadius", 0.05f);
-    addParameter(m_consistentNormalsK, "ConsistentNormalsK", 10);
-    addParameter(m_consistentNormalsMethod, "ConsistentNormalsMethod", 2);
-    addParameter(m_numThreads, "NumThreads", 0);
-    addParameter(m_bbType, "BoundingBoxType", std::string("MVBB"));
-    addParameter(m_setColorToZero, "SetColorToZero", false);
-    addParameter(m_enableVotingAnalysis, "EnableVotingAnalysis", false);
-    addParameter(m_votingAnalysisOutputPath, "VotingAnalysisOutputPath", std::string("/home/vseib/Desktop/"));
+    addParameter(m_normal_radius, "NormalRadius", 0.05f);
+    addParameter(m_consistent_normals_k, "ConsistentNormalsK", 10);
+    addParameter(m_consistent_normals_method, "ConsistentNormalsMethod", 2);
+    addParameter(m_num_threads, "NumThreads", 0);
+    addParameter(m_bb_type, "BoundingBoxType", std::string("MVBB"));
+    addParameter(m_set_color_to_zero, "SetColorToZero", false);
+    addParameter(m_enable_voting_analysis, "EnableVotingAnalysis", false);
+    addParameter(m_voting_analysis_output_path, "VotingAnalysisOutputPath", std::string("/home/vseib/Desktop/"));
     addParameter(m_use_svm, "UseSvmTraining", false);
     addParameter(m_svm_auto_train, "SvmAutoTrain", false);
     addParameter(m_svm_1_vs_all_train, "SvmOneVsAllTraining", false);
@@ -116,13 +116,13 @@ ImplicitShapeModel::~ImplicitShapeModel()
     log4cxx::Logger::getRootLogger()->removeAllAppenders();
 
     delete m_codebook;
-    delete m_keypointsDetector;
-    delete m_featureDescriptor;
-    delete m_globalFeatureDescriptor;
+    delete m_keypoints_detector;
+    delete m_feature_descriptor;
+    delete m_global_feature_descriptor;
     delete m_clustering;
     delete m_voting;
     delete m_distance;
-    delete m_featureRanking;
+    delete m_feature_ranking;
 }
 
 void ImplicitShapeModel::setLogging(bool l)
@@ -143,12 +143,12 @@ void ImplicitShapeModel::init()
     m_processing_times = {{"complete",0}, {"features",0}, {"keypoints",0}, {"normals",0}, {"flann",0}, {"voting",0}, {"maxima",0}};
 
     m_codebook = new Codebook();
-    m_keypointsDetector = new KeypointsVoxelGrid();
-    m_featureDescriptor = new FeaturesSHOT();
-    m_globalFeatureDescriptor = new FeaturesGRSD();
+    m_keypoints_detector = new KeypointsVoxelGrid();
+    m_feature_descriptor = new FeaturesSHOT();
+    m_global_feature_descriptor = new FeaturesGRSD();
     m_clustering = new ClusteringAgglomerative();
     m_voting = new VotingMeanShift();
-    m_featureRanking = new RankingUniform();
+    m_feature_ranking = new RankingUniform();
 }
 
 void ImplicitShapeModel::clear()
@@ -254,7 +254,7 @@ void ImplicitShapeModel::train()
             pcl::PointCloud<PointNormalT>::Ptr model = loadPointCloud(cloud_filenames[j]);
             unsigned instance_id = cloud_instance_ids[j];
 
-            if(m_setColorToZero)
+            if(m_set_color_to_zero)
             {
                 LOG_INFO("Setting color to 0 in loaded model");
                 for(int i = 0; i < model->size(); i++)
@@ -267,12 +267,12 @@ void ImplicitShapeModel::train()
 
             // compute bounding box
             Utils::BoundingBox bounding_box;
-            if (m_bbType == "MVBB")
+            if (m_bb_type == "MVBB")
                 bounding_box = Utils::computeMVBB<PointNormalT>(model);
-            else if (m_bbType == "AABB")
+            else if (m_bb_type == "AABB")
                 bounding_box = Utils::computeAABB<PointNormalT>(model);
             else
-                throw BadParamExceptionType<std::string>("invalid bounding box type", m_bbType);
+                throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
 
             if(m_enable_signals)
             {
@@ -349,7 +349,7 @@ void ImplicitShapeModel::train()
     pcl::PointCloud<ISMFeature>::Ptr allFeatures_ranked(new pcl::PointCloud<ISMFeature>());
 
     std::tie(features_ranked, allFeatures_ranked) =
-            (*m_featureRanking)(features, m_num_kd_trees, m_flann_exact_match);
+            (*m_feature_ranking)(features, m_num_kd_trees, m_flann_exact_match);
 
     // cluster descriptors and extract cluster centers
     LOG_INFO("clustering");
@@ -470,7 +470,7 @@ bool ImplicitShapeModel::detect(const std::string& filename, std::vector<VotingM
 {
     pcl::PointCloud<PointNormalT>::Ptr points = loadPointCloud(filename);
 
-    if(m_setColorToZero)
+    if(m_set_color_to_zero)
     {
         LOG_INFO("Setting color to 0 in loaded model");
         for(int i = 0; i < points->size(); i++)
@@ -597,7 +597,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     // analyze voting spaces - only for debug
     std::map<unsigned, pcl::PointCloud<PointT>::Ptr > all_votings;
-    if(m_enableVotingAnalysis)
+    if(m_enable_voting_analysis)
     {
         all_votings = analyzeVotingSpacesForDebug(m_voting->getVotes(), points);
     }
@@ -609,7 +609,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     LOG_INFO("detected " << positions.size() << " maxima");
 
     // only debug
-    if(m_enableVotingAnalysis)
+    if(m_enable_voting_analysis)
     {
         addMaximaForDebug(all_votings, positions);
     }
@@ -656,7 +656,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
                                     bool hasNormals, boost::timer::cpu_timer& timer_normals, boost::timer::cpu_timer& timer_keypoints,
                                     bool compute_global)
 {
-    if(m_useSmoothing)
+    if(m_use_smoothing)
     {
         // smooth cloud to remove noise in normal's orientation
         LOG_INFO("performing MLS smoothing");
@@ -673,8 +673,8 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         input->height = points->height;
         input->is_dense = points->is_dense;
 
-        m_MLSSmoothing.setInputCloud(input);
-        m_MLSSmoothing.process(*output);
+        m_mls_smoothing.setInputCloud(input);
+        m_mls_smoothing.process(*output);
         // copy resulting geometric data
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
         for(int i = 0; i < points->size(); i++)
@@ -691,13 +691,13 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         filtered->is_dense = points->is_dense;
         points = filtered;
     }
-    if(m_useVoxelFiltering)
+    if(m_use_voxel_viltering)
     {
         // filter cloud to get a uniform point distribution
         LOG_INFO("performing voxel filtering");
         pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
-        m_voxelFiltering.setInputCloud(points);
-        m_voxelFiltering.filter(*filtered);
+        m_voxel_filtering.setInputCloud(points);
+        m_voxel_filtering.filter(*filtered);
         points = filtered;
     }
 
@@ -725,7 +725,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     }
 
     // skip normals on certain descriptors
-    std::string descr_type = m_featureDescriptor->getType();
+    std::string descr_type = m_feature_descriptor->getType();
 
     // TODO VS: add descriptor type that can be checked for "needNormals" and "isBinary"
     if (!hasNormals && (descr_type != "SHORT_SHOT" && descr_type != "SHORT_CSHOT" &&
@@ -762,16 +762,16 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     // detect interesting keypoints
     LOG_INFO("computing keypoints");
     timer_keypoints.start();
-    m_keypointsDetector->setNumThreads(m_numThreads);
-    pcl::PointCloud<PointT>::ConstPtr keypoints = (*m_keypointsDetector)(pointCloud, normals,
+    m_keypoints_detector->setNumThreads(m_num_threads);
+    pcl::PointCloud<PointT>::ConstPtr keypoints = (*m_keypoints_detector)(pointCloud, normals,
                                                                          pointsWithoutNaN, normalsWithoutNaN,
                                                                          searchTree);
     timer_keypoints.stop();
 
     // compute descriptors for keypoints
     LOG_INFO("computing features");
-    m_featureDescriptor->setNumThreads(m_numThreads);
-    pcl::PointCloud<ISMFeature>::ConstPtr features = (*m_featureDescriptor)(pointCloud, normals,
+    m_feature_descriptor->setNumThreads(m_num_threads);
+    pcl::PointCloud<ISMFeature>::ConstPtr features = (*m_feature_descriptor)(pointCloud, normals,
                                                                             pointsWithoutNaN, normalsWithoutNaN,
                                                                             keypoints,
                                                                             searchTree);
@@ -786,8 +786,8 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         // compute global descriptors for objects
         LOG_INFO("computing global features");
         pcl::PointCloud<PointT>::ConstPtr dummy_keypoints(new pcl::PointCloud<PointT>());
-        m_globalFeatureDescriptor->setNumThreads(m_numThreads);
-        pcl::PointCloud<ISMFeature>::ConstPtr global_features = (*m_globalFeatureDescriptor)(pointCloud, normals,
+        m_global_feature_descriptor->setNumThreads(m_num_threads);
+        pcl::PointCloud<ISMFeature>::ConstPtr global_features = (*m_global_feature_descriptor)(pointCloud, normals,
                                                                                              pointsWithoutNaN, normalsWithoutNaN,
                                                                                              dummy_keypoints,
                                                                                              searchTree);
@@ -835,23 +835,23 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
     }
     else
     {
-        LOG_INFO("computing consistent normal orientation (using method " << m_consistentNormalsMethod <<")");
+        LOG_INFO("computing consistent normal orientation (using method " << m_consistent_normals_method <<")");
 
         // prepare PCL normal estimation object
         pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
         normalEst.setInputCloud(model);
         normalEst.setSearchMethod(searchTree);
-        normalEst.setRadiusSearch(m_normalRadius);
-        normalEst.setNumberOfThreads(m_numThreads);
+        normalEst.setRadiusSearch(m_normal_radius);
+        normalEst.setNumberOfThreads(m_num_threads);
 
-        NormalOrientation orient(m_consistentNormalsK, m_normalRadius);
+        NormalOrientation orient(m_consistent_normals_k, m_normal_radius);
 
-        if(m_consistentNormalsMethod == 0)
+        if(m_consistent_normals_method == 0)
         {
             // no consitent orientation - just compute
             normalEst.compute(*normals);
         }
-        else if(m_consistentNormalsMethod == 1)
+        else if(m_consistent_normals_method == 1)
         {
             // move model to origin, then point normals away from origin
             pcl::PointCloud<PointT>::Ptr model_no_centroid(new pcl::PointCloud<PointT>());
@@ -879,7 +879,7 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
                 norm.normal_z *= -1;
             }
         }
-        else if(m_consistentNormalsMethod == 2)
+        else if(m_consistent_normals_method == 2)
         {
             normalEst.compute(*normals); // this is only needed for curvature at each point
             orient.processSHOTLRF(model, normals, normals, searchTree);
@@ -892,7 +892,7 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
 #endif
         else
         {
-            LOG_WARN("Invalid consistent normals method: " << m_consistentNormalsMethod << "! Skipping consistent normals.");
+            LOG_WARN("Invalid consistent normals method: " << m_consistent_normals_method << "! Skipping consistent normals.");
         }
     }
 }
@@ -922,12 +922,12 @@ Json::Value ImplicitShapeModel::iChildConfigsToJson() const
     Json::Value children(Json::objectValue);
 
     children["Codebook"] = m_codebook->configToJson();
-    children["Keypoints"] = m_keypointsDetector->configToJson();
-    children["Features"] = m_featureDescriptor->configToJson();
-    children["GlobalFeatures"] = m_globalFeatureDescriptor->configToJson();
+    children["Keypoints"] = m_keypoints_detector->configToJson();
+    children["Features"] = m_feature_descriptor->configToJson();
+    children["GlobalFeatures"] = m_global_feature_descriptor->configToJson();
     children["Clustering"] = m_clustering->configToJson();
     children["Voting"] = m_voting->configToJson();
-    children["FeatureWeighting"] = m_featureRanking->configToJson(); // TODO VS: rename config entry to FeatureRanking in future
+    children["FeatureWeighting"] = m_feature_ranking->configToJson(); // TODO VS: rename config entry to FeatureRanking in future
 
     return children;
 }
@@ -965,28 +965,28 @@ bool ImplicitShapeModel::iChildConfigsFromJson(const Json::Value& object)
 
     // clear
     delete m_codebook;
-    delete m_keypointsDetector;
-    delete m_featureDescriptor;
-    delete m_globalFeatureDescriptor;
+    delete m_keypoints_detector;
+    delete m_feature_descriptor;
+    delete m_global_feature_descriptor;
     delete m_clustering;
     delete m_voting;
-    delete m_featureRanking;
+    delete m_feature_ranking;
 
     // create new child objects
     m_codebook = Factory<Codebook>::create(*codebook);
-    m_keypointsDetector = Factory<Keypoints>::create(*keypoints);
-    m_featureDescriptor = Factory<Features>::create(*features);
-    m_globalFeatureDescriptor = use_dummy ? Factory<Features>::create(dummy) : Factory<Features>::create(*global_features);
+    m_keypoints_detector = Factory<Keypoints>::create(*keypoints);
+    m_feature_descriptor = Factory<Features>::create(*features);
+    m_global_feature_descriptor = use_dummy ? Factory<Features>::create(dummy) : Factory<Features>::create(*global_features);
     m_clustering = Factory<Clustering>::create(*clustering);
     m_voting = Factory<Voting>::create(*voting);
-    m_featureRanking = Factory<FeatureRanking>::create(*feature_ranking);
+    m_feature_ranking = Factory<FeatureRanking>::create(*feature_ranking);
 
-    if (!m_codebook || !m_keypointsDetector || !m_featureDescriptor || !m_globalFeatureDescriptor ||
-            !m_clustering || !m_voting || !m_featureRanking)
+    if (!m_codebook || !m_keypoints_detector || !m_feature_descriptor || !m_global_feature_descriptor ||
+            !m_clustering || !m_voting || !m_feature_ranking)
         throw RuntimeException("Could not create object(s). The configuration file might be corrupted.");
 
     // set global descriptor for the detection step
-    m_voting->setGlobalFeatureDescriptor(m_globalFeatureDescriptor);
+    m_voting->setGlobalFeatureDescriptor(m_global_feature_descriptor);
 
     return true;
 }
@@ -994,12 +994,12 @@ bool ImplicitShapeModel::iChildConfigsFromJson(const Json::Value& object)
 void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
 {
     m_codebook->saveData(oa);
-    m_keypointsDetector->saveData(oa);
-    m_featureDescriptor->saveData(oa);
-    m_globalFeatureDescriptor->saveData(oa);
+    m_keypoints_detector->saveData(oa);
+    m_feature_descriptor->saveData(oa);
+    m_global_feature_descriptor->saveData(oa);
     m_clustering->saveData(oa);
     m_voting->saveData(oa);
-    m_featureRanking->saveData(oa);
+    m_feature_ranking->saveData(oa);
 
     // TODO VS temporarily disabled
 //    // store label maps
@@ -1022,8 +1022,8 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
 bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
 {
     // objects have to be initialized already
-    if (!m_codebook || !m_keypointsDetector || !m_featureDescriptor || !m_globalFeatureDescriptor ||
-            !m_clustering || !m_voting || !m_featureRanking) {
+    if (!m_codebook || !m_keypoints_detector || !m_feature_descriptor || !m_global_feature_descriptor ||
+            !m_clustering || !m_voting || !m_feature_ranking) {
         LOG_ERROR("object is not initialized");
         return false;
     }
@@ -1034,12 +1034,12 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
 
     // init data for objects
     if (!m_codebook->loadData(ia) ||
-            !m_keypointsDetector->loadData(ia) ||
-            !m_featureDescriptor->loadData(ia) ||
-            !m_globalFeatureDescriptor->loadData(ia) ||
+            !m_keypoints_detector->loadData(ia) ||
+            !m_feature_descriptor->loadData(ia) ||
+            !m_global_feature_descriptor->loadData(ia) ||
             !m_clustering->loadData(ia) ||
             !m_voting->loadData(ia) ||
-            !m_featureRanking->loadData(ia))
+            !m_feature_ranking->loadData(ia))
     {
         LOG_ERROR("could not load child objects");
         return false;
@@ -1080,15 +1080,15 @@ void ImplicitShapeModel::iPostInitConfig()
         throw RuntimeException("invalid distance type: " + m_distanceType);
 
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-    m_MLSSmoothing.setSearchMethod(tree);
-    m_MLSSmoothing.setComputeNormals(false);
-    m_MLSSmoothing.setPolynomialOrder(m_polynomialOrder);
-    m_MLSSmoothing.setSearchRadius(m_smoothingRadius);
-    m_voxelFiltering.setLeafSize(m_voxelLeafSize, m_voxelLeafSize, m_voxelLeafSize);  
+    m_mls_smoothing.setSearchMethod(tree);
+    m_mls_smoothing.setComputeNormals(false);
+    m_mls_smoothing.setPolynomialOrder(m_polynomial_order);
+    m_mls_smoothing.setSearchRadius(m_smoothing_radius);
+    m_voxel_filtering.setLeafSize(m_voxel_leaf_size, m_voxel_leaf_size, m_voxel_leaf_size);
 
     // m_numThreads == 0 is the default, so don't change anything
-    if (m_numThreads > 0)
-        omp_set_num_threads(m_numThreads);
+    if (m_num_threads > 0)
+        omp_set_num_threads(m_num_threads);
 
     LOG_INFO("OpenMP is using " << omp_get_max_threads() << " threads");
 
@@ -1552,20 +1552,20 @@ void ImplicitShapeModel::addMaximaForDebug(std::map<unsigned, pcl::PointCloud<Po
     }
 
     // check if path terminates in /
-    unsigned pos = m_votingAnalysisOutputPath.find_last_of('/');
-    if(pos != m_votingAnalysisOutputPath.size()-1)
+    unsigned pos = m_voting_analysis_output_path.find_last_of('/');
+    if(pos != m_voting_analysis_output_path.size()-1)
     {
-        m_votingAnalysisOutputPath = m_votingAnalysisOutputPath.append("/");
-        std::string command = "mkdir "+m_votingAnalysisOutputPath+" -p";
+        m_voting_analysis_output_path = m_voting_analysis_output_path.append("/");
+        std::string command = "mkdir "+m_voting_analysis_output_path+" -p";
         int unused = std::system(command.c_str());
     }
 
     m_counter++;
     std::ofstream ofs;
-    ofs.open(m_votingAnalysisOutputPath+"votes.txt", std::ofstream::out | std::ofstream::app);
+    ofs.open(m_voting_analysis_output_path+"votes.txt", std::ofstream::out | std::ofstream::app);
     for(auto obj : all_votings)
     {
-        pcl::io::savePCDFileBinary(m_votingAnalysisOutputPath+"file_idx_"+std::to_string(m_counter)+"_class_"+
+        pcl::io::savePCDFileBinary(m_voting_analysis_output_path+"file_idx_"+std::to_string(m_counter)+"_class_"+
                                    std::to_string(obj.first)+".pcd", *obj.second);
         ofs << "file: " << m_counter << ", class: " << obj.first << ", votes:" << obj.second->size() << std::endl;
     }
