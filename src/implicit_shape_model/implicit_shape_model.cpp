@@ -92,7 +92,7 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     addParameter(m_use_radius_outlier_removal, "UseRadiusOutlierRemoval", false);
     addParameter(m_ror_min_neighbors, "OutlierRemovalMinNeighbors", 10);
     addParameter(m_ror_radius, "OutlierRemovalRadius", 0.005f);
-    addParameter(m_use_voxel_viltering, "UseVoxelFiltering", false);
+    addParameter(m_use_voxel_filtering, "UseVoxelFiltering", false);
     addParameter(m_voxel_leaf_size, "VoxelLeafSize", 0.0015f);
 
     addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
@@ -715,7 +715,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         m_radius_outlier_rem.filter(*filtered);
         points = filtered;
     }
-    if(m_use_voxel_viltering)
+    if(m_use_voxel_filtering)
     {
         // filter cloud to get a uniform point distribution
         LOG_INFO("performing voxel filtering");

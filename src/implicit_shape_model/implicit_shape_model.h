@@ -269,7 +269,7 @@ namespace ism3d
         bool m_use_radius_outlier_removal;
         int m_ror_min_neighbors;
         float m_ror_radius;
-        bool m_use_voxel_viltering;
+        bool m_use_voxel_filtering;
         float m_voxel_leaf_size;
 
         float m_normal_radius;
