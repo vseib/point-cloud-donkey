@@ -20,7 +20,7 @@ namespace ism3d
 {
     FeaturesSHORTSHOTGlobal::FeaturesSHORTSHOTGlobal()
     {
-        addParameter(m_min_radius, "ShortShotMinRadius", 0.25);
+        addParameter(m_min_radius, "ShortShotMinRadius", 0.1);
         addParameter(m_feature_dims, "ShortShotDims", 32);
         addParameter(m_log_radius, "ShortShotLogRadius", false);
         addParameter(m_r_bins, "ShortShotRBins", 1);
