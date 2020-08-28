@@ -36,8 +36,6 @@ namespace ism3d
                                                                          pcl::search::Search<PointT>::Ptr search)
     {
 
-        // TODO VS: test with organized point clouds
-
         // NOTE: code taken from http://robotica.unileon.es/index.php/PCL/OpenNI_tutorial_4:_3D_object_recognition_(descriptors)#NARF
 
         // first we need to create a range image from the point cloud
