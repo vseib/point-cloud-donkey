@@ -34,11 +34,9 @@ namespace ism3d
                                                                          pcl::PointCloud<PointT>::Ptr keypoints,
                                                                          pcl::search::Search<PointT>::Ptr search)
     {
-        // TODO VS: test this with a colored point cloud, without color all features are NAN
-
         // NOTE: point cloud MUST contain RGB data, otherwise results will be meaningless
-        const int rift_distance_bins = 4;
-        const int rift_gradient_bins = 8;
+        const int rift_distance_bins = 8;  // original value: 4
+        const int rift_gradient_bins = 16; // original value: 8
         const int rift_size = rift_distance_bins * rift_gradient_bins;
 
         // Object for storing the point cloud with intensity value.
