@@ -42,12 +42,8 @@ namespace ism3d
         Eigen::Vector3f position;
         float weight;
         unsigned classId;
-        unsigned instanceId; // currently with max votes
+        unsigned instanceId;
         float instanceWeight;
-
-        // TODO VS temp for testing
-        unsigned instanceIdAlt; // alternative: with max weight
-        float instanceWeightAlt;
 
         Utils::BoundingBox boundingBox;
         std::vector<int> voteIndices;

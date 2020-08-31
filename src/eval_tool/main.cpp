@@ -351,7 +351,6 @@ int main(int argc, char **argv)
                     std::ofstream summaryFile;
                     int numCorrectClasses = 0;
                     int numCorrectInstances = 0;
-                    int numCorrectInstancesAlt = 0;
                     std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracaHelper; // maps class id to pair <correct, total>
 
                     int numCorrectGlobal = 0;
@@ -452,13 +451,11 @@ int main(int argc, char **argv)
                                     int classId = -1;
                                     int classIdglobal = -1;
                                     int instanceId = -1;
-                                    int instanceIdAlt = -1;
                                     if(maxima.size() > 0)
                                     {
                                         classId = maxima.at(0).classId;
                                         classIdglobal = maxima.at(0).globalHypothesis.classId;
                                         instanceId = maxima.at(0).instanceId;
-                                        instanceIdAlt = maxima.at(0).instanceIdAlt;
                                     }
 
                                     // only display additional classifiers if they are different from normal classification
@@ -506,10 +503,6 @@ int main(int argc, char **argv)
                                     if(((int)trueInstanceID) == instanceId)
                                     {
                                         numCorrectInstances++;
-                                    }
-                                    if(((int)trueInstanceID) == instanceIdAlt)
-                                    {
-                                        numCorrectInstancesAlt++;
                                     }
                                     // global classifier
                                     if(((int)trueID) == classIdglobal)
@@ -562,8 +555,6 @@ int main(int argc, char **argv)
                                     << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
                         summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
                                     << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
-                        summaryFile << " result_alt: " << numCorrectInstancesAlt << " of " << pointClouds.size() << " instances recognized correctly ("
-                                    << ((float)numCorrectInstancesAlt/pointClouds.size())*100.0f << " %)\n";
 
                         summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
                                     << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";

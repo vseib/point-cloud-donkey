@@ -317,10 +317,6 @@ namespace ism3d
     {
         std::vector<VotingMaximum::GlobalHypothesis> global_hyps;
 
-        // TODO VS refactor later
-        // option 1: maximum number of votes
-        std::map<unsigned, unsigned> instance_votes;
-        // option 2: maximum weight
         std::map<unsigned, float> instance_weights;
 
         VotingMaximum result;
@@ -340,43 +336,29 @@ namespace ism3d
             result.weight += m.weight;
             result.voteIndices.insert(result.voteIndices.end(), m.voteIndices.begin(), m.voteIndices.end());
 
-
-            // TODO VS refactor later----------------------
-            if(instance_votes.find(m.instanceId) != instance_votes.end())
+            if(instance_weights.find(m.instanceId) != instance_weights.end())
             {
-                instance_votes.at(m.instanceId) += 1;
                 instance_weights.at(m.instanceId) += m.instanceWeight;
             }
             else
             {
-                instance_votes.insert({m.instanceId, 1});
                 instance_weights.insert({m.instanceId, m.instanceWeight});
             }
 
             // find max value
-            unsigned max_id_votes;
-            unsigned best_votes = 0;
             unsigned max_id_weights;
             float best_weight = 0;
-            for(auto it : instance_votes)
+            for(auto it : instance_weights)
             {
-                unsigned num_votes = it.second;
                 float weight = instance_weights[it.first];
-                if(num_votes > best_votes)
-                {
-                    best_votes = num_votes;
-                    max_id_votes = it.first;
-                }
                 if(weight > best_weight)
                 {
                     best_weight = weight;
                     max_id_weights = it.first;
                 }
             }
-            result.instanceId = max_id_votes;
-            result.instanceWeight = instance_weights[max_id_votes];
-            result.instanceIdAlt = max_id_weights;
-            result.instanceWeightAlt = instance_weights[max_id_weights];
+            result.instanceId = max_id_weights;
+            result.instanceWeight = instance_weights[max_id_weights];
             // -----------------------------------------------------------------------------
 
             // accumulate global hypotheses and merge afterwards
