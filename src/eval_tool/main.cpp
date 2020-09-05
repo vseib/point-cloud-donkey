@@ -42,11 +42,13 @@
 bool write_log_to_files = false;
 bool log_info = true;
 
+// mappings from real labels (string) to label ids and back
 std::map<std::string, unsigned> class_labels_map;
 std::map<std::string, unsigned> instance_labels_map;
 std::map<unsigned, std::string> class_labels_rmap;
 std::map<unsigned, std::string> instance_labels_rmap;
-
+// mapping from instance label ids to class label ids
+std::map<unsigned, unsigned> instance_to_class_map;
 
 unsigned convertLabel(std::string& label,
                       std::map<std::string, unsigned>& labels_map,
@@ -64,6 +66,70 @@ unsigned convertLabel(std::string& label,
         return cur_size;
     }
 }
+
+
+void parseFileList(std::string &input_file_name,
+                   std::vector<std::string> &filenames,
+                   std::vector<unsigned> &class_labels,
+                   std::vector<unsigned> &instance_labels,
+                   std::string &mode)
+{
+    // parse input
+    std::ifstream infile(input_file_name);
+    std::string file;
+    std::string class_label;
+    std::string instance_label;
+    bool using_instances = false;
+
+    // special treatment of first line: determine mode
+    infile >> file;         // in the first line: #
+    infile >> class_label;  // in the first line: the mode ("train" or "test")
+    infile >> instance_label; // in the first line: "inst" or first element of second line
+
+    if(file == "#" && (class_label == "train" || class_label == "test"))
+    {
+        mode = class_label;
+        if (instance_label == "inst")
+        {
+            using_instances = true;
+        }
+    }
+
+    // process remaining lines
+    if (using_instances)
+    {
+        // other lines contain a filename, a class label and an instance label
+        while(infile >> file >> class_label >> instance_label)
+        {
+            if (file[0] == '#') continue; // allows to comment out lines
+            filenames.push_back(file);
+            unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+            unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
+            class_labels.push_back(converted_class_label);
+            instance_labels.push_back(converted_instance_label);
+        }
+    }
+    else
+    {
+        // if no instances are used, the first filename has already been read into variable "instance_label"
+        file = instance_label;
+        infile >> class_label;
+
+        filenames.push_back(file);
+        unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+
+        class_labels.push_back(converted_class_label);
+        // read remaining lines
+        while(infile >> file >> class_label)
+        {
+            if (file[0] == '#') continue; // allows to comment out lines
+            filenames.push_back(file);
+            unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
+            class_labels.push_back(converted_class_label);
+        }
+    }
+}
+
 
 int main(int argc, char **argv)
 {
@@ -116,62 +182,8 @@ int main(int argc, char **argv)
         if(variables.count("inputfile"))
         {
             // manually parse input file if available, then adapt it to boost params
-            std::string input_file = variables["inputfile"].as<std::string>();
-
-            // parse input
-            std::ifstream infile(input_file);
-            std::string file;
-            std::string class_label;
-            std::string instance_label;
-            bool using_instances = false;
-
-            // special treatment of first line: determine mode
-            infile >> file;
-            infile >> class_label;
-            infile >> instance_label;
-
-            if(file == "#" && (class_label == "train" || class_label == "test"))
-            {
-                mode = class_label;
-                if (instance_label == "inst")
-                {
-                    using_instances = true;
-                }
-            }
-
-            // process remaining lines
-            if (using_instances)
-            {
-                // other lines contain a filename, a class label and an instance label
-                while(infile >> file >> class_label >> instance_label)
-                {
-                    if (file[0] == '#') continue; // allows to comment out lines
-                    filenames.push_back(file);
-                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-                    unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
-                    class_labels.push_back(converted_class_label);
-                    instance_labels.push_back(converted_instance_label);
-                }
-            }
-            else
-            {
-                // if no instances are used, the first filename has already been read into variable "instance_label"
-                file = instance_label;
-                infile >> class_label;
-
-                filenames.push_back(file);
-                unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-
-                class_labels.push_back(converted_class_label);
-                // read remaining lines
-                while(infile >> file >> class_label)
-                {
-                    if (file[0] == '#') continue; // allows to comment out lines
-                    filenames.push_back(file);
-                    unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-                    class_labels.push_back(converted_class_label);
-                }
-            }
+            std::string input_file_name = variables["inputfile"].as<std::string>();
+            parseFileList(input_file_name, filenames, class_labels, instance_labels, mode);
         }
 
         try {
