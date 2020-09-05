@@ -400,9 +400,9 @@ int main(int argc, char **argv)
                     if(label_usage == LabelUsage::BOTH_GIVEN)
                     {
                         if(ism.isInstancePrimaryLabel())
-                            label_usage == LabelUsage::INSTANCE_PRIMARY;
+                            label_usage = LabelUsage::INSTANCE_PRIMARY;
                         else
-                            label_usage == LabelUsage::CLASS_PRIMARY;
+                            label_usage = LabelUsage::CLASS_PRIMARY;
                     }
 
                     if(variables.count("pointclouds")) // input directly from command line
