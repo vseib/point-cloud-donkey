@@ -42,6 +42,15 @@
 bool write_log_to_files = false;
 bool log_info = true;
 
+// determines how labels are used
+enum class LabelUsage
+{
+    CLASS_ONLY,        // only class labels, no instance labels
+    BOTH_GIVEN,        // both labels given, needs to be decided which is primary
+    CLASS_PRIMARY,     // use class labels as primary labels, instance labels are secondary
+    INSTANCE_PRIMARY   // use instance labels as primary labels, store class labels in look-up table
+};
+
 // mappings from real labels (string) to label ids and back
 std::map<std::string, unsigned> class_labels_map;
 std::map<std::string, unsigned> instance_labels_map;
@@ -49,6 +58,8 @@ std::map<unsigned, std::string> class_labels_rmap;
 std::map<unsigned, std::string> instance_labels_rmap;
 // mapping from instance label ids to class label ids
 std::map<unsigned, unsigned> instance_to_class_map;
+LabelUsage label_usage;
+
 
 unsigned convertLabel(std::string& label,
                       std::map<std::string, unsigned>& labels_map,
@@ -67,8 +78,19 @@ unsigned convertLabel(std::string& label,
     }
 }
 
+void updateInstanceClassMapping(unsigned instance_label, unsigned class_label)
+{
+    if(instance_to_class_map.find(instance_label) != instance_to_class_map.end())
+    {
+        // already added do nothing
+    }
+    else
+    {
+        instance_to_class_map.insert({instance_label, class_label});
+    }
+}
 
-void parseFileList(std::string &input_file_name,
+LabelUsage parseFileList(std::string &input_file_name,
                    std::vector<std::string> &filenames,
                    std::vector<unsigned> &class_labels,
                    std::vector<unsigned> &instance_labels,
@@ -105,6 +127,7 @@ void parseFileList(std::string &input_file_name,
             filenames.push_back(file);
             unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
             unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
+            updateInstanceClassMapping(converted_instance_label, converted_class_label);
             class_labels.push_back(converted_class_label);
             instance_labels.push_back(converted_instance_label);
         }
@@ -127,6 +150,15 @@ void parseFileList(std::string &input_file_name,
             unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
             class_labels.push_back(converted_class_label);
         }
+    }
+
+    if(using_instances)
+    {
+        return LabelUsage::BOTH_GIVEN; // instance labels given, decide later which is primary
+    }
+    else
+    {
+        return LabelUsage::CLASS_ONLY; // no instance labels given, use only class labels
     }
 }
 
@@ -183,7 +215,7 @@ int main(int argc, char **argv)
         {
             // manually parse input file if available, then adapt it to boost params
             std::string input_file_name = variables["inputfile"].as<std::string>();
-            parseFileList(input_file_name, filenames, class_labels, instance_labels, mode);
+            label_usage = parseFileList(input_file_name, filenames, class_labels, instance_labels, mode);
         }
 
         try {
@@ -207,21 +239,34 @@ int main(int argc, char **argv)
                 ism.setLogging(log_info);
                 ism.setSignalsState(false); // disable signals since we are using command line, no GUI
 
-                if (!ism.readObject(ismFile, true))
+                if(!ism.readObject(ismFile, true))
                 {
                     std::cerr << "could not read ism from file, training stopped: " << ismFile << std::endl;
                     return 1;
                 }
 
+                // if both, class and instance labels given, check which is primary
+                if(label_usage == LabelUsage::BOTH_GIVEN)
+                {
+                    if(ism.isInstancePrimaryLabel())
+                    {
+                        label_usage = LabelUsage::INSTANCE_PRIMARY;
+                    }
+                    else
+                    {
+                        label_usage = LabelUsage::CLASS_PRIMARY;
+                    }
+                }
+
                 // set output filename
-                if (variables.count("output"))
+                if(variables.count("output"))
                 {
                     std::string outFilename = variables["output"].as<std::string>();
                     ism.setOutputFilename(outFilename);
                 }
 
                 // add the training models to the ism
-                if ((variables.count("models") && variables.count("classes")) ||
+                if((variables.count("models") && variables.count("classes")) ||
                         (filenames.size() > 0 && class_labels.size() > 0))
                 {
                     std::vector<std::string> models;
@@ -237,15 +282,27 @@ int main(int argc, char **argv)
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         models = filenames;
-                        class_ids = class_labels;
-                        // instance ids must be filled even if training with class labels only
-                        if(instance_labels.size() > 0)
+                        if(label_usage == LabelUsage::CLASS_ONLY)
                         {
+                            // instance ids must be filled even if training with class labels only
+                            class_ids = class_labels;
+                            instance_ids = class_labels;
+                        }
+                        else if(label_usage == LabelUsage::CLASS_PRIMARY)
+                        {
+                            class_ids = class_labels;
+                            instance_ids = instance_labels;
+                        }
+                        else if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+                        {
+                            class_ids = instance_labels;
                             instance_ids = instance_labels;
                         }
                         else
                         {
-                            instance_ids = class_labels;
+                            std::cerr << "Label usage not defined or not supported! ("
+                                      << static_cast<std::underlying_type<LabelUsage>::type>(label_usage) << ")" << std::endl;
+                            return 1;
                         }
                     }
 
@@ -274,8 +331,8 @@ int main(int argc, char **argv)
 
                 // train
                 ism.train();
-                // store labels in the model object file
-                ism.setLabels(class_labels_rmap, instance_labels_rmap);
+                // store maps in the model object file
+                ism.setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
 
                 // write the ism data
                 if (variables.count("inplace"))
@@ -337,6 +394,16 @@ int main(int argc, char **argv)
                     // not used here, but might be needed some day
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
+                    instance_to_class_map = ism.getInstanceClassMap();
+
+                    // if both, class and instance labels given, check which is primary
+                    if(label_usage == LabelUsage::BOTH_GIVEN)
+                    {
+                        if(ism.isInstancePrimaryLabel())
+                            label_usage == LabelUsage::INSTANCE_PRIMARY;
+                        else
+                            label_usage == LabelUsage::CLASS_PRIMARY;
+                    }
 
                     if(variables.count("pointclouds")) // input directly from command line
                     {
@@ -346,24 +413,29 @@ int main(int argc, char **argv)
                     else if(filenames.size() > 0) // input inside file given on command line
                     {
                         pointClouds = filenames;
-                        gt_class_ids = class_labels;
-                    }
-
-                    // instance ids must be filled even if testing with class labels only
-                    if(instance_labels.size() > 0)
-                    {
-                        gt_instance_ids = instance_labels;
-                    }
-                    else
-                    {
-                        gt_instance_ids = class_labels;
+                        if(label_usage == LabelUsage::CLASS_ONLY)
+                        {
+                            // instance ids must be filled even if testing with class labels only
+                            gt_class_ids = class_labels;
+                            gt_instance_ids = class_labels;
+                        }
+                        else if(label_usage == LabelUsage::CLASS_PRIMARY || label_usage == LabelUsage::INSTANCE_PRIMARY)
+                        {
+                            gt_class_ids = class_labels;
+                            gt_instance_ids = instance_labels;
+                        }
+                        else
+                        {
+                            std::cerr << "Label usage not defined or not supported!" << std::endl;
+                            return 1;
+                        }
                     }
 
                     // prepare summary
                     std::ofstream summaryFile;
                     int numCorrectClasses = 0;
                     int numCorrectInstances = 0;
-                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracaHelper; // maps class id to pair <correct, total>
+                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
 
                     int numCorrectGlobal = 0;
                     int numBothCorrect = 0;
@@ -467,6 +539,12 @@ int main(int argc, char **argv)
                                     {
                                         classId = maxima.at(0).classId;
                                         classIdglobal = maxima.at(0).globalHypothesis.classId;
+                                        // lookup real class ids if instances were used as primary labels
+                                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+                                        {
+                                            classId = instance_to_class_map[classId];
+                                            classIdglobal = instance_to_class_map[classIdglobal];
+                                        }
                                         instanceId = maxima.at(0).instanceId;
                                     }
 
@@ -485,30 +563,30 @@ int main(int argc, char **argv)
                                     {
                                         // correct classification
                                         numCorrectClasses++;
-                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
                                         {
                                             // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
                                             res.first++;
                                             res.second++;
                                         }
                                         else
                                         {
-                                            averageAccuracaHelper.insert({trueID, {1,1}});
+                                            averageAccuracyHelper.insert({trueID, {1,1}});
                                         }
                                     }
                                     else
                                     {
                                         // wrong classification
-                                        if(averageAccuracaHelper.find(trueID) != averageAccuracaHelper.end())
+                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
                                         {
                                             // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracaHelper.at(trueID);
+                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
                                             res.second++;
                                         }
                                         else
                                         {
-                                            averageAccuracaHelper.insert({trueID, {0,1}});
+                                            averageAccuracyHelper.insert({trueID, {0,1}});
                                         }
                                     }
                                     // instance recognition
@@ -552,12 +630,12 @@ int main(int argc, char **argv)
                         summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
 
                         float avg_pc_acc = 0;
-                        for(const auto &elem : averageAccuracaHelper)
+                        for(const auto &elem : averageAccuracyHelper)
                         {
                             const std::pair<unsigned, unsigned> &p = elem.second;
                             avg_pc_acc += (float)p.first/p.second;
                         }
-                        avg_pc_acc /= averageAccuracaHelper.size();
+                        avg_pc_acc /= averageAccuracyHelper.size();
 
                         // complete and close summary file
                         summaryFile << std::endl << std::endl;

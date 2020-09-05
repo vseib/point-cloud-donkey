@@ -168,11 +168,15 @@ namespace ism3d
          * @brief setLabels Sets class and instance labels as members to be safed for later use
          * @param class_labels the map with class labels used during training
          * @param instance_labels the map with instance labels used during training
+         * @param instance_to_class_map map to get a class label for a given instance label
          */
-        void setLabels(std::map<unsigned, std::string> &class_labels, std::map<unsigned, std::string> &instance_labels)
+        void setLabels(std::map<unsigned, std::string> &class_labels,
+                       std::map<unsigned, std::string> &instance_labels,
+                       std::map<unsigned, unsigned> &instance_to_class_map)
         {
             m_class_labels = class_labels;
             m_instance_labels = instance_labels;
+            m_instance_to_class_map = instance_to_class_map;
         }
 
         std::map<unsigned, std::string> getClassLabels()
@@ -185,6 +189,16 @@ namespace ism3d
             return m_instance_labels;
         }
 
+        std::map<unsigned, unsigned> getInstanceClassMap()
+        {
+            return m_instance_to_class_map;
+        }
+
+        bool isInstancePrimaryLabel()
+        {
+            // TODO VS: add logic later depending on some params
+            return false;
+        }
 
         // signals
         boost::signals2::signal<void(pcl::PointCloud<PointT>::ConstPtr)> m_signalPointCloud;
@@ -298,6 +312,7 @@ namespace ism3d
 
         std::map<unsigned, std::string> m_class_labels;
         std::map<unsigned, std::string> m_instance_labels;
+        std::map<unsigned, unsigned> m_instance_to_class_map;
 
         // TODO VS temp
         static int m_counter;

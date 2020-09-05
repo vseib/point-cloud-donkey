@@ -1035,6 +1035,17 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
     m_voting->saveData(oa);
     m_feature_ranking->saveData(oa);
 
+    unsigned size = m_instance_to_class_map.size();
+    oa << size;
+    for(auto it : m_instance_to_class_map)
+    {
+        unsigned inst_label = it.first;
+        oa << inst_label;
+        unsigned class_label = it.second;
+        oa << class_label;
+    }
+
+
     // TODO VS temporarily disabled
 //    // store label maps
 //    unsigned size = m_class_labels.size();
@@ -1077,6 +1088,18 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
     {
         LOG_ERROR("could not load child objects");
         return false;
+    }
+
+    unsigned size;
+    ia >> size;
+    m_instance_to_class_map.clear();
+    for(unsigned i = 0; i < size; i++)
+    {
+        unsigned label_inst;
+        ia >> label_inst;
+        unsigned label_class;
+        ia >> label_class;
+        m_instance_to_class_map.insert({label_inst, label_class});
     }
 
     // TODO VS temporarily disabled
