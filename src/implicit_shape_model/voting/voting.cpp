@@ -361,11 +361,11 @@ void Voting::forwardGlobalFeatures(std::map<unsigned, std::vector<pcl::PointClou
 void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
 {
     // fill in bounding box information
-    int bb_dims_size = m_dimensions_map.size();
+    unsigned bb_dims_size = m_dimensions_map.size();
     oa << bb_dims_size;
     for(auto it : m_dimensions_map)
     {
-        int classId = it.first;
+        unsigned classId = it.first;
         float firstDim = it.second.first;
         float secondDim = it.second.second;
         oa << classId;
@@ -373,11 +373,11 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
         oa << secondDim;
     }
 
-    int bb_vars_size = m_variance_map.size();
+    unsigned bb_vars_size = m_variance_map.size();
     oa << bb_vars_size;
     for(auto it : m_variance_map)
     {
-        int classId = it.first;
+        unsigned classId = it.first;
         float firstVar = it.second.first;
         float secondVar = it.second.second;
         oa << classId;
@@ -386,18 +386,18 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
     }
 
     // fill in global features
-    int glob_feat_size = m_global_features.size();
+    unsigned glob_feat_size = m_global_features.size();
     oa << glob_feat_size;
     for(auto it : m_global_features)
     {
-        int classId = it.first; // descriptor type is same for all features, only store it once
+        unsigned classId = it.first; // descriptor type is same for all features, only store it once
         oa << classId;
 
-        int cloud_size = it.second.size();
+        unsigned cloud_size = it.second.size();
         oa << cloud_size;
         for(auto feat_cloud : it.second) // iterate over each vector element (point cloud) of one class
         {
-            int feat_size = feat_cloud->points.size();
+            unsigned feat_size = feat_cloud->points.size();
             oa << feat_size;
             for(auto feat : feat_cloud->points) // iterate over each descriptor (point in the cloud)
             {
@@ -421,7 +421,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
     m_dimensions_map.clear();
     m_variance_map.clear();
 
-    int bb_dims_size;
+    unsigned bb_dims_size;
     ia >> bb_dims_size;
     for(int i = 0; i < bb_dims_size; i++)
     {
@@ -434,7 +434,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         m_dimensions_map.insert({classId, {firstDim, secondDim}});
     }
 
-    int bb_vars_size;
+    unsigned bb_vars_size;
     ia >> bb_vars_size;
     for(int i = 0; i < bb_vars_size; i++)
     {
@@ -457,7 +457,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> global_features_map;
         int descriptor_length;
 
-        int global_feat_size;
+        unsigned global_feat_size;
         ia >> global_feat_size;
         for(int i = 0; i < global_feat_size; i++)
         {
@@ -466,13 +466,13 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
 
             std::vector<pcl::PointCloud<ISMFeature>::Ptr> cloud_vector;
 
-            int cloud_size;
+            unsigned cloud_size;
             ia >> cloud_size;
-            for(int j = 0; j < cloud_size; j++)
+            for(unsigned j = 0; j < cloud_size; j++)
             {
                 pcl::PointCloud<ISMFeature>::Ptr temp_cloud(new pcl::PointCloud<ISMFeature>());
 
-                int feat_size;
+                unsigned feat_size;
                 ia >> feat_size;
                 for(int k = 0; k < feat_size; k++)
                 {
