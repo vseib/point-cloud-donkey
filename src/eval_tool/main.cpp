@@ -331,6 +331,7 @@ int main(int argc, char **argv)
 
                 // train
                 ism.train();
+
                 // store maps in the model object file
                 ism.setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
 

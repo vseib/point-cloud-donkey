@@ -1037,14 +1037,13 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
 
     unsigned size = m_instance_to_class_map.size();
     oa << size;
-    for(auto it : m_instance_to_class_map)
+    for(auto const &it : m_instance_to_class_map)
     {
-        unsigned inst_label = it.first;
-        oa << inst_label;
-        unsigned class_label = it.second;
-        oa << class_label;
+        unsigned label_inst = it.first;
+        unsigned label_class = it.second;
+        oa << label_inst;
+        oa << label_class;
     }
-
 
     // TODO VS temporarily disabled
 //    // store label maps
@@ -1095,9 +1094,8 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
     m_instance_to_class_map.clear();
     for(unsigned i = 0; i < size; i++)
     {
-        unsigned label_inst;
+        unsigned label_inst, label_class;
         ia >> label_inst;
-        unsigned label_class;
         ia >> label_class;
         m_instance_to_class_map.insert({label_inst, label_class});
     }

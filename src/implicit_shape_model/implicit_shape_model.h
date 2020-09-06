@@ -197,7 +197,7 @@ namespace ism3d
         bool isInstancePrimaryLabel()
         {
             // TODO VS: add logic later depending on some params
-            return false;
+            return true;
         }
 
         // signals
