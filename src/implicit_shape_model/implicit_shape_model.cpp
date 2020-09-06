@@ -1027,14 +1027,6 @@ bool ImplicitShapeModel::iChildConfigsFromJson(const Json::Value& object)
 
 void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
 {
-    m_codebook->saveData(oa);
-    m_keypoints_detector->saveData(oa);
-    m_feature_descriptor->saveData(oa);
-    m_global_feature_descriptor->saveData(oa);
-    m_clustering->saveData(oa);
-    m_voting->saveData(oa);
-    m_feature_ranking->saveData(oa);
-
     unsigned size = m_instance_to_class_map.size();
     oa << size;
     for(auto const &it : m_instance_to_class_map)
@@ -1044,6 +1036,15 @@ void ImplicitShapeModel::iSaveData(boost::archive::binary_oarchive &oa) const
         oa << label_inst;
         oa << label_class;
     }
+
+    m_codebook->saveData(oa);
+    m_keypoints_detector->saveData(oa);
+    m_feature_descriptor->saveData(oa);
+    m_global_feature_descriptor->saveData(oa);
+    m_clustering->saveData(oa);
+    m_voting->saveData(oa);
+    m_feature_ranking->saveData(oa);
+
 
     // TODO VS temporarily disabled
 //    // store label maps
@@ -1076,6 +1077,17 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
     // forward svm path as it might have been manually changed in config
     m_voting->setSVMPath(m_svm_path);
 
+    unsigned size;
+    ia >> size;
+    m_instance_to_class_map.clear();
+    for(unsigned i = 0; i < size; i++)
+    {
+        unsigned label_inst, label_class;
+        ia >> label_inst;
+        ia >> label_class;
+        m_instance_to_class_map.insert({label_inst, label_class});
+    }
+
     // init data for objects
     if (!m_codebook->loadData(ia) ||
             !m_keypoints_detector->loadData(ia) ||
@@ -1089,16 +1101,6 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
         return false;
     }
 
-    unsigned size;
-    ia >> size;
-    m_instance_to_class_map.clear();
-    for(unsigned i = 0; i < size; i++)
-    {
-        unsigned label_inst, label_class;
-        ia >> label_inst;
-        ia >> label_class;
-        m_instance_to_class_map.insert({label_inst, label_class});
-    }
 
     // TODO VS temporarily disabled
 //    // load original labels
