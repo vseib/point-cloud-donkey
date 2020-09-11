@@ -449,66 +449,66 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
 
     MaximaHandler::setBoundingBoxMaps(m_dimensions_map, m_variance_map);
 
-    // read global features
+    // NOTE: even if global features are not used, they must be completely deserialized!
+    // load all global features from training into a single cloud
+    pcl::PointCloud<ISMFeature>::Ptr global_features_cloud(new pcl::PointCloud<ISMFeature>());
+    std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> global_features_map;
+    int descriptor_length;
+
+    unsigned global_feat_size;
+    ia >> global_feat_size;
+    for(int i = 0; i < global_feat_size; i++)
+    {
+        unsigned classId;
+        ia >> classId;
+
+        std::vector<pcl::PointCloud<ISMFeature>::Ptr> cloud_vector;
+
+        unsigned cloud_size;
+        ia >> cloud_size;
+        for(unsigned j = 0; j < cloud_size; j++)
+        {
+            pcl::PointCloud<ISMFeature>::Ptr temp_cloud(new pcl::PointCloud<ISMFeature>());
+
+            unsigned feat_size;
+            ia >> feat_size;
+            for(int k = 0; k < feat_size; k++)
+            {
+                pcl::ReferenceFrame referenceFrame;
+                for(int i_ref = 0; i_ref < 9; i_ref++)
+                {
+                    float ref;
+                    ia >> ref;
+                    referenceFrame.rf[i_ref] = ref;
+                }
+
+                std::vector<float> descriptor;
+                ia >> descriptor;
+                float radius;
+                ia >> radius;
+                unsigned instanceId;
+                ia >> instanceId;
+
+                ISMFeature ism_feature;
+                ism_feature.referenceFrame = referenceFrame;
+                ism_feature.descriptor = descriptor;
+                ism_feature.globalDescriptorRadius =  radius;
+                ism_feature.classId = classId;
+                ism_feature.instanceId = instanceId;
+                temp_cloud->push_back(ism_feature);
+                global_features_cloud->push_back(ism_feature);
+                descriptor_length = ism_feature.descriptor.size(); // are all the same just overwrite
+            }
+            temp_cloud->height = 1;
+            temp_cloud->width = temp_cloud->size();
+            temp_cloud->is_dense = false;
+            cloud_vector.push_back(temp_cloud);
+        }
+        global_features_map.insert({classId, cloud_vector});
+    }
+
     if(m_use_global_features)
     {
-        // load all global features from training into a single cloud
-        pcl::PointCloud<ISMFeature>::Ptr global_features_cloud(new pcl::PointCloud<ISMFeature>());
-        std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> global_features_map;
-        int descriptor_length;
-
-        unsigned global_feat_size;
-        ia >> global_feat_size;
-        for(int i = 0; i < global_feat_size; i++)
-        {
-            unsigned classId;
-            ia >> classId;
-
-            std::vector<pcl::PointCloud<ISMFeature>::Ptr> cloud_vector;
-
-            unsigned cloud_size;
-            ia >> cloud_size;
-            for(unsigned j = 0; j < cloud_size; j++)
-            {
-                pcl::PointCloud<ISMFeature>::Ptr temp_cloud(new pcl::PointCloud<ISMFeature>());
-
-                unsigned feat_size;
-                ia >> feat_size;
-                for(int k = 0; k < feat_size; k++)
-                {
-                    pcl::ReferenceFrame referenceFrame;
-                    for(int i_ref = 0; i_ref < 9; i_ref++)
-                    {
-                        float ref;
-                        ia >> ref;
-                        referenceFrame.rf[i_ref] = ref;
-                    }
-
-                    std::vector<float> descriptor;
-                    ia >> descriptor;
-                    float radius;
-                    ia >> radius;
-                    unsigned instanceId;
-                    ia >> instanceId;
-
-                    ISMFeature ism_feature;
-                    ism_feature.referenceFrame = referenceFrame;
-                    ism_feature.descriptor = descriptor;
-                    ism_feature.globalDescriptorRadius =  radius;
-                    ism_feature.classId = classId;
-                    ism_feature.instanceId = instanceId;
-                    temp_cloud->push_back(ism_feature);
-                    global_features_cloud->push_back(ism_feature);
-                    descriptor_length = ism_feature.descriptor.size(); // are all the same just overwrite
-                }
-                temp_cloud->height = 1;
-                temp_cloud->width = temp_cloud->size();
-                temp_cloud->is_dense = false;
-                cloud_vector.push_back(temp_cloud);
-            }
-            global_features_map.insert({classId, cloud_vector});
-        }
-
         // create flann index
         std::shared_ptr<FlannHelper> fh = std::make_shared<FlannHelper>(descriptor_length, global_features_cloud->size());
         fh->createDataset(global_features_cloud);
