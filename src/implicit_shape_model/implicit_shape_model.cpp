@@ -113,6 +113,7 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     addParameter(m_single_object_mode, "SingleObjectMode", false);
     addParameter(m_num_kd_trees, "FLANNNumKDTrees", 4);
     addParameter(m_flann_exact_match, "FLANNExactMatch", false);
+    addParameter(m_instance_labels_primary, "InstanceLabelsPrimary", true);
 
     init();
 }

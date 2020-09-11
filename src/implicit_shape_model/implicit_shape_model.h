@@ -196,8 +196,7 @@ namespace ism3d
 
         bool isInstancePrimaryLabel()
         {
-            // TODO VS: add logic later depending on some params
-            return true;
+            return m_instance_labels_primary;
         }
 
         // signals
@@ -313,6 +312,7 @@ namespace ism3d
         std::map<unsigned, std::string> m_class_labels;
         std::map<unsigned, std::string> m_instance_labels;
         std::map<unsigned, unsigned> m_instance_to_class_map;
+        bool m_instance_labels_primary;
 
         // TODO VS temp
         static int m_counter;
