@@ -382,7 +382,8 @@ void ImplicitShapeModel::train()
     std::vector<std::shared_ptr<Codeword>> codewords;
     for (int i = 0; i < (int)clusterCenters.size(); i++)
     {
-        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f)); // init with uniform weights
+         // init with uniform weights // TODO VS: codeword weight is never anything else than 1.0f - remove??
+        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f));
         codewords.push_back(codeword);
     }
 

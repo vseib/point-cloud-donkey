@@ -121,7 +121,7 @@ namespace ism3d
 
             // compute vote weight
             float weight = 1.0f;
-            // TODO VS rethink all weights and maybe remove some
+            // TODO VS rethink all weights and maybe remove some: remove codeword weight
             weight = useClassWeight ? weight * classWeight : weight;
             weight = useVoteWeight ? weight * voteWeight : weight;
             weight = useMatchingWeight ? weight * matching_weight : weight;

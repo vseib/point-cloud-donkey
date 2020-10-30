@@ -28,8 +28,8 @@ Codebook::Codebook()
 {
     m_activationStrategy = new ActivationStrategyKNN();
 
-    addParameter(m_useClassWeight, "UseClassWeight", false);
-    addParameter(m_useVoteWeight, "UseVoteWeight", false);
+    addParameter(m_useClassWeight, "UseClassWeight", false); // TODO VS weights umbenennen: class -> statistical
+    addParameter(m_useVoteWeight, "UseVoteWeight", false); // TODO VS weights umbenennen: vote -> center
     addParameter(m_useMatchingWeight, "UseMatchingWeight", false);
     addParameter(m_useCodewordWeight, "UseCodewordWeight", false);
 
@@ -333,7 +333,7 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
     }
 
     LOG_INFO("Starting step 9");
-    // set class weights for distribution entry
+    // set class weights (statistical weights) for distribution entry
     for (distribution_t::const_iterator it = m_distribution.begin(); it != m_distribution.end(); it++)
     {
         const std::shared_ptr<CodewordDistribution>& entry = it->second;

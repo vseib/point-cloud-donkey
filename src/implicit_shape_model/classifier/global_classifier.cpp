@@ -190,6 +190,10 @@ namespace ism3d
             // SVM does not support instance labels, so we have to get it from KNN classifier
             VotingMaximum instance_maximum;
             instance_maximum.classId = maximum.classId;
+            // TODO VS: use only if
+            // 1. secondary labels are used
+            // 2. feature type of training and test is the same (usually this is the case, but it's possible
+            //    to use an SVM with a different descriptor type than was used for training the global KNN classifier)
             classifyWithKNN(global_features, instance_maximum);
             // fill in instance result into actual maximum
             maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
