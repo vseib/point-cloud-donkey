@@ -84,7 +84,7 @@ add_library(implicit_shape_model
     features/features_short_shot_global.cpp
     features/features_cshot.cpp
     features/features_cshot_global.cpp
-    #features/features_short_cshot.cpp
+    features/features_short_cshot.cpp
     features/features_pfh.cpp
     features/features_fpfh.cpp
     features/features_rift.cpp

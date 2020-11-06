@@ -1,93 +1,79 @@
-#ifndef ISM3D_FEATURESSHORTCSHOT_H
-#define ISM3D_FEATURESSHORTCSHOT_H
+/*
+ * BSD 3-Clause License
+ *
+ * Full text: https://opensource.org/licenses/BSD-3-Clause
+ *
+ * Copyright (c) 2019, Viktor Seib
+ * All rights reserved.
+ *
+ */
+
+#ifndef ISM3D_FEATURESHORTCSHOT_H
+#define ISM3D_FEATURESHORTCSHOT_H
 
 #include "features.h"
 
-// Useful constants.
-#define PST_PI 3.1415926535897932384626433832795
-#define PST_RAD_45 0.78539816339744830961566084581988
-#define PST_RAD_90 1.5707963267948966192313216916398
-#define PST_RAD_135 2.3561944901923449288469825374596
-#define PST_RAD_180 PST_PI
-#define PST_RAD_360 6.283185307179586476925286766558
-#define PST_RAD_PI_7_8 2.7488935718910690836548129603691
-
-
 namespace ism3d
 {
-/**
+    /**
      * @brief The FeaturesSHORTCSHOT class
-     * Computes features using the signature of histograms of orientations descriptor with color,
-     * but only retains a small portion of the descriptor
+     * Computes features using the generalized Short C-SHOT (reuses code from the Compact Geometric Features (CGF), see third_party/CGF/cgf.cpp)
+     *
+     * Original CGF repo: https://marckhoury.github.io/CGF/ and https://github.com/marckhoury/CGF
      */
-class FeaturesSHORTCSHOT
-        : public Features
-{
-public:
-    FeaturesSHORTCSHOT();
-    ~FeaturesSHORTCSHOT();
-
-    static std::string getTypeStatic();
-    std::string getType() const;
-
-protected:
-    pcl::PointCloud<ISMFeature>::Ptr iComputeDescriptors(pcl::PointCloud<PointT>::ConstPtr,
-                                                         pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                         pcl::PointCloud<PointT>::ConstPtr,
-                                                         pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                         pcl::PointCloud<pcl::ReferenceFrame>::Ptr,
-                                                         pcl::PointCloud<PointT>::Ptr,
-                                                         pcl::search::Search<PointT>::Ptr);
-
-    inline bool
-    areEquals (double val1, double val2, double zeroDoubleEps = 1E-15)
+    class FeaturesSHORTCSHOT
+            : public Features
     {
-      return (fabs (val1 - val2)<zeroDoubleEps);
-    }
+    public:
+        FeaturesSHORTCSHOT();
+        ~FeaturesSHORTCSHOT();
 
-    inline bool
-    areEquals (float val1, float val2, float zeroFloatEps = 1E-8f)
-    {
-      return (fabs (val1 - val2)<zeroFloatEps);
-    }
+        static std::string getTypeStatic();
+        std::string getType() const;
 
-    void computePointSHOT(const int index, const std::vector<int> &indices, const std::vector<float> &sqr_dists, Eigen::VectorXf &shot);
+    protected:
+        pcl::PointCloud<ISMFeature>::Ptr iComputeDescriptors(pcl::PointCloud<PointT>::ConstPtr,
+                                                             pcl::PointCloud<pcl::Normal>::ConstPtr,
+                                                             pcl::PointCloud<PointT>::ConstPtr,
+                                                             pcl::PointCloud<pcl::Normal>::ConstPtr,
+                                                             pcl::PointCloud<pcl::ReferenceFrame>::Ptr,
+                                                             pcl::PointCloud<PointT>::Ptr,
+                                                             pcl::search::Search<PointT>::Ptr);
 
-    void interpolateDoubleChannel (const std::vector<int> &indices,
-      const std::vector<float> &sqr_dists, const int index, std::vector<double> &binDistanceColor,
-      const int nr_bins_shape, const int nr_bins_color, Eigen::VectorXf &shot);
+    private:
 
-    void RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B, float &L, float &A, float &B2);
+        std::vector<std::vector<double>> compute_descriptor(pcl::PointCloud<PointT>::ConstPtr cloud,
+                                                pcl::PointCloud<PointT>::Ptr keypoints,
+                                                pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames);
 
-    void normalizeHistogram(Eigen::VectorXf &shot, int desc_length);
+        // distribute the increment linearly between bins
+        // return value:
+        //  first: portion for current bin
+        //  second: +1 to assign the portion (1-first) to next bin
+        //          -1 to assign the portion (1-first) to previous bin
+        std::pair<float,int> linearDistribution(float raw_bin_id);
 
+        std::pair<float,int> linearDistribution2(float raw_bin_id, float bin_size, float signal_range);
 
-private:
+        // check if bin is in valid range and correct if necessary
+        int correct_bin(int bin, int total_bins, bool is_cyclic);
 
-    static float sRGB_LUT[256];
-    static float sXYZ_LUT[4000];
+        void configureSphericalGrid();
 
-    double m_radius;
+        void RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B, float &L, float &A, float &B2);
 
-    double search_radius_;
-    pcl::PointCloud<PointT>::ConstPtr surface_;
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr frames_;
-    pcl::PointCloud<PointT>::Ptr input_;
-    pcl::IndicesPtr indices_;
-    pcl::search::Search<PointT>::Ptr search_;
+        static float sRGB_LUT[256];
+        static float sXYZ_LUT[4000];
 
-    pcl::PointCloud<pcl::Normal>::ConstPtr normals_;
-
-    int nr_shape_bins_;
-    int nr_color_bins_;
-    float sqradius_;
-    float radius3_4_;
-    float radius1_4_;
-    float radius1_2_;
-    int nr_grid_sector_;
-    int maxAngularSectors_;
-    int descLength_;
-};
+        double m_radius;
+        double m_min_radius;
+        bool m_log_radius;
+        int m_feature_dims;
+        int m_r_bins;
+        int m_e_bins;
+        int m_a_bins;
+        std::string m_bin_type;
+    };
 }
 
-#endif // ISM3D_FEATURESSHORTCSHOT_H
+#endif // ISM3D_FEATURESHORTCSHOT_H

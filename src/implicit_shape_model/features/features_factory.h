@@ -62,8 +62,8 @@ namespace ism3d
             return new FeaturesCSHOT();
         else if (type == FeaturesCGF::getTypeStatic())
             return new FeaturesCGF();
-//        else if (type == FeaturesSHORTCSHOT::getTypeStatic())
-//            return new FeaturesSHORTCSHOT();
+        else if (type == FeaturesSHORTCSHOT::getTypeStatic())
+            return new FeaturesSHORTCSHOT();
         else if (type == FeaturesRIFT::getTypeStatic())
             return new FeaturesRIFT(); // works only with color data!
         else if (type == Features3DSC::getTypeStatic())
