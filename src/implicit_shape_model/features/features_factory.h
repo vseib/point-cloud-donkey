@@ -22,7 +22,7 @@
 #include "features_short_shot_global.h"
 #include "features_cshot.h"
 #include "features_cshot_global.h"
-//#include "features_short_cshot.h"  TODO VS: re-implement short c-shot
+#include "features_short_cshot.h"
 #include "features_rift.h"
 #include "features_esf.h"
 #include "features_3dsc.h"
