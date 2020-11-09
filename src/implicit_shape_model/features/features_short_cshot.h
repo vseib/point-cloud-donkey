@@ -15,6 +15,8 @@
 
 namespace ism3d
 {
+    // TODO VS update doc
+
     /**
      * @brief The FeaturesSHORTCSHOT class
      * Computes features using the generalized Short C-SHOT (reuses code from the Compact Geometric Features (CGF), see third_party/CGF/cgf.cpp)
@@ -68,10 +70,14 @@ namespace ism3d
         double m_radius;
         double m_min_radius;
         bool m_log_radius;
-        int m_feature_dims;
+        int m_total_feature_dims;
+        int m_shape_feature_dims;
+        int m_color_feature_dims;
+        int m_color_hist_size;
         int m_r_bins;
         int m_e_bins;
         int m_a_bins;
+
         std::string m_bin_type;
     };
 }

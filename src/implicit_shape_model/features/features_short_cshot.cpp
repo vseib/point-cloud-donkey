@@ -22,7 +22,9 @@ namespace ism3d
     {
         addParameter(m_radius, "Radius", 0.1);
         addParameter(m_min_radius, "ShortShotMinRadius", m_radius*0.25);
-        addParameter(m_feature_dims, "ShortShotDims", 32);
+        addParameter(m_shape_feature_dims, "ShortShotDims", 32);
+        addParameter(m_color_feature_dims, "ShortColorShotDims", 32);
+        addParameter(m_color_hist_size, "ShortColorShotHistSize", 2);
         addParameter(m_log_radius, "ShortShotLogRadius", false);
         addParameter(m_r_bins, "ShortShotRBins", 1);
         addParameter(m_e_bins, "ShortShotEBins", 1);
@@ -61,7 +63,7 @@ namespace ism3d
             std::vector<double>& raw_hist = raw_features.at(i);
 
             // store the descriptor
-            feature.descriptor.resize(m_feature_dims);
+            feature.descriptor.resize(m_total_feature_dims);
             for (int j = 0; j < feature.descriptor.size(); j++)
                 feature.descriptor[j] = static_cast<float>(raw_hist[j]);
 
@@ -94,9 +96,9 @@ namespace ism3d
             std::vector<float> distances;
             std::vector<double> shape_descriptor;
             shape_descriptor.resize(m_r_bins * m_e_bins * m_a_bins);
-            float m_c_hist_size = 2; // TODO VS make param
+
             std::vector<double> color_descriptor;
-            color_descriptor.resize(m_r_bins * m_e_bins * m_a_bins * m_c_hist_size);
+            color_descriptor.resize(m_r_bins * m_e_bins * m_a_bins * m_color_hist_size);
 
             // reference values for shape part of descriptor
             pcl::ReferenceFrame current_frame = (*referenceFrames)[i];
@@ -181,12 +183,12 @@ namespace ism3d
                     if (colorDistance < 0.0)
                       colorDistance = 0.0;
 
-                    int bin_c = colorDistance / m_c_hist_size;
+                    int bin_c = colorDistance / m_color_hist_size;
 
                     int idx_c = bin_c +
-                                bin_r      * m_c_hist_size +
-                                bin_theta  * m_c_hist_size * m_r_bins +
-                                bin_phi    * m_c_hist_size * m_r_bins * m_e_bins;
+                                bin_r      * m_color_hist_size +
+                                bin_theta  * m_color_hist_size * m_r_bins +
+                                bin_phi    * m_color_hist_size * m_r_bins * m_e_bins;
                     color_descriptor[idx_c] += 1;
                 }
             }
@@ -290,55 +292,55 @@ namespace ism3d
         // automatically set bins to default configuration to match the given dimensionality
         if(m_bin_type == "auto")
         {
-            if(m_feature_dims == 8)
+            if(m_shape_feature_dims == 8)
             {
                 m_r_bins = 1;
                 m_e_bins = 1;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 16)
+            else if(m_shape_feature_dims == 16)
             {
                 m_r_bins = 2;
                 m_e_bins = 2;
                 m_a_bins = 4;
             }
-            else if(m_feature_dims == 24)
+            else if(m_shape_feature_dims == 24)
             {
                 m_r_bins = 2;
                 m_e_bins = 2;
                 m_a_bins = 6;
             }
-            else if(m_feature_dims == 32)
+            else if(m_shape_feature_dims == 32)
             {
                 m_r_bins = 2;
                 m_e_bins = 2;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 64)
+            else if(m_shape_feature_dims == 64)
             {
                 m_r_bins = 2;
                 m_e_bins = 4;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 96)
+            else if(m_shape_feature_dims == 96)
             {
                 m_r_bins = 3;
                 m_e_bins = 4;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 128)
+            else if(m_shape_feature_dims == 128)
             {
                 m_r_bins = 4;
                 m_e_bins = 4;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 192)
+            else if(m_shape_feature_dims == 192)
             {
                 m_r_bins = 6;
                 m_e_bins = 4;
                 m_a_bins = 8;
             }
-            else if(m_feature_dims == 256)
+            else if(m_shape_feature_dims == 256)
             {
                 m_r_bins = 8;
                 m_e_bins = 4;
@@ -346,17 +348,17 @@ namespace ism3d
             }
             else
             {
-                LOG_ERROR("Unsupported Short SHOT dimensions for automatic bin configuration: " << m_feature_dims << "! Setting to 32 dimensions with default bins.");
+                LOG_ERROR("Unsupported Short CSHOT dimensions for automatic bin configuration: " << m_shape_feature_dims << "! Setting to 32 dimensions with default bins.");
                 m_r_bins = 2;
                 m_e_bins = 2;
                 m_a_bins = 8;
-                m_feature_dims = 32;
+                m_shape_feature_dims = 32;
             }
         }
         else if(m_bin_type == "manual")
         {
             // bins are read from config, do nothing, but update dimensionality
-            m_feature_dims = m_r_bins * m_e_bins * m_a_bins;
+            m_shape_feature_dims = m_r_bins * m_e_bins * m_a_bins;
         }
         else
         {
@@ -364,8 +366,12 @@ namespace ism3d
             m_r_bins = 2;
             m_e_bins = 2;
             m_a_bins = 8;
-            m_feature_dims = 32;
+            m_shape_feature_dims = 32;
         }
+
+        // TODO VS: allow to select different number of bins for shape and color - so far: have to be the same!
+        m_color_feature_dims = m_shape_feature_dims;
+        m_total_feature_dims = m_shape_feature_dims + m_color_feature_dims * m_color_hist_size;
     }
 
     float FeaturesSHORTCSHOT::sRGB_LUT[256] = {- 1};
