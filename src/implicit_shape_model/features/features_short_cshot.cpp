@@ -107,9 +107,9 @@ namespace ism3d
             Eigen::Vector4f current_frame_z (current_frame.z_axis[0], current_frame.z_axis[1], current_frame.z_axis[2], 0);
 
             // reference values for color part of descriptor
-            unsigned char redRef = keypoints->points[i].r; // TODO VS: check if r g b values are non-zero
+            unsigned char redRef   = keypoints->points[i].r;
             unsigned char greenRef = keypoints->points[i].g;
-            unsigned char blueRef = keypoints->points[i].b;
+            unsigned char blueRef  = keypoints->points[i].b;
 
             float LRef, aRef, bRef;
             RGB2CIELAB (redRef, greenRef, blueRef, LRef, aRef, bRef);
@@ -183,7 +183,7 @@ namespace ism3d
                     if (colorDistance < 0.0)
                       colorDistance = 0.0;
 
-                    int bin_c = colorDistance / m_color_hist_size;
+                    int bin_c = colorDistance * m_color_hist_size;
 
                     int idx_c = bin_c +
                                 bin_r      * m_color_hist_size +
