@@ -102,10 +102,10 @@ namespace ism3d
             Eigen::Vector4f current_frame_z (current_frame.z_axis[0], current_frame.z_axis[1], current_frame.z_axis[2], 0);
 
             // reference values for color part of descriptor
+            // NOTE: this block taken from PCL (Point Cloud Library): cshot.hpp
             unsigned char redRef   = keypoints->points[i].r;
             unsigned char greenRef = keypoints->points[i].g;
             unsigned char blueRef  = keypoints->points[i].b;
-
             float LRef, aRef, bRef;
             RGB2CIELAB (redRef, greenRef, blueRef, LRef, aRef, bRef);
             LRef /= 100.0f;
@@ -138,16 +138,16 @@ namespace ism3d
                     compute_shape_descriptor(shape_descriptor, r, theta, phi, ln_rmin, ln_rmax_rmin);
 
                     // prepare for color histogram
+                    // NOTE: this block taken from PCL (Point Cloud Library): cshot.hpp
+                    // (with some modifications)
                     unsigned char red = cloud->points[indices[j]].r;
                     unsigned char green = cloud->points[indices[j]].g;
                     unsigned char blue = cloud->points[indices[j]].b;
-
                     float L, a, b;
                     RGB2CIELAB (red, green, blue, L, a, b);
                     L /= 100.0f;
                     a /= 120.0f;
                     b /= 120.0f;   //normalized LAB components (0<L<1, -1<a<1, -1<b<1)
-
                     double color_distance = (fabs (LRef - L) + ((fabs (aRef - a) + fabs (bRef - b)) / 2)) /3;
                     if (color_distance > 1.0)
                       color_distance = 1.0;
@@ -545,10 +545,9 @@ namespace ism3d
         m_total_feature_dims = m_shape_feature_dims + m_color_feature_dims * m_color_hist_size;
     }
 
+    // NOTE: next block taken from PCL (Point Cloud Library): cshot.hpp
     float FeaturesSHORTCSHOT::sRGB_LUT[256] = {- 1};
-
     float FeaturesSHORTCSHOT::sXYZ_LUT[4000] = {- 1};
-
     void FeaturesSHORTCSHOT::RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B,
                                          float &L, float &A, float &B2)
     {

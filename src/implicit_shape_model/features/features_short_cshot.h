@@ -68,8 +68,8 @@ namespace ism3d
 
         void configureSphericalGrid();
 
+        // NOTE: next three lines taken from PCL (Point Cloud Library): cshot.hpp
         void RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B, float &L, float &A, float &B2);
-
         static float sRGB_LUT[256];
         static float sXYZ_LUT[4000];
 
