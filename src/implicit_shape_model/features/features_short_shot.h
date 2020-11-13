@@ -46,7 +46,7 @@ namespace ism3d
                                                 pcl::PointCloud<PointT>::Ptr keypoints,
                                                 pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames);
 
-        std::vector<double> compute_shape_descriptor(
+        void compute_shape_descriptor(std::vector<double> &shape_descriptor,
                 double r, double theta, double phi, double ln_rmin, double ln_rmax_rmin);
 
         // distribute the increment linearly between bins

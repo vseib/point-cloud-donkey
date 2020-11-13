@@ -99,6 +99,9 @@ namespace ism3d
             Eigen::Vector4f current_frame_z (current_frame.z_axis[0], current_frame.z_axis[1], current_frame.z_axis[2], 0);
 
             std::vector<double> shape_descriptor;
+            shape_descriptor.resize(m_r_bins * m_e_bins * m_a_bins);
+            std::fill(shape_descriptor.begin(), shape_descriptor.end(), 0);
+
             tree->radiusSearch(keypoints->points[i], m_radius, indices, distances);
 
             for(int j = 0; j < indices.size(); j++)
@@ -114,7 +117,7 @@ namespace ism3d
                     double theta = pcl::rad2deg(acos(z_l / r));
                     double phi = pcl::rad2deg(atan2(y_l, x_l));
 
-                    shape_descriptor = compute_shape_descriptor(r, theta, phi, ln_rmin, ln_rmax_rmin);
+                    compute_shape_descriptor(shape_descriptor, r, theta, phi, ln_rmin, ln_rmax_rmin);
                 }
             }
             // normalize descriptor with l2 norm
@@ -134,7 +137,8 @@ namespace ism3d
     }
 
 
-    std::vector<double> FeaturesSHORTSHOT::compute_shape_descriptor(
+    void FeaturesSHORTSHOT::compute_shape_descriptor(
+            std::vector<double> &shape_descriptor,
             double r, double theta, double phi, double ln_rmin, double ln_rmax_rmin)
     {
         // compute bin for shape descriptor
@@ -194,8 +198,7 @@ namespace ism3d
                 bin_phi2_ok = true;
         }
 
-        // compute all possible bins and update values
-        // first: bin, second: update value
+        // compute all possible bins
         std::vector<int> bins;
         bins.push_back(bin_r + bin_theta * m_r_bins + bin_phi * m_r_bins * m_e_bins);
         if(bin_phi2_ok)
@@ -215,15 +218,9 @@ namespace ism3d
         if(bin_r2_ok)
             increments.push_back((1-result_r.first) + result_theta.first + result_phi.first);
 
-        std::vector<double> shape_descriptor;
-        shape_descriptor.resize(m_r_bins * m_e_bins * m_a_bins);
-        std::fill(shape_descriptor.begin(), shape_descriptor.end(), 0);
-
         // update bins
         for(int idx = 0; idx < bins.size(); idx++)
             shape_descriptor[bins[idx]] += (increments[idx]);
-
-        return shape_descriptor;
     }
 
 

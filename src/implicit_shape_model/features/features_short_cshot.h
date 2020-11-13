@@ -48,14 +48,20 @@ namespace ism3d
                                                 pcl::PointCloud<PointT>::Ptr keypoints,
                                                 pcl::PointCloud<pcl::ReferenceFrame>::Ptr referenceFrames);
 
+        void compute_shape_descriptor(std::vector<double> &shape_descriptor,
+                double r, double theta, double phi, double ln_rmin, double ln_rmax_rmin);
+
+        void compute_color_descriptor(std::vector<double> &color_descriptor,
+                double r, double theta, double phi, double ln_rmin, double ln_rmax_rmin, double color_distance);
+
         // distribute the increment linearly between bins
         // return value:
         //  first: portion for current bin
         //  second: +1 to assign the portion (1-first) to next bin
         //          -1 to assign the portion (1-first) to previous bin
-        std::pair<float,int> linearDistribution(float raw_bin_id);
+        std::pair<float,int> linear_interpolation(float raw_bin_id);
 
-        std::pair<float,int> linearDistribution2(float raw_bin_id, float bin_size, float signal_range);
+//        std::pair<float,int> linearDistribution2(float raw_bin_id, float bin_size, float signal_range);
 
         // check if bin is in valid range and correct if necessary
         int correct_bin(int bin, int total_bins, bool is_cyclic);

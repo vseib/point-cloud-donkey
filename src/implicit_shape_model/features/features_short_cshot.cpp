@@ -94,11 +94,6 @@ namespace ism3d
         {
             std::vector<int> indices;
             std::vector<float> distances;
-            std::vector<double> shape_descriptor;
-            shape_descriptor.resize(m_r_bins * m_e_bins * m_a_bins);
-
-            std::vector<double> color_descriptor;
-            color_descriptor.resize(m_r_bins * m_e_bins * m_a_bins * m_color_hist_size);
 
             // reference values for shape part of descriptor
             pcl::ReferenceFrame current_frame = (*referenceFrames)[i];
@@ -117,8 +112,14 @@ namespace ism3d
             aRef /= 120.0f;
             bRef /= 120.0f;    //normalized LAB components (0<L<1, -1<a<1, -1<b<1)
 
+            std::vector<double> shape_descriptor;
+            shape_descriptor.resize(m_r_bins * m_e_bins * m_a_bins);
             std::fill(shape_descriptor.begin(), shape_descriptor.end(), 0);
+
+            std::vector<double> color_descriptor;
+            color_descriptor.resize(m_r_bins * m_e_bins * m_a_bins * m_color_hist_size);
             std::fill(color_descriptor.begin(), color_descriptor.end(), 0);
+
             tree->radiusSearch(keypoints->points[i], m_radius, indices, distances);
 
             for(int j = 0; j < indices.size(); j++)
@@ -134,62 +135,26 @@ namespace ism3d
                     double theta = pcl::rad2deg(acos(z_l / r));
                     double phi = pcl::rad2deg(atan2(y_l, x_l));
 
-                    // compute bin for shape descriptor
-                    int bin_r;
-                    float raw_r;
-                    if(m_log_radius)
-                    {
-                        raw_r = (m_r_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
-                        bin_r = int(raw_r);
-                    }
-                    else
-                    {
-                        raw_r = m_r_bins * r / m_radius;
-                        bin_r = int(raw_r);
-                    }
+                    compute_shape_descriptor(shape_descriptor, r, theta, phi, ln_rmin, ln_rmax_rmin);
 
-                    float raw_theta = m_e_bins * theta / 180;
-                    int bin_theta = int(raw_theta);
-                    float raw_phi = m_a_bins * (phi + 180) / 360;
-                    int bin_phi = int(raw_phi);
-
-                    // check primary bin range
-                    bin_r = bin_r >= 0 ? bin_r : 0;
-                    bin_r = bin_r < m_r_bins ? bin_r : m_r_bins - 1;                 
-                    bin_theta = bin_theta < m_e_bins ? bin_theta : m_e_bins - 1;
-                    bin_phi = bin_phi < m_a_bins ? bin_phi : m_a_bins - 1;
-
-                    int idx = bin_r + bin_theta * m_r_bins + bin_phi * m_r_bins * m_e_bins;
-                    shape_descriptor[idx] += 1;
-
-
-
-                    // update color descriptor
+                    // prepare for color histogram
                     unsigned char red = cloud->points[indices[j]].r;
                     unsigned char green = cloud->points[indices[j]].g;
                     unsigned char blue = cloud->points[indices[j]].b;
 
                     float L, a, b;
-
                     RGB2CIELAB (red, green, blue, L, a, b);
                     L /= 100.0f;
                     a /= 120.0f;
                     b /= 120.0f;   //normalized LAB components (0<L<1, -1<a<1, -1<b<1)
 
-                    double colorDistance = (fabs (LRef - L) + ((fabs (aRef - a) + fabs (bRef - b)) / 2)) /3;
+                    double color_distance = (fabs (LRef - L) + ((fabs (aRef - a) + fabs (bRef - b)) / 2)) /3;
+                    if (color_distance > 1.0)
+                      color_distance = 1.0;
+                    if (color_distance < 0.0)
+                      color_distance = 0.0;
 
-                    if (colorDistance > 1.0)
-                      colorDistance = 1.0;
-                    if (colorDistance < 0.0)
-                      colorDistance = 0.0;
-
-                    int bin_c = colorDistance * m_color_hist_size;
-
-                    int idx_c = bin_c +
-                                bin_r      * m_color_hist_size +
-                                bin_theta  * m_color_hist_size * m_r_bins +
-                                bin_phi    * m_color_hist_size * m_r_bins * m_e_bins;
-                    color_descriptor[idx_c] += 1;
+                    compute_color_descriptor(color_descriptor, r, theta, phi, ln_rmin, ln_rmax_rmin, color_distance);
                 }
             }
 
@@ -214,7 +179,213 @@ namespace ism3d
         return descriptors;
     }
 
-    std::pair<float,int> FeaturesSHORTCSHOT::linearDistribution(float raw_bin_id)
+    void FeaturesSHORTCSHOT::compute_shape_descriptor(
+            std::vector<double> &shape_descriptor,
+            double r, double theta, double phi, double ln_rmin, double ln_rmax_rmin)
+    {
+        // compute bin for shape descriptor
+        int bin_r;
+        float raw_r;
+        if(m_log_radius)
+        {
+            raw_r = (m_r_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
+            bin_r = int(raw_r);
+        }
+        else
+        {
+            raw_r = m_r_bins * r / m_radius;
+            bin_r = int(raw_r);
+        }
+
+        float raw_theta = m_e_bins * theta / 180;
+        int bin_theta = int(raw_theta);
+        float raw_phi = m_a_bins * (phi + 180) / 360;
+        int bin_phi = int(raw_phi);
+
+        // check primary bin range
+        bin_r = bin_r >= 0 ? bin_r : 0;
+        bin_r = bin_r < m_r_bins ? bin_r : m_r_bins - 1;
+        bin_theta = bin_theta < m_e_bins ? bin_theta : m_e_bins - 1;
+        bin_phi = bin_phi < m_a_bins ? bin_phi : m_a_bins - 1;
+
+        // init secondary bins (for interpolation)
+        int bin_r2 = bin_r;
+        int bin_theta2 = bin_theta;
+        int bin_phi2 = bin_phi;
+        bool bin_r2_ok = false, bin_theta2_ok = false, bin_phi2_ok = false;
+
+        // compute and check secondary bins
+        auto result_r = linear_interpolation(raw_r);
+        if(m_r_bins > 1)
+        {
+            bin_r2 = bin_r + result_r.second;
+            bin_r2 = correct_bin(bin_r2, m_r_bins, false);
+            if (bin_r2 != bin_r)
+                bin_r2_ok = true;
+        }
+        auto result_theta = linear_interpolation(raw_theta);
+        if(m_e_bins > 1)
+        {
+            bin_theta2 = bin_theta + result_theta.second;
+            bin_theta2 = correct_bin(bin_theta2, m_e_bins, false);
+            if (bin_theta2 != bin_theta)
+                bin_theta2_ok = true;
+        }
+        auto result_phi = linear_interpolation(raw_phi);
+        if(m_a_bins > 1)
+        {
+            bin_phi2 = bin_phi + result_phi.second;
+            bin_phi2 = correct_bin(bin_phi2, m_a_bins, true);
+            if (bin_phi2 != bin_phi)
+                bin_phi2_ok = true;
+        }
+
+        // compute all possible bins and update values
+        // first: bin, second: update value
+        std::vector<int> bins;
+        bins.push_back(bin_r + bin_theta * m_r_bins + bin_phi * m_r_bins * m_e_bins);
+        if(bin_phi2_ok)
+            bins.push_back(bin_r + bin_theta * m_r_bins + bin_phi2 * m_r_bins * m_e_bins);
+        if(bin_theta2_ok)
+            bins.push_back(bin_r + bin_theta2 * m_r_bins + bin_phi * m_r_bins * m_e_bins);
+        if(bin_r2_ok)
+            bins.push_back(bin_r2 + bin_theta * m_r_bins + bin_phi * m_r_bins * m_e_bins);
+
+        // compute corresponding increments
+        std::vector<float> increments;
+        increments.push_back(result_r.first + result_theta.first + result_phi.first);
+        if(bin_phi2_ok)
+            increments.push_back(result_r.first + result_theta.first + (1-result_phi.first));
+        if(bin_theta2_ok)
+            increments.push_back(result_r.first + (1-result_theta.first) + result_phi.first);
+        if(bin_r2_ok)
+            increments.push_back((1-result_r.first) + result_theta.first + result_phi.first);
+
+        // update bins
+        for(int idx = 0; idx < bins.size(); idx++)
+            shape_descriptor[bins[idx]] += (increments[idx]);
+    }
+
+    void FeaturesSHORTCSHOT::compute_color_descriptor(
+            std::vector<double> &color_descriptor,
+            double r, double theta, double phi, double ln_rmin,
+            double ln_rmax_rmin, double color_distance)
+    {
+        // compute geometrical bin for color histogram
+        int bin_r;
+        float raw_r;
+        if(m_log_radius)
+        {
+            raw_r = (m_r_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
+            bin_r = int(raw_r);
+        }
+        else
+        {
+            raw_r = m_r_bins * r / m_radius;
+            bin_r = int(raw_r);
+        }
+
+        float raw_theta = m_e_bins * theta / 180;
+        int bin_theta = int(raw_theta);
+        float raw_phi = m_a_bins * (phi + 180) / 360;
+        int bin_phi = int(raw_phi);
+        // bin inside the color histogram inside the geometrical bin
+        float raw_c = color_distance * m_color_hist_size;
+        int bin_c = int(raw_c);
+
+        // check primary bin range
+        bin_r = bin_r >= 0 ? bin_r : 0;
+        bin_r = bin_r < m_r_bins ? bin_r : m_r_bins - 1;
+        bin_theta = bin_theta < m_e_bins ? bin_theta : m_e_bins - 1;
+        bin_phi = bin_phi < m_a_bins ? bin_phi : m_a_bins - 1;
+        bin_c = bin_c < m_color_hist_size ? bin_c : m_color_hist_size - 1;
+
+        // init secondary bins (for interpolation)
+        int bin_r2 = bin_r;
+        int bin_theta2 = bin_theta;
+        int bin_phi2 = bin_phi;
+        int bin_c2 = bin_c;
+        bool bin_r2_ok = false, bin_theta2_ok = false, bin_phi2_ok = false, bin_c2_ok = false;
+
+        // compute and check secondary bins
+        auto result_r = linear_interpolation(raw_r);
+        if(m_r_bins > 1)
+        {
+            bin_r2 = bin_r + result_r.second;
+            bin_r2 = correct_bin(bin_r2, m_r_bins, false);
+            if (bin_r2 != bin_r)
+                bin_r2_ok = true;
+        }
+        auto result_theta = linear_interpolation(raw_theta);
+        if(m_e_bins > 1)
+        {
+            bin_theta2 = bin_theta + result_theta.second;
+            bin_theta2 = correct_bin(bin_theta2, m_e_bins, false);
+            if (bin_theta2 != bin_theta)
+                bin_theta2_ok = true;
+        }
+        auto result_phi = linear_interpolation(raw_phi);
+        if(m_a_bins > 1)
+        {
+            bin_phi2 = bin_phi + result_phi.second;
+            bin_phi2 = correct_bin(bin_phi2, m_a_bins, true);
+            if (bin_phi2 != bin_phi)
+                bin_phi2_ok = true;
+        }
+        auto result_c = linear_interpolation(raw_c);
+        if(m_color_hist_size > 1)
+        {
+            bin_c2 = bin_c + result_c.second;
+            bin_c2 = correct_bin(bin_c2, m_color_hist_size, false);
+            if (bin_c2 != bin_c)
+                bin_c2_ok = true;
+        }
+
+        // compute all possible bins
+        std::vector<int> bins;
+        bins.push_back(bin_c
+                       + bin_r     * m_color_hist_size
+                       + bin_theta * m_color_hist_size * m_r_bins
+                       + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+        if(bin_phi2_ok)
+            bins.push_back(bin_c
+                           + bin_r     * m_color_hist_size
+                           + bin_theta * m_color_hist_size * m_r_bins
+                           + bin_phi2  * m_color_hist_size * m_r_bins * m_e_bins);
+        if(bin_theta2_ok)
+            bins.push_back(bin_c
+                           + bin_r      * m_color_hist_size
+                           + bin_theta2 * m_color_hist_size * m_r_bins
+                           + bin_phi    * m_color_hist_size * m_r_bins * m_e_bins);
+        if(bin_r2_ok)
+            bins.push_back(bin_c
+                           + bin_r2    * m_color_hist_size
+                           + bin_theta * m_color_hist_size * m_r_bins
+                           + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+        if(bin_c2_ok)
+            bins.push_back(bin_c2
+                           + bin_r     * m_color_hist_size
+                           + bin_theta * m_color_hist_size * m_r_bins
+                           + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+
+        // compute corresponding increments
+        std::vector<float> increments;
+        increments.push_back(result_c.first + result_r.first + result_theta.first + result_phi.first);
+        if(bin_phi2_ok)
+            increments.push_back(result_c.first + result_r.first + result_theta.first + (1-result_phi.first));
+        if(bin_theta2_ok)
+            increments.push_back(result_c.first + result_r.first + (1-result_theta.first) + result_phi.first);
+        if(bin_r2_ok)
+            increments.push_back(result_c.first + (1-result_r.first) + result_theta.first + result_phi.first);
+        if(bin_c2_ok)
+            increments.push_back((1-result_c.first) + (1-result_r.first) + result_theta.first + result_phi.first);
+
+        // update bins
+        for(int idx = 0; idx < bins.size(); idx++)
+            color_descriptor[bins[idx]] += (increments[idx]);
+    }
+
+    std::pair<float,int> FeaturesSHORTCSHOT::linear_interpolation(float raw_bin_id)
     {
         float decimals = raw_bin_id - (int)raw_bin_id;
         if(decimals <= 0.5)
@@ -227,47 +398,47 @@ namespace ism3d
         }
     }
 
-    std::pair<float,int> FeaturesSHORTCSHOT::linearDistribution2(float raw_bin_id,
-                                                                float bin_size,
-                                                                float signal_range)
-    {
-        float decimals = raw_bin_id - int(raw_bin_id);
-        bool lower_bin = true;
-        // decimals indicate whether the current bin position
-        // is closer to the lower or to the higher neighboring bin
-        if (decimals > 0.5)
-        {
-            decimals = 1-decimals;
-            lower_bin = false;
-        }
+//    std::pair<float,int> FeaturesSHORTCSHOT::linearDistribution2(float raw_bin_id,
+//                                                                float bin_size,
+//                                                                float signal_range)
+//    {
+//        float decimals = raw_bin_id - int(raw_bin_id);
+//        bool lower_bin = true;
+//        // decimals indicate whether the current bin position
+//        // is closer to the lower or to the higher neighboring bin
+//        if (decimals > 0.5)
+//        {
+//            decimals = 1-decimals;
+//            lower_bin = false;
+//        }
 
-        // bin_size: value range that is discretized per bin (e.g. 90 degrees)
-        // cur_range: portion of the bin_size closest to bin border
-        float cur_range = bin_size * decimals;
+//        // bin_size: value range that is discretized per bin (e.g. 90 degrees)
+//        // cur_range: portion of the bin_size closest to bin border
+//        float cur_range = bin_size * decimals;
 
-        // check if a neighboring bin is affected to distribute bin updates
-        // signal_range: value range to discretized per bin (e.g. 30 degrees)
-        // if the decimal position inside the bin is further away from the bin border than
-        // half the signal range, no neighboring bins are affected
-        if(cur_range < 0.5 * signal_range)
-        {
-            // portion of the signal range that falls into neighboring bin
-            float neighbor_value_raw = 0.5 * signal_range - cur_range;
-            // normalized portion that falls into current bin
-            float update_value_normalized = (signal_range - neighbor_value_raw) / signal_range;
-            return {update_value_normalized, lower_bin ? -1 : 1};
+//        // check if a neighboring bin is affected to distribute bin updates
+//        // signal_range: value range to discretized per bin (e.g. 30 degrees)
+//        // if the decimal position inside the bin is further away from the bin border than
+//        // half the signal range, no neighboring bins are affected
+//        if(cur_range < 0.5 * signal_range)
+//        {
+//            // portion of the signal range that falls into neighboring bin
+//            float neighbor_value_raw = 0.5 * signal_range - cur_range;
+//            // normalized portion that falls into current bin
+//            float update_value_normalized = (signal_range - neighbor_value_raw) / signal_range;
+//            return {update_value_normalized, lower_bin ? -1 : 1};
 
-            // TODO VS: this simulates a triangle function (triangle area = 1, base = 1, height = 2)
-//            float xx = neighbor_value_raw / signal_range; // portion of the base = 1 in neighboring bin
-//            float yy = 1 - 2*xx*xx; // 1 - area of triangle in neighboring bin --> area in current bin
-//            return {yy, lower_bin ? -1 : 1};
+//            // this simulates a triangle function (triangle area = 1, base = 1, height = 2)
+////            float xx = neighbor_value_raw / signal_range; // portion of the base = 1 in neighboring bin
+////            float yy = 1 - 2*xx*xx; // 1 - area of triangle in neighboring bin --> area in current bin
+////            return {yy, lower_bin ? -1 : 1};
 
-        }
-        else
-        {   // only current bin is updated
-            return {1, 0};
-        }
-    }
+//        }
+//        else
+//        {   // only current bin is updated
+//            return {1, 0};
+//        }
+//    }
 
     int FeaturesSHORTCSHOT::correct_bin(int bin, int total_bins, bool is_cyclic)
     {
