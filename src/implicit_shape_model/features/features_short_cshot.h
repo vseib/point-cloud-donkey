@@ -67,6 +67,7 @@ namespace ism3d
         int correct_bin(int bin, int total_bins, bool is_cyclic);
 
         void configureSphericalGrid();
+        void configureSphericalColorGrid();
 
         // NOTE: next three lines taken from PCL (Point Cloud Library): cshot.hpp
         void RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B, float &L, float &A, float &B2);
@@ -83,6 +84,9 @@ namespace ism3d
         int m_r_bins;
         int m_e_bins;
         int m_a_bins;
+        int m_r_color_bins;
+        int m_e_color_bins;
+        int m_a_color_bins;
 
         std::string m_bin_type;
     };

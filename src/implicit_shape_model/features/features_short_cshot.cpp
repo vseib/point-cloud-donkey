@@ -45,6 +45,8 @@ namespace ism3d
                                                                          pcl::search::Search<PointT>::Ptr search)
     {
         configureSphericalGrid();
+        configureSphericalColorGrid();
+        m_total_feature_dims = m_shape_feature_dims + m_color_feature_dims * m_color_hist_size;
 
         // compute features
         std::vector<std::vector<double>> raw_features = compute_descriptor(
@@ -539,10 +541,62 @@ namespace ism3d
             m_a_bins = 8;
             m_shape_feature_dims = 32;
         }
+    }
 
-        // TODO VS: allow to select different number of bins for shape and color - so far: have to be the same!
-        m_color_feature_dims = m_shape_feature_dims;
-        m_total_feature_dims = m_shape_feature_dims + m_color_feature_dims * m_color_hist_size;
+    void FeaturesSHORTCSHOT::configureSphericalColorGrid()
+    {
+        // automatically set bins to default configuration to match the given dimensionality
+        // NOTE: in contrast to shape bins, here only automatically setting bins is supported
+        if(m_color_feature_dims == 8)
+        {
+            m_r_color_bins = 1;
+            m_e_color_bins = 1;
+            m_a_color_bins = 8;
+        }
+        else if(m_color_feature_dims == 16)
+        {
+            m_r_color_bins = 2;
+            m_e_color_bins = 2;
+            m_a_color_bins = 4;
+        }
+        else if(m_color_feature_dims == 24)
+        {
+            m_r_color_bins = 2;
+            m_e_color_bins = 2;
+            m_a_color_bins = 6;
+        }
+        else if(m_color_feature_dims == 32)
+        {
+            m_r_color_bins = 2;
+            m_e_color_bins = 2;
+            m_a_color_bins = 8;
+        }
+        else if(m_color_feature_dims == 64)
+        {
+            m_r_color_bins = 2;
+            m_e_color_bins = 4;
+            m_a_color_bins = 8;
+        }
+        else if(m_color_feature_dims == 96)
+        {
+            m_r_color_bins = 3;
+            m_e_color_bins = 4;
+            m_a_color_bins = 8;
+        }
+        else if(m_color_feature_dims == 128)
+        {
+            m_r_color_bins = 4;
+            m_e_color_bins = 4;
+            m_a_color_bins = 8;
+        }
+        else
+        {
+            LOG_ERROR("Unsupported Short Color SHOT dimensions for bin configuration: " << m_color_feature_dims << "! Setting to 32 dimensions.");
+            m_r_color_bins = 2;
+            m_e_color_bins = 2;
+            m_a_color_bins = 8;
+            m_color_feature_dims = 32;
+        }
     }
 
     // NOTE: next block taken from PCL (Point Cloud Library): cshot.hpp
