@@ -24,10 +24,10 @@ namespace ism3d
         addParameter(m_min_radius, "ShortShotMinRadius", m_radius*0.25);
         addParameter(m_shape_feature_dims, "ShortShotDims", 32);
         addParameter(m_color_feature_dims, "ShortColorShotDims", 32);
-        addParameter(m_color_hist_size, "ShortColorShotHistSize", 2);
+        addParameter(m_color_hist_size, "ShortColorShotHistSize", 15);
         addParameter(m_log_radius, "ShortShotLogRadius", false);
-        addParameter(m_r_bins, "ShortShotRBins", 1);
-        addParameter(m_e_bins, "ShortShotEBins", 1);
+        addParameter(m_r_bins, "ShortShotRBins", 2);
+        addParameter(m_e_bins, "ShortShotEBins", 2);
         addParameter(m_a_bins, "ShortShotABins", 8);
         addParameter(m_bin_type, "ShortShotBinType", std::string("auto"));
     }
