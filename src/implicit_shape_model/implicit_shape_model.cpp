@@ -258,27 +258,59 @@ void ImplicitShapeModel::train()
         for (int j = 0; j < (int)cloud_filenames.size(); j++)
         {
             LOG_INFO("training class " << class_id << ", current file " << j+1 << " of " << cloud_filenames.size() << ": " << cloud_filenames[j]);
-            pcl::PointCloud<PointNormalT>::Ptr model = loadPointCloud(cloud_filenames[j]);
-            model->is_dense = false; // to prevent errors in some PCL algorithms
+            pcl::PointCloud<PointNormalT>::Ptr point_cloud = loadPointCloud(cloud_filenames[j]);
+            point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
 
+            // TODO VS: refactor this param to m_color_transform
+            // ZERO, NORMAL_XYZ, JET
             if(m_set_color_to_zero)
             {
-                LOG_INFO("Setting color to 0 in loaded model");
-                for(int i = 0; i < model->size(); i++)
+                LOG_INFO("Setting color to 0 in loaded point cloud");
+                for(int i = 0; i < point_cloud->size(); i++)
                 {
-                    model->at(i).r = 0;
-                    model->at(i).g = 0;
-                    model->at(i).b = 0;
+                    point_cloud->at(i).r = 0;
+                    point_cloud->at(i).g = 0;
+                    point_cloud->at(i).b = 0;
                 }
             }
+            // TODO VS: refactor this param to m_color_transform
+            bool normal_xyz_color_transform = false;
+            if(normal_xyz_color_transform)
+            {
+                LOG_INFO("Setting color to normal's XYZ in loaded point cloud");
+                for(int i = 0; i < point_cloud->size(); i++)
+                {
+                    const PointNormalT point = point_cloud->at(i);
+                    point_cloud->at(i).r = point.normal_z * 255.0f;
+                    point_cloud->at(i).g = point.normal_y * 255.0f;
+                    point_cloud->at(i).b = point.normal_x * 255.0f;
+                }
+            }
+            // TODO VS: refactor this param to m_color_transform
+            bool jet_color_transform = false;
+            if(jet_color_transform)
+            {
+                LOG_INFO("Setting color to JET color scheme in loaded point cloud");
+                for(int i = 0; i < point_cloud->size(); i++)
+                {
+//                    const PointNormalT point = point_cloud->at(i);
+//                    point_cloud->at(i).r = point.normal_x / 255.0f;
+//                    point_cloud->at(i).g = point.normal_y / 255.0f;
+//                    point_cloud->at(i).b = point.normal_z / 255.0f;
+                }
+//                std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
+//                LOG_INFO("now saving, name is: "+ name);
+//                pcl::io::savePCDFileASCII(name, *point_cloud);
+            }
+
 
             // compute bounding box
             Utils::BoundingBox bounding_box;
             if (m_bb_type == "MVBB")
-                bounding_box = Utils::computeMVBB<PointNormalT>(model);
+                bounding_box = Utils::computeMVBB<PointNormalT>(point_cloud);
             else if (m_bb_type == "AABB")
-                bounding_box = Utils::computeAABB<PointNormalT>(model);
+                bounding_box = Utils::computeAABB<PointNormalT>(point_cloud);
             else
                 throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
 
@@ -292,7 +324,7 @@ void ImplicitShapeModel::train()
             // check first normal
             bool has_normals = clouds_have_normals[j];
             if (has_normals) {
-                const PointNormalT& firstNormal = model->at(0);
+                const PointNormalT& firstNormal = point_cloud->at(0);
                 if (firstNormal.normal_x == 0 && firstNormal.normal_y == 0 && firstNormal.normal_z == 0 ||
                         std::isnan(firstNormal.normal_x) ||
                         std::isnan(firstNormal.normal_y) ||
@@ -303,16 +335,16 @@ void ImplicitShapeModel::train()
             }
 
             // compute features
-            pcl::PointCloud<ISMFeature>::ConstPtr model_features;
+            pcl::PointCloud<ISMFeature>::ConstPtr cloud_features;
             pcl::PointCloud<ISMFeature>::ConstPtr global_features;
-            std::tie(model_features, global_features, std::ignore, std::ignore) = computeFeatures(model, has_normals, timer, timer, true);
+            std::tie(cloud_features, global_features, std::ignore, std::ignore) = computeFeatures(point_cloud, has_normals, timer, timer, true);
 
             // check for NAN features
-            pcl::PointCloud<ISMFeature>::Ptr model_features_cleaned = removeNaNFeatures(model_features);
+            pcl::PointCloud<ISMFeature>::Ptr cloud_features_cleaned = removeNaNFeatures(cloud_features);
             pcl::PointCloud<ISMFeature>::Ptr global_features_cleaned = removeNaNFeatures(global_features);
 
             // insert labels into features
-            for(ISMFeature& ismf : model_features_cleaned->points)
+            for(ISMFeature& ismf : cloud_features_cleaned->points)
             {
                 ismf.classId = class_id;
                 ismf.instanceId = instance_id;
@@ -326,12 +358,12 @@ void ImplicitShapeModel::train()
             if(m_enable_signals)
             {
                 timer.stop();
-                m_signalFeatures(model_features_cleaned);
+                m_signalFeatures(cloud_features_cleaned);
                 timer.resume();
             }
 
             // concatenate features
-            features[class_id].push_back(model_features_cleaned);
+            features[class_id].push_back(cloud_features_cleaned);
             globalFeatures[class_id].push_back(global_features_cleaned);
             boundingBoxes[class_id].push_back(bounding_box);
         }
@@ -767,7 +799,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     if (!hasNormals && (descr_type != "SHORT_SHOT" && descr_type != "SHORT_CSHOT" &&
                         descr_type != "SHORT_SHOT_PCL"))
     {
-        // compute normals on the model
+        // compute normals on the cloud
         timer_normals.start();
         LOG_INFO("computing normals");
         computeNormals(pointCloud, normals, searchTree);

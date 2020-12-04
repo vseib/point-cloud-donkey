@@ -108,7 +108,7 @@ pcl::SHOTNALocalReferenceFrameEstimation<PointInT, PointNT, PointOutT>::getLocal
 
   // Disambiguation
   Eigen::Vector4d v1 = Eigen::Vector4d::Zero ();
-	Eigen::Vector4d v_tmp = Eigen::Vector4d::Zero ();
+//	Eigen::Vector4d v_tmp = Eigen::Vector4d::Zero ();
   Eigen::Vector4d v3 = Eigen::Vector4d::Zero ();
   v1.head<3> ().matrix () = solver.eigenvectors ().col (2);
   v3.head<3> ().matrix () = solver.eigenvectors ().col (0);
@@ -131,8 +131,6 @@ pcl::SHOTNALocalReferenceFrameEstimation<PointInT, PointNT, PointOutT>::getLocal
 //     double dp = normals_->at(n_indices[ne]).getNormalVector4fMap().template cast<double>().dot (v1);
 //     if (dp >= 0)
 //       plusTangentDirection1++;
-
-
 
     dp = normals_->at(n_indices[ne]).getNormalVector4fMap().template cast<double>().dot(v3);
     if (dp >= 0)

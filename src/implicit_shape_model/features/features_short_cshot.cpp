@@ -119,7 +119,7 @@ namespace ism3d
             std::fill(shape_descriptor.begin(), shape_descriptor.end(), 0);
 
             std::vector<double> color_descriptor;
-            color_descriptor.resize(m_r_bins * m_e_bins * m_a_bins * m_color_hist_size);
+            color_descriptor.resize(m_r_color_bins * m_e_color_bins * m_a_color_bins * m_color_hist_size);
             std::fill(color_descriptor.begin(), color_descriptor.end(), 0);
 
             tree->radiusSearch(keypoints->points[i], m_radius, indices, distances);
@@ -278,18 +278,18 @@ namespace ism3d
         float raw_r;
         if(m_log_radius)
         {
-            raw_r = (m_r_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
+            raw_r = (m_r_color_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
             bin_r = int(raw_r);
         }
         else
         {
-            raw_r = m_r_bins * r / m_radius;
+            raw_r = m_r_color_bins * r / m_radius;
             bin_r = int(raw_r);
         }
 
-        float raw_theta = m_e_bins * theta / 180;
+        float raw_theta = m_e_color_bins * theta / 180;
         int bin_theta = int(raw_theta);
-        float raw_phi = m_a_bins * (phi + 180) / 360;
+        float raw_phi = m_a_color_bins * (phi + 180) / 360;
         int bin_phi = int(raw_phi);
         // bin inside the color histogram inside the geometrical bin
         float raw_c = color_distance * m_color_hist_size;
@@ -297,9 +297,9 @@ namespace ism3d
 
         // check primary bin range
         bin_r = bin_r >= 0 ? bin_r : 0;
-        bin_r = bin_r < m_r_bins ? bin_r : m_r_bins - 1;
-        bin_theta = bin_theta < m_e_bins ? bin_theta : m_e_bins - 1;
-        bin_phi = bin_phi < m_a_bins ? bin_phi : m_a_bins - 1;
+        bin_r = bin_r < m_r_color_bins ? bin_r : m_r_color_bins - 1;
+        bin_theta = bin_theta < m_e_color_bins ? bin_theta : m_e_color_bins - 1;
+        bin_phi = bin_phi < m_a_color_bins ? bin_phi : m_a_color_bins - 1;
         bin_c = bin_c < m_color_hist_size ? bin_c : m_color_hist_size - 1;
 
         // init secondary bins (for interpolation)
@@ -311,26 +311,26 @@ namespace ism3d
 
         // compute and check secondary bins
         auto result_r = linear_interpolation(raw_r);
-        if(m_r_bins > 1)
+        if(m_r_color_bins > 1)
         {
             bin_r2 = bin_r + result_r.second;
-            bin_r2 = correct_bin(bin_r2, m_r_bins, false);
+            bin_r2 = correct_bin(bin_r2, m_r_color_bins, false);
             if (bin_r2 != bin_r)
                 bin_r2_ok = true;
         }
         auto result_theta = linear_interpolation(raw_theta);
-        if(m_e_bins > 1)
+        if(m_e_color_bins > 1)
         {
             bin_theta2 = bin_theta + result_theta.second;
-            bin_theta2 = correct_bin(bin_theta2, m_e_bins, false);
+            bin_theta2 = correct_bin(bin_theta2, m_e_color_bins, false);
             if (bin_theta2 != bin_theta)
                 bin_theta2_ok = true;
         }
         auto result_phi = linear_interpolation(raw_phi);
-        if(m_a_bins > 1)
+        if(m_a_color_bins > 1)
         {
             bin_phi2 = bin_phi + result_phi.second;
-            bin_phi2 = correct_bin(bin_phi2, m_a_bins, true);
+            bin_phi2 = correct_bin(bin_phi2, m_a_color_bins, true);
             if (bin_phi2 != bin_phi)
                 bin_phi2_ok = true;
         }
@@ -347,28 +347,28 @@ namespace ism3d
         std::vector<int> bins;
         bins.push_back(bin_c
                        + bin_r     * m_color_hist_size
-                       + bin_theta * m_color_hist_size * m_r_bins
-                       + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+                       + bin_theta * m_color_hist_size * m_r_color_bins
+                       + bin_phi   * m_color_hist_size * m_r_color_bins * m_e_color_bins);
         if(bin_phi2_ok)
             bins.push_back(bin_c
                            + bin_r     * m_color_hist_size
-                           + bin_theta * m_color_hist_size * m_r_bins
-                           + bin_phi2  * m_color_hist_size * m_r_bins * m_e_bins);
+                           + bin_theta * m_color_hist_size * m_r_color_bins
+                           + bin_phi2  * m_color_hist_size * m_r_color_bins * m_e_color_bins);
         if(bin_theta2_ok)
             bins.push_back(bin_c
                            + bin_r      * m_color_hist_size
-                           + bin_theta2 * m_color_hist_size * m_r_bins
-                           + bin_phi    * m_color_hist_size * m_r_bins * m_e_bins);
+                           + bin_theta2 * m_color_hist_size * m_r_color_bins
+                           + bin_phi    * m_color_hist_size * m_r_color_bins * m_e_color_bins);
         if(bin_r2_ok)
             bins.push_back(bin_c
                            + bin_r2    * m_color_hist_size
-                           + bin_theta * m_color_hist_size * m_r_bins
-                           + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+                           + bin_theta * m_color_hist_size * m_r_color_bins
+                           + bin_phi   * m_color_hist_size * m_r_color_bins * m_e_color_bins);
         if(bin_c2_ok)
             bins.push_back(bin_c2
                            + bin_r     * m_color_hist_size
-                           + bin_theta * m_color_hist_size * m_r_bins
-                           + bin_phi   * m_color_hist_size * m_r_bins * m_e_bins);
+                           + bin_theta * m_color_hist_size * m_r_color_bins
+                           + bin_phi   * m_color_hist_size * m_r_color_bins * m_e_color_bins);
 
         // compute corresponding increments
         std::vector<float> increments;

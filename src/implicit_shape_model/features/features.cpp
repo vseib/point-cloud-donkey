@@ -21,7 +21,7 @@
 #endif
 
 #include <pcl/features/shot_lrf_omp.h>
-#include "../third_party/pcl_shot_na_lrf/shot_na_lrf.h"  // TODO: remove from project if it gets merged into pcl
+#include "../third_party/pcl_shot_na_lrf/shot_na_lrf.h"
 #include "../third_party/pcl_shot_na_lrf/shot_na_lrf.hpp"
 
 namespace ism3d
