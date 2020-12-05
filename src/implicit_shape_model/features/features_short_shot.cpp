@@ -247,15 +247,19 @@ namespace ism3d
         {
             if(bin < 0)
                 return total_bins-1;
-            if(bin >= total_bins)
+            else if(bin >= total_bins)
                 return 0;
+            else
+                return bin;
         }
         else
         {
             if(bin < 0)
                 return 0;
-            if(bin >= total_bins)
+            else if(bin >= total_bins)
                 return total_bins-1;
+            else
+                return bin;
         }
     }
 
