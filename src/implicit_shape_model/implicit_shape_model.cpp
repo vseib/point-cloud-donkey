@@ -620,10 +620,10 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     m_processing_times["flann"] += getElapsedTime(timer_flann, "milliseconds");
 
     // activate codebook with current keypoints and cast votes
+    boost::timer::cpu_timer timer_voting;
     LOG_INFO("activating codewords and casting votes");
     m_voting->clear();
 
-    boost::timer::cpu_timer timer_voting;
     // use index depending on distance type
     if(m_distance->getType() == "Euclidean")
     {
@@ -646,8 +646,8 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
     LOG_INFO("finding maxima");
     boost::timer::cpu_timer timer_maxima;
     std::vector<VotingMaximum> positions = m_voting->findMaxima(pointsWithoutNaN, normalsWithoutNaN);
-    m_processing_times["maxima"] += getElapsedTime(timer_maxima, "milliseconds");
     LOG_INFO("detected " << positions.size() << " maxima");
+    m_processing_times["maxima"] += getElapsedTime(timer_maxima, "milliseconds");
 
     // only debug
     if(m_enable_voting_analysis)
