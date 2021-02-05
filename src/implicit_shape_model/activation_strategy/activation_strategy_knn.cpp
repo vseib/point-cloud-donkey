@@ -17,6 +17,7 @@ namespace ism3d
     ActivationStrategyKNN::ActivationStrategyKNN()
     {
         addParameter(m_k, "K", 1);
+        m_is_detection = false;
     }
 
     ActivationStrategyKNN::~ActivationStrategyKNN()

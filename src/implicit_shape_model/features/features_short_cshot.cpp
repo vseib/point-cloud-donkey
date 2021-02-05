@@ -387,6 +387,7 @@ namespace ism3d
             color_descriptor[bins[idx]] += (increments[idx]);
     }
 
+    // return pair: first: increment value, second: neighboring bin (next or previous compared to the current one)
     std::pair<float,int> FeaturesSHORTCSHOT::linear_interpolation(float raw_bin_id)
     {
         float decimals = raw_bin_id - (int)raw_bin_id;

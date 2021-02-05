@@ -16,6 +16,9 @@ namespace ism3d
 ActivationStrategy::ActivationStrategy()
     : m_distance(0)
 {
+    addParameter(m_use_distance_ratio, "UseDistanceRatio", false);
+    addParameter(m_distance_ratio_threshold, "DistanceRatioThreshold", 0.95f);
+    m_is_detection = false;
 }
 
 ActivationStrategy::~ActivationStrategy()

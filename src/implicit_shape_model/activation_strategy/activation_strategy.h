@@ -48,6 +48,11 @@ namespace ism3d
                                                              const std::vector<std::shared_ptr<Codeword> >& codewords,
                                                              const Distance* distance);
 
+        void setIsDetection()
+        {
+            m_is_detection = true;
+        }
+
     protected:
         ActivationStrategy();
 
@@ -55,6 +60,10 @@ namespace ism3d
                                                                    const std::vector<std::shared_ptr<Codeword> >&) const = 0;
         const Distance& distance() const;
         const Distance* m_distance;
+
+        bool m_use_distance_ratio;
+        float m_distance_ratio_threshold;
+        bool m_is_detection;
     };
 }
 

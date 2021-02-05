@@ -64,12 +64,28 @@ public:
         std::vector<std::vector<int> > indices;
         std::vector<std::vector<float> > distances;
         flann::SearchParams params = flann_exact_match ? flann::SearchParams(-1) : flann::SearchParams(128);
-        index.knnSearch(query, indices, distances, m_k, params);
+        if(m_use_distance_ratio && m_is_detection)
+            index.knnSearch(query, indices, distances, m_k+1, params);
+        else
+            index.knnSearch(query, indices, distances, m_k, params);
 
         delete[] query.ptr();
 
+        // apply distance ratio
+        if(m_use_distance_ratio && m_is_detection && m_k == 1)
+        {
+            float dist1 = distances[0][0];
+            float dist2 = distances[0][1];
+            // if distance is too close, consider the match random
+            if(dist1/dist2 > m_distance_ratio_threshold)
+            {
+                indices[0].clear();
+            }
+        }
+
         // create output data
-        for (int i = 0; i < (int)indices[0].size(); i++)
+        int use_num = std::min((int)indices[0].size(), m_k);
+        for (int i = 0; i < use_num; i++)
         {
             activatedCodewords.push_back(codewords[indices[0][i]]);
         }

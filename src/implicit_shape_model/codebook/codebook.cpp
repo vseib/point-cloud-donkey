@@ -401,6 +401,9 @@ void Codebook::castVotes(pcl::PointCloud<ISMFeature>::Ptr features,
     if (isEmpty())
         return;
 
+    // set flag for detection in activation strategy (used for distance ratio)
+    m_activationStrategy->setIsDetection();
+
     // reduce descriptor for partial shot
     if(m_use_partial_shot)
     {
