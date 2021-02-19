@@ -118,9 +118,9 @@ file(COPY implicit_shape_model/third_party/cgf/embedding.py DESTINATION ${CMAKE_
 
 
 
-#ISM evaluation tool
+#ISM evaluation tools
 add_executable(eval_tool
-    eval_tool/main.cpp
+    eval_tool/eval_classification.cpp
 )
 target_link_libraries(eval_tool implicit_shape_model ${Boost_LIBRARIES})
 
