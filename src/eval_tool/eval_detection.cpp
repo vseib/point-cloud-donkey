@@ -61,6 +61,92 @@ std::map<unsigned, unsigned> instance_to_class_map;
 LabelUsage label_usage;
 
 
+
+// represents one object instance, either detected or ground truth
+struct DetectionObject
+{
+    std::string class_label;
+    std::string instance_label;
+    std::string global_class_label; // only for detection, not in ground truth
+    Eigen::Vector3f position;
+    float visibility_ratio;     // only in ground truth, used to filter detections
+    float confidence;           // only for detection, not in ground truth
+    // using path because some datasets use repeating names in subfolders
+    std::string filepath;       // filename of gt annotations, not the point cloud
+
+    DetectionObject(std::string class_label, std::string instance_label, std::string global_class_label, Eigen::Vector3f position,
+                    float visibility_ratio, float confidence, std::string filepath)
+        : class_label(class_label), instance_label(instance_label), global_class_label(global_class_label), position(position),
+          visibility_ratio(visibility_ratio), confidence(confidence), filepath(filepath) {}
+
+    void print()
+    {
+        LOG_INFO("Object from " << filepath);
+        LOG_INFO("    class: " << class_label << ", instance: " << instance_label << ", visible: " << visibility_ratio << " at position: (" <<
+                 position.x() << ", " << position.y() << ", " << position.z() << "), confidence: " << confidence);
+    }
+};
+
+
+DetectionObject convertMaxToObj(const ism3d::VotingMaximum& max, std::string &filename)
+{
+    std::string class_name = class_labels_rmap[max.classId];
+    std::string instance_name = instance_labels_rmap[max.instanceId];
+    std::string global_class = class_labels_rmap[max.globalHypothesis.classId];
+    float confidence = max.weight; // TODO make conf not weight!
+    Eigen::Vector3f position(max.position[0], max.position[1], max.position[2]);
+    // create object
+    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename};
+}
+
+
+std::vector<DetectionObject> parseGtFile(std::string &filename)
+{
+    std::vector<DetectionObject> objects;
+
+    std::ifstream file(filename);
+    std::string line;
+    while(std::getline(file, line))
+    {
+        if(line == "")
+            continue;
+
+        std::stringstream iss(line);
+        std::string item;
+        std::vector<std::string> tokens;
+        while(std::getline(iss, item, ' '))
+        {
+            tokens.push_back(item);
+        }
+
+        if(tokens.size() == 5 || tokens.size() == 6)
+        {
+            std::string class_name = tokens[0];
+            std::string instance_name = class_name; // overwrite later if available
+            int offset = 0;
+            if(tokens.size() == 6) // gt annotation with class and instance labels
+            {
+                instance_name = tokens[1];
+                offset = -1;
+            }
+            std::string visibility_str = tokens[2+offset]; // TODO parse number
+            visibility_str = visibility_str.substr(1, visibility_str.find_first_of(')')-1);
+            float visibility = std::stof(visibility_str);
+            Eigen::Vector3f position(std::stof(tokens[3+offset]), std::stof(tokens[4+offset]), std::stof(tokens[5+offset]));
+
+            // create object
+            objects.emplace_back(class_name, instance_name, class_name, position, visibility, 1.0f, filename);
+        }
+        else
+        {
+            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 5 or 6!");
+            exit(1);
+        }
+    }
+    return objects;
+}
+
+
 unsigned convertLabel(std::string& label,
                       std::map<std::string, unsigned>& labels_map,
                       std::map<unsigned, std::string>& labels_rmap)
@@ -90,11 +176,61 @@ void updateInstanceClassMapping(unsigned instance_label, unsigned class_label)
     }
 }
 
+void parseFileListDetectionTest(std::string &input_file_name,
+                                      std::vector<std::string> &filenames,
+                                      std::vector<std::string> &gt_files)
+{
+    // parse input
+    std::ifstream infile(input_file_name);
+    std::string file;
+    std::string gt_file;
+    std::string additional_flag;
+    std::string additional_flag_2;
+
+    // special treatment of first line: determine mode
+    infile >> file;     // in the first line: #
+    infile >> gt_file;  // in the first line: the mode ("train" or "test") - here: must be "test"
+    infile >> additional_flag; // in the first line mandatory: "detection"
+    infile >> additional_flag_2; // optional: "inst"
+
+    if(file == "#" && (gt_file == "train" || gt_file == "test"))
+    {
+        if("test" != gt_file)
+        {
+            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< "test" << "', but your input file says '" << gt_file << "'!");
+            exit(1);
+        }
+        if (additional_flag != "detection")
+        {
+            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
+            exit(1);
+        }
+        if (additional_flag_2 == "inst")
+        {
+            // don't care here
+        }
+
+        // if no instances are used, the first filename has already been read into variable "additional_flag_2"
+        file = additional_flag_2;
+        filenames.push_back(file);
+        infile >> gt_file;
+        gt_files.push_back(gt_file);
+        // read remaining lines
+        while(infile >> file >> gt_file)
+        {
+            if (file[0] == '#') continue; // allows to comment out lines
+            filenames.push_back(file);
+            gt_files.push_back(gt_file);
+        }
+    }
+}
+
+
 LabelUsage parseFileList(std::string &input_file_name,
                    std::vector<std::string> &filenames,
                    std::vector<unsigned> &class_labels,
                    std::vector<unsigned> &instance_labels,
-                   std::string &mode)
+                   std::string mode)
 {
     // parse input
     std::ifstream infile(input_file_name);
@@ -113,7 +249,11 @@ LabelUsage parseFileList(std::string &input_file_name,
 
     if(file == "#" && (class_label == "train" || class_label == "test"))
     {
-        mode = class_label;
+        if(mode != class_label)
+        {
+            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< mode << "', but your input file says '" << class_label << "'!");
+            exit(1);
+        }
         if (additional_flag != "detection")
         {
             LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
@@ -209,22 +349,23 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::vector<std::string> filenames;
-        std::vector<unsigned> class_labels;
-        std::vector<unsigned> instance_labels;
-        std::string mode = "";
-
-        if(variables.count("inputfile"))
+        try
         {
-            // manually parse input file if available, then adapt it to boost params
-            std::string input_file_name = variables["inputfile"].as<std::string>();
-            label_usage = parseFileList(input_file_name, filenames, class_labels, instance_labels, mode);
-        }
+            std::vector<std::string> filenames;
+            std::vector<std::string> gt_filenames;
+            std::vector<unsigned> class_labels;
+            std::vector<unsigned> instance_labels;
 
-        try {
             // train the ISM
-            if ((variables.count("train") && mode == "") || mode == "train")
+            if (variables.count("train"))
             {
+                if(variables.count("inputfile"))
+                {
+                    // manually parse input file
+                    std::string input_file_name = variables["inputfile"].as<std::string>();
+                    label_usage = parseFileList(input_file_name, filenames, class_labels, instance_labels, "train");
+                }
+
                 std::cout << "starting the training process" << std::endl;
 
                 std::string ismFile;
@@ -328,7 +469,7 @@ int main(int argc, char **argv)
                 // train
                 ism.train();
 
-                // TODO VS: check if this really works in both eval_tools
+                // TODO VS: check if this really works in both eval_tools, need to save info to recover label_usage for detection
                 // store maps in the model object file
                 ism.setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
 
@@ -358,8 +499,20 @@ int main(int argc, char **argv)
             }
 
             // use ISM for detection
-            if ((variables.count("detect") && mode == "") || mode == "test")
+            if (variables.count("detect"))
             {
+                if(variables.count("inputfile"))
+                {
+                    // manually parse input file
+                    std::string input_file_name = variables["inputfile"].as<std::string>();
+                    parseFileListDetectionTest(input_file_name, filenames, gt_filenames);
+                }
+                else
+                {
+                    LOG_ERROR("No input file provided! You need to provide an input file with -f");
+                    return 1;
+                }
+
                 std::cout << "starting the detection process" << std::endl;
 
                 std::string ismFile;
@@ -382,65 +535,59 @@ int main(int argc, char **argv)
                     std::cerr << "could not read ism from file, detection stopped: " << ismFile << std::endl;
                     return 1;
                 }
-                else if ((variables.count("pointclouds") && variables.count("groundtruth")) ||
-                         (filenames.size() > 0 && class_labels.size() > 0))  // load pointclouds and groundtruth
+                else if (filenames.size() > 0 && gt_filenames.size() > 0)  // load pointclouds and groundtruth
                 {
                     std::vector<std::string> pointClouds;
-                    std::vector<unsigned> gt_class_ids;
-                    std::vector<unsigned> gt_instance_ids;
-
-                    // not used here, but might be needed some day
+                    // load label information from training
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
                     instance_to_class_map = ism.getInstanceClassMap();
 
-                    // if both, class and instance labels given, check which is primary
-                    if(label_usage == LabelUsage::BOTH_GIVEN)
+                    // determine label_usage: empty mapping means that no instance labels were given
+                    if(instance_to_class_map.size() == 0)
                     {
-                        if(ism.isInstancePrimaryLabel())
-                            label_usage = LabelUsage::INSTANCE_PRIMARY;
-                        else
-                            label_usage = LabelUsage::CLASS_PRIMARY;
+                        label_usage = LabelUsage::CLASS_ONLY;
                     }
+                    else
+                    {
+                        // determine label_usage: compare all instance and class labels
+                        bool all_equal = true;
+                        for(auto elem : class_labels_rmap)
+                        {
+                            std::string label1 = elem.second;
+                            std::string label2 = instance_labels_rmap[elem.first];
+                            if(label1 != label2)
+                            {
+                                all_equal = false;
+                                break;
+                            }
+                        }
 
-                    if(variables.count("pointclouds")) // input directly from command line
-                    {
-                        pointClouds = variables["pointclouds"].as<std::vector<std::string> >();
-                        gt_class_ids = variables["groundtruth"].as<std::vector<unsigned> >();
-                    }
-                    else if(filenames.size() > 0) // input inside file given on command line
-                    {
-                        pointClouds = filenames;
-                        if(label_usage == LabelUsage::CLASS_ONLY)
+                        if(all_equal && ism.isInstancePrimaryLabel())
                         {
-                            // instance ids must be filled even if testing with class labels only
-                            gt_class_ids = class_labels;
-                            gt_instance_ids = class_labels;
+                            // instances used as primary labels, classes determined over mapping
+                            label_usage = LabelUsage::INSTANCE_PRIMARY;
                         }
-                        else if(label_usage == LabelUsage::CLASS_PRIMARY || label_usage == LabelUsage::INSTANCE_PRIMARY)
+                        else if(!all_equal && !ism.isInstancePrimaryLabel())
                         {
-                            gt_class_ids = class_labels;
-                            gt_instance_ids = instance_labels;
+                            // both labels used, class labels as primary
+                            label_usage = LabelUsage::CLASS_PRIMARY;
                         }
                         else
                         {
-                            std::cerr << "Label usage not defined or not supported!" << std::endl;
+                            LOG_ERROR("Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!");
+                            LOG_ERROR("Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel());
                             return 1;
                         }
                     }
 
+                    if(filenames.size() > 0) // input inside file given on command line
+                    {
+                        pointClouds = filenames;
+                    }
+
                     // prepare summary
                     std::ofstream summaryFile;
-                    int numCorrectClasses = 0;
-                    int numCorrectInstances = 0;
-                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
-
-                    int numCorrectGlobal = 0;
-                    int numBothCorrect = 0;
-                    int numOnlyGlobalCorrect = 0;
-
-                    //std::cout << "preparing output folder" << std::endl;
-
                     if (variables.count("output"))
                     {
                         // create folder for output
@@ -461,207 +608,170 @@ int main(int argc, char **argv)
                         std::cerr << "no output file specified, detected maxima will not be saved" << std::endl;
                     }
 
-                    if (pointClouds.size() == gt_class_ids.size())
+                    std::vector<DetectionObject> gt_objects;
+                    std::vector<DetectionObject> detected_objects;
+
+                    int numCorrectClasses = 0;
+                    int numCorrectInstances = 0;
+                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
+
+                    int numCorrectGlobal = 0;
+                    int numBothCorrect = 0;
+                    int numOnlyGlobalCorrect = 0;
+
+                    boost::timer::cpu_timer timer;
+                    std::map<std::string, double> times;
+                    for(unsigned i = 0; i < pointClouds.size(); i++)
                     {
-                        boost::timer::cpu_timer timer;
-                        std::map<std::string, double> times;
-                        for(unsigned i = 0; i < pointClouds.size(); i++)
+                        // detect
+                        std::string pointCloud = pointClouds.at(i);
+                        std::string gt_file = gt_filenames.at(i);
+                        std::vector<ism3d::VotingMaximum> maxima;
+
+                        std::cout << "Processing file: " << pointCloud << std::endl;
+                        if (!ism.detect(pointCloud, maxima, times))
                         {
-                            // detect
-                            std::string pointCloud = pointClouds.at(i);
-                            unsigned trueID = gt_class_ids.at(i);
-                            unsigned trueInstanceID = gt_instance_ids.at(i);
-                            std::vector<ism3d::VotingMaximum> maxima;
-
-                            std::cout << "Processing file: " << pointCloud << std::endl;
-                            if (!ism.detect(pointCloud, maxima, times))
+                            std::cerr << "detection failed" << std::endl;
+                            return 1;
+                        }
+                        else
+                        {
+                            //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
+                            // write detected maxima to detection log file
+                            if (variables.count("output"))
                             {
-                                std::cerr << "detection failed" << std::endl;
-                                return 1;
-                            }
-                            else
-                            {
-                                //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
-                                // write detected maxima to detection log file
-                                if (variables.count("output"))
+                                // collect all gt objects
+                                std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
+                                gt_objects.insert(gt_objects.end(), gt_objects_from_file.begin(), gt_objects_from_file.end());
+                                // collect all detections
+                                for (int i = 0; i < (int)maxima.size(); i++)
                                 {
-                                    if(write_log_to_files)
+                                    DetectionObject detected_obj = convertMaxToObj(maxima[i], gt_file);
+                                    detected_objects.push_back(std::move(detected_obj));
+                                }
+
+                                if(write_log_to_files)
+                                {
+                                    unsigned tmp = pointCloud.find_last_of('/');
+                                    if(tmp == std::string::npos) tmp = 0;
+                                    std::string fileWithoutFolder = pointCloud.substr(tmp+1);
+
+                                    std::cout << "writing detection log" << std::endl;
+                                    std::string outFile = variables["output"].as<std::string>();
+                                    std::string outFileName = outFile;
+                                    outFileName.append("/");
+                                    outFileName.append(fileWithoutFolder);
+                                    outFileName.append(".txt");
+
+                                    std::ofstream file;
+                                    file.open(outFileName.c_str(), std::ios::out);
+                                    file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
+                                         << ", ground truth file: " << gt_file << std::endl;
+                                    file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
+
+                                    for (int i = 0; i < (int)maxima.size(); i++)
                                     {
-                                        unsigned tmp = pointCloud.find_last_of('/');
-                                        if(tmp == std::string::npos) tmp = 0;
-                                        std::string fileWithoutFolder = pointCloud.substr(tmp+1);
+                                        const ism3d::VotingMaximum& maximum = maxima[i];
 
-                                        std::cout << "writing detection log" << std::endl;
-                                        std::string outFile = variables["output"].as<std::string>();
-                                        std::string outFileName = outFile;
-                                        outFileName.append("/");
-                                        outFileName.append(fileWithoutFolder);
-                                        outFileName.append(".txt");
-
-                                        std::ofstream file;
-                                        file.open(outFileName.c_str(), std::ios::out);
-                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
-                                             << ", ground truth class: " << trueID << ", ground truth instance: " << trueInstanceID << std::endl;
-                                        file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
-
-                                        for (int i = 0; i < (int)maxima.size(); i++)
-                                        {
-                                            const ism3d::VotingMaximum& maximum = maxima[i];
-
-                                            file << i << ", ";
-                                            file << maximum.classId << ", ";
-                                            file << maximum.weight << ", ";
-                                            file << maximum.instanceId << ", ";
-                                            file << maximum.instanceWeight << ", ";
-                                            file << maximum.voteIndices.size() << ", ";
-                                            file << maximum.position[0] << ", ";
-                                            file << maximum.position[1] << ", ";
-                                            file << maximum.position[2] << ", ";
-                                            file << maximum.boundingBox.size[0] << ", ";
-                                            file << maximum.boundingBox.size[1] << ", ";
-                                            file << maximum.boundingBox.size[2] << ", ";
-                                            file << maximum.boundingBox.rotQuat.R_component_1() << ", ";
-                                            file << maximum.boundingBox.rotQuat.R_component_2() << ", ";
-                                            file << maximum.boundingBox.rotQuat.R_component_3() << ", ";
-                                            file << maximum.boundingBox.rotQuat.R_component_4() << std::endl;
-                                        }
-
-                                        file.close();
+                                        file << i << ", ";
+                                        file << maximum.classId << ", ";
+                                        file << maximum.weight << ", ";
+                                        file << maximum.instanceId << ", ";
+                                        file << maximum.instanceWeight << ", ";
+                                        file << maximum.voteIndices.size() << ", ";
+                                        file << maximum.position[0] << ", ";
+                                        file << maximum.position[1] << ", ";
+                                        file << maximum.position[2] << ", ";
+                                        file << maximum.boundingBox.size[0] << ", ";
+                                        file << maximum.boundingBox.size[1] << ", ";
+                                        file << maximum.boundingBox.size[2] << ", ";
+                                        file << maximum.boundingBox.rotQuat.R_component_1() << ", ";
+                                        file << maximum.boundingBox.rotQuat.R_component_2() << ", ";
+                                        file << maximum.boundingBox.rotQuat.R_component_3() << ", ";
+                                        file << maximum.boundingBox.rotQuat.R_component_4() << std::endl;
                                     }
 
-                                    // writing summary file
-                                    int classId = -1;
-                                    int classIdglobal = -1;
-                                    int instanceId = -1;
-                                    if(maxima.size() > 0)
-                                    {
-                                        classId = maxima.at(0).classId;
-                                        classIdglobal = maxima.at(0).globalHypothesis.classId;
-                                        // lookup real class ids if instances were used as primary labels
-                                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
-                                        {
-                                            classId = instance_to_class_map[classId];
-                                            classIdglobal = instance_to_class_map[classIdglobal];
-                                        }
-                                        instanceId = maxima.at(0).instanceId;
-                                    }
-
-                                    // only display additional classifiers if they are different from normal classification
-                                    summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
-
-                                    if(classId != classIdglobal)
-                                    {
-                                        summaryFile << ", global class: " << classIdglobal;
-                                    }
-                                    summaryFile << std::endl;
-
-                                    // count correct matches
-                                    // normal classifier
-                                    if(((int)trueID) == classId)
-                                    {
-                                        // correct classification
-                                        numCorrectClasses++;
-                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
-                                        {
-                                            // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
-                                            res.first++;
-                                            res.second++;
-                                        }
-                                        else
-                                        {
-                                            averageAccuracyHelper.insert({trueID, {1,1}});
-                                        }
-                                    }
-                                    else
-                                    {
-                                        // wrong classification
-                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
-                                        {
-                                            // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
-                                            res.second++;
-                                        }
-                                        else
-                                        {
-                                            averageAccuracyHelper.insert({trueID, {0,1}});
-                                        }
-                                    }
-                                    // instance recognition
-                                    if(((int)trueInstanceID) == instanceId)
-                                    {
-                                        numCorrectInstances++;
-                                    }
-                                    // global classifier
-                                    if(((int)trueID) == classIdglobal)
-                                    {
-                                        numCorrectGlobal++;
-                                    }
-                                    // both correct
-                                    if((int)trueID == classId && (int)trueID == classIdglobal)
-                                    {
-                                        numBothCorrect++;
-                                    }
-                                    // global correct, normal wrong
-                                    if((int)trueID != classId && (int)trueID == classIdglobal)
-                                    {
-                                        numOnlyGlobalCorrect++;
-                                    }
+                                    file.close();
                                 }
                             }
                         }
-
-                        // write processing time details to summary
-                        double time_sum = 0;
-                        for(auto it : times)
-                        {
-                            if(it.first == "complete") continue;
-                            time_sum += (it.second / 1000);
-                        }
-                        summaryFile << "\n\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
-                        summaryFile << "times per step:\n";
-                        summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
-                        summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
-                        summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
-                        summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
-                        summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
-                        summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
-
-                        float avg_pc_acc = 0;
-                        for(const auto &elem : averageAccuracyHelper)
-                        {
-                            const std::pair<unsigned, unsigned> &p = elem.second;
-                            avg_pc_acc += (float)p.first/p.second;
-                        }
-                        avg_pc_acc /= averageAccuracyHelper.size();
-
-                        // complete and close summary file
-                        summaryFile << std::endl << std::endl;
-                        summaryFile << " Accuracy: " << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %, Average per Class Accuracy: " <<
-                                       avg_pc_acc*100.0f << " %" << std::endl << std::endl;
-                        summaryFile << " result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
-                                    << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
-                        summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
-                                    << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
-
-                        summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
-                                    << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
-                        summaryFile << " both correct: " << numBothCorrect << " (" << ((float)numBothCorrect/pointClouds.size())*100.0f << " %)\n";
-                        summaryFile << " only global correct: " << numOnlyGlobalCorrect << " (" << ((float)numOnlyGlobalCorrect/pointClouds.size())*100.0f << " %)\n\n\n";
-
-                        summaryFile << " Total processing time: " << timer.format(4, "%w") << " seconds \n";
-                        summaryFile.close();
-
                     }
-                    else
+
+
+                    //////////// TODO rewrite from here //////////////////////
+
+                    // TODO VS write summary file here
+//                    // writing summary file
+//                    int classId = -1;
+//                    int classIdglobal = -1;
+//                    int instanceId = -1;
+//                    if(maxima.size() > 0)
+//                    {
+//                        classId = maxima.at(0).classId;
+//                        classIdglobal = maxima.at(0).globalHypothesis.classId;
+//                        // lookup real class ids if instances were used as primary labels
+//                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+//                        {
+//                            classId = instance_to_class_map[classId];
+//                            classIdglobal = instance_to_class_map[classIdglobal];
+//                        }
+//                        instanceId = maxima.at(0).instanceId;
+//                    }
+
+//                    // only display additional classifiers if they are different from normal classification
+//                    summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
+
+//                    if(classId != classIdglobal)
+//                    {
+//                        summaryFile << ", global class: " << classIdglobal;
+//                    }
+//                    summaryFile << std::endl;
+
+
+                    // write processing time details to summary
+                    double time_sum = 0;
+                    for(auto it : times)
                     {
-                        std::cerr << "number of point clouds does not match the number of groundtruth ids" << std::endl;
-                        return 1;
+                        if(it.first == "complete") continue;
+                        time_sum += (it.second / 1000);
                     }
+                    summaryFile << "\n\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
+                    summaryFile << "times per step:\n";
+                    summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
+
+                    float avg_pc_acc = 0;
+                    for(const auto &elem : averageAccuracyHelper)
+                    {
+                        const std::pair<unsigned, unsigned> &p = elem.second;
+                        avg_pc_acc += (float)p.first/p.second;
+                    }
+                    avg_pc_acc /= averageAccuracyHelper.size();
+
+                    // complete and close summary file
+                    summaryFile << std::endl << std::endl;
+                    summaryFile << " Accuracy: " << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %, Average per Class Accuracy: " <<
+                                   avg_pc_acc*100.0f << " %" << std::endl << std::endl;
+                    summaryFile << " result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
+                                << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
+                    summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
+                                << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
+
+                    summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
+                                << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
+                    summaryFile << " both correct: " << numBothCorrect << " (" << ((float)numBothCorrect/pointClouds.size())*100.0f << " %)\n";
+                    summaryFile << " only global correct: " << numOnlyGlobalCorrect << " (" << ((float)numOnlyGlobalCorrect/pointClouds.size())*100.0f << " %)\n\n\n";
+
+                    summaryFile << " Total processing time: " << timer.format(4, "%w") << " seconds \n";
+                    summaryFile.close();
                 }
                 else
                 {
-                    std::cerr << "number of point clouds arguments does not match the number of groundtruth id arguments" << std::endl;
+                    std::cerr << "number of point clouds does not match the number of groundtruth files" << std::endl;
                     return 1;
                 }
             }
