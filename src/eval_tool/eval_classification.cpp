@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
     generic.add_options()
             ("help,h", "Display this help message")
-            ("output,o", boost::program_options::value<std::string>(), "The output folder (created automatically) for ism files after training or the detection log after detection")
+            ("output,o", boost::program_options::value<std::string>(), "The output folder (created automatically) for ism files after training or the classification log after classification")
             ("inputfile,f", boost::program_options::value<std::string>(), "Input file (for training or testing) containing the input clouds and their corresponding labels (replaces m and c in training and p and g in testing");
 
     training.add_options()
@@ -365,10 +365,10 @@ int main(int argc, char **argv)
                 }
             }
 
-            // detect the ISM
+            // use ISM for classification
             if ((variables.count("detect") && mode == "") || mode == "test")
             {
-                std::cout << "starting the detection process" << std::endl;
+                std::cout << "starting the classification process" << std::endl;
 
                 std::string ismFile;
                 try // allows to use -t or -d for ism-files when input file with dataset is specified with -f
@@ -387,7 +387,7 @@ int main(int argc, char **argv)
 
                 if (!ism.readObject(ismFile))
                 {
-                    std::cerr << "could not read ism from file, detection stopped: " << ismFile << std::endl;
+                    std::cerr << "could not read ism from file, classification stopped: " << ismFile << std::endl;
                     return 1;
                 }
                 else if ((variables.count("pointclouds") && variables.count("groundtruth")) ||
@@ -484,13 +484,13 @@ int main(int argc, char **argv)
                             std::cout << "Processing file: " << pointCloud << std::endl;
                             if (!ism.detect(pointCloud, maxima, times))
                             {
-                                std::cerr << "detection failed" << std::endl;
+                                std::cerr << "classification failed" << std::endl;
                                 return 1;
                             }
                             else
                             {
                                 //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
-                                // write detected maxima to detection log file
+                                // write detected maxima to classification log file
                                 if (variables.count("output"))
                                 {
                                     if(write_log_to_files)
@@ -499,7 +499,7 @@ int main(int argc, char **argv)
                                         if(tmp == std::string::npos) tmp = 0;
                                         std::string fileWithoutFolder = pointCloud.substr(tmp+1);
 
-                                        std::cout << "writing detection log" << std::endl;
+                                        std::cout << "writing classification log" << std::endl;
                                         std::string outFile = variables["output"].as<std::string>();
                                         std::string outFileName = outFile;
                                         outFileName.append("/");
@@ -508,7 +508,7 @@ int main(int argc, char **argv)
 
                                         std::ofstream file;
                                         file.open(outFileName.c_str(), std::ios::out);
-                                        file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
+                                        file << "ISM3D classification log, filename: " << ismFile << ", point cloud: " << pointCloud
                                              << ", ground truth class: " << trueID << ", ground truth instance: " << trueInstanceID << std::endl;
                                         file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
 
