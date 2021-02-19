@@ -115,6 +115,11 @@ LabelUsage parseFileList(std::string &input_file_name,
         {
             using_instances = true;
         }
+        if (instance_label == "detection")
+        {
+            LOG_ERROR("ERROR: You are using a detection data set with the classification eval_tool! Use the binary 'eval_tool_detection' instead.");
+            exit(1);
+        }
     }
 
     // process remaining lines
