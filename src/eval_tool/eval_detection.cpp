@@ -100,18 +100,26 @@ LabelUsage parseFileList(std::string &input_file_name,
     std::ifstream infile(input_file_name);
     std::string file;
     std::string class_label;
+    std::string additional_flag;
+    std::string additional_flag_2;
     std::string instance_label;
     bool using_instances = false;
 
     // special treatment of first line: determine mode
     infile >> file;         // in the first line: #
     infile >> class_label;  // in the first line: the mode ("train" or "test")
-    infile >> instance_label; // in the first line: "inst" or first element of second line
+    infile >> additional_flag; // in the first line mandatory: "detection"
+    infile >> additional_flag_2; // optional: "inst"
 
     if(file == "#" && (class_label == "train" || class_label == "test"))
     {
         mode = class_label;
-        if (instance_label == "inst")
+        if (additional_flag != "detection")
+        {
+            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
+            exit(1);
+        }
+        if (additional_flag_2 == "inst")
         {
             using_instances = true;
         }
@@ -134,8 +142,8 @@ LabelUsage parseFileList(std::string &input_file_name,
     }
     else
     {
-        // if no instances are used, the first filename has already been read into variable "instance_label"
-        file = instance_label;
+        // if no instances are used, the first filename has already been read into variable "additional_flag_2"
+        file = additional_flag_2;
         infile >> class_label;
 
         filenames.push_back(file);
@@ -199,8 +207,8 @@ int main(int argc, char **argv)
         std::cout << desc << std::endl;
         return 1;
     }
-    else {
-
+    else
+    {
         std::vector<std::string> filenames;
         std::vector<unsigned> class_labels;
         std::vector<unsigned> instance_labels;
@@ -261,20 +269,13 @@ int main(int argc, char **argv)
                 }
 
                 // add the training models to the ism
-                if((variables.count("models") && variables.count("classes")) ||
-                        (filenames.size() > 0 && class_labels.size() > 0))
+                if(filenames.size() > 0 && class_labels.size() > 0)
                 {
                     std::vector<std::string> models;
                     std::vector<unsigned> class_ids;
                     std::vector<unsigned> instance_ids;
 
-                    if(variables.count("models")) // input directly from command line
-                    {
-                        models = variables["models"].as<std::vector<std::string> >();
-                        class_ids = variables["classes"].as<std::vector<unsigned> >();
-                        instance_ids = class_ids; // NOTE: instance training not supported on direct command line input
-                    }
-                    else if(filenames.size() > 0) // input inside file given on command line
+                    if(filenames.size() > 0) // input inside file given on command line
                     {
                         models = filenames;
                         if(label_usage == LabelUsage::CLASS_ONLY)
@@ -327,6 +328,7 @@ int main(int argc, char **argv)
                 // train
                 ism.train();
 
+                // TODO VS: check if this really works in both eval_tools
                 // store maps in the model object file
                 ism.setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
 
@@ -355,7 +357,7 @@ int main(int argc, char **argv)
                 }
             }
 
-            // detect the ISM
+            // use ISM for detection
             if ((variables.count("detect") && mode == "") || mode == "test")
             {
                 std::cout << "starting the detection process" << std::endl;
