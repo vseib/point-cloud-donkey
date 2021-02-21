@@ -88,12 +88,114 @@ struct DetectionObject
 };
 
 
+std::tuple<float,float>
+get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_positives, int num_gt)
+{
+    int tp = 0;
+    for(unsigned i = 0; i < true_positives.size(); i++)
+    {
+        tp += true_positives[i];
+    }
+
+    int fp = 0;
+    for(unsigned i = 0; i < false_positives.size(); i++)
+    {
+        fp += false_positives[i];
+    }
+
+    float precision = tp / float(fp + tp);
+    float recall = num_gt == 0 ? 0 : float(tp) / num_gt;
+
+    return {precision, recall};
+}
+
+std::tuple<std::vector<int>,std::vector<int>>
+match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
+                    std::vector<DetectionObject> &class_objects_det,
+                    float distance_threshold)
+{
+    // sort objects by confidence then loop over sorted list, starting with hightest conf
+    std::sort(class_objects_det.begin(), class_objects_det.end(), [](DetectionObject &obj1, DetectionObject &obj2)
+    {
+       return obj1.confidence > obj2.confidence;
+    });
+
+    std::vector<bool> used_gt(class_objects_gt.size(), false);
+    std::vector<int> tp(class_objects_det.size(), 0);
+    std::vector<int> fp(class_objects_det.size(), 0);
+
+    for(unsigned det_idx = 0; det_idx < class_objects_det.size(); det_idx++)
+    {
+        float best_dist = 0.0f;
+        int best_index = -1;
+
+        // find matching gt object with smallest distance
+        const DetectionObject &det_obj = class_objects_det[det_idx];
+        for(unsigned gt_idx = 0; gt_idx < class_objects_gt.size(); gt_idx++)
+        {
+            const DetectionObject &gt_obj = class_objects_gt[gt_idx];
+            if(det_obj.filepath != gt_obj.filepath)
+            {
+                continue;
+            }
+
+            float distance = (gt_obj.position - det_obj.position).norm();
+            // record index and smallest dist if this gt object was not used before
+            if(distance > best_dist && !used_gt[gt_idx])
+            {
+                best_dist = distance;
+                best_index = int(gt_idx);
+            }
+        }
+
+        if(best_dist > distance_threshold || best_index == -1)
+        {
+            fp[det_idx] = 1;
+        }
+        else
+        {
+            tp[det_idx] = 1;
+            used_gt[unsigned(best_index)] = true;
+        }
+    }
+
+    return {tp, fp};
+}
+
+void rearrangeObjects(std::vector<DetectionObject> &source_list,
+                      std::map<std::string, std::vector<DetectionObject>> &target_map)
+{
+    for(const auto &object : source_list)
+    {
+        if(target_map.find(object.class_label) != target_map.end())
+        {
+            target_map.at(object.class_label).push_back(object);
+        }
+        else // class id not yet in map
+        {
+            target_map.insert({object.class_label,{object}});
+        }
+    }
+}
+
 DetectionObject convertMaxToObj(const ism3d::VotingMaximum& max, std::string &filename)
 {
-    std::string class_name = class_labels_rmap[max.classId];
-    std::string instance_name = instance_labels_rmap[max.instanceId];
-    std::string global_class = class_labels_rmap[max.globalHypothesis.classId];
-    float confidence = max.weight; // TODO make conf not weight!
+    std::string class_name, instance_name, global_class;
+    // lookup real class ids if instances were used as primary labels
+    if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+    {
+        class_name = class_labels_rmap[instance_to_class_map[max.classId]];
+        instance_name = instance_labels_rmap[max.classId]; // class id actually has the instance label
+        global_class = class_labels_rmap[instance_to_class_map[max.globalHypothesis.classId]];
+    }
+    else
+    {
+        class_name = class_labels_rmap[max.classId];
+        instance_name = instance_labels_rmap[max.instanceId];
+        global_class = class_labels_rmap[max.globalHypothesis.classId];
+    }
+
+    float confidence = max.weight; // TODO VS make conf not weight!
     Eigen::Vector3f position(max.position[0], max.position[1], max.position[2]);
     // create object
     return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename};
@@ -116,30 +218,38 @@ std::vector<DetectionObject> parseGtFile(std::string &filename)
         std::vector<std::string> tokens;
         while(std::getline(iss, item, ' '))
         {
+            if(item == "")
+                continue;
             tokens.push_back(item);
         }
 
-        if(tokens.size() == 5 || tokens.size() == 6)
+        if(tokens.size() == 4 || tokens.size() == 5 || tokens.size() == 6)
         {
             std::string class_name = tokens[0];
             std::string instance_name = class_name; // overwrite later if available
             int offset = 0;
-            if(tokens.size() == 6) // gt annotation with class and instance labels
+
+            if(tokens.size() == 6) // gt annotation with visibility ratio and class and instance labels
             {
                 instance_name = tokens[1];
-                offset = -1;
+                offset += 1;
             }
-            std::string visibility_str = tokens[2+offset]; // TODO parse number
-            visibility_str = visibility_str.substr(1, visibility_str.find_first_of(')')-1);
-            float visibility = std::stof(visibility_str);
-            Eigen::Vector3f position(std::stof(tokens[3+offset]), std::stof(tokens[4+offset]), std::stof(tokens[5+offset]));
+            float visibility = 1.0f;
+            if(tokens.size() == 5) // visibility ratio given, no instance labels
+            {
+                std::string visibility_str = tokens[1+offset];
+                visibility_str = visibility_str.substr(1, visibility_str.find_first_of(')')-1);
+                visibility = std::stof(visibility_str);
+                offset += 1;
+            }
+            Eigen::Vector3f position(std::stof(tokens[1+offset]), std::stof(tokens[2+offset]), std::stof(tokens[3+offset]));
 
             // create object
             objects.emplace_back(class_name, instance_name, class_name, position, visibility, 1.0f, filename);
         }
         else
         {
-            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 5 or 6!");
+            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 4, 5 or 6!");
             exit(1);
         }
     }
@@ -649,7 +759,6 @@ int main(int argc, char **argv)
                                     DetectionObject detected_obj = convertMaxToObj(maxima[i], gt_file);
                                     detected_objects.push_back(std::move(detected_obj));
                                 }
-
                                 if(write_log_to_files)
                                 {
                                     unsigned tmp = pointCloud.find_last_of('/');
@@ -697,36 +806,84 @@ int main(int argc, char **argv)
                         }
                     }
 
+                    // maps a class label id to list of objects
+                    std::map<std::string, std::vector<DetectionObject>> gt_class_map;
+                    std::map<std::string, std::vector<DetectionObject>> det_class_map;
 
-                    //////////// TODO rewrite from here //////////////////////
+                    rearrangeObjects(gt_objects, gt_class_map);
+                    rearrangeObjects(detected_objects, det_class_map);
 
-                    // TODO VS write summary file here
-//                    // writing summary file
-//                    int classId = -1;
-//                    int classIdglobal = -1;
-//                    int instanceId = -1;
-//                    if(maxima.size() > 0)
-//                    {
-//                        classId = maxima.at(0).classId;
-//                        classIdglobal = maxima.at(0).globalHypothesis.classId;
-//                        // lookup real class ids if instances were used as primary labels
-//                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
-//                        {
-//                            classId = instance_to_class_map[classId];
-//                            classIdglobal = instance_to_class_map[classIdglobal];
-//                        }
-//                        instanceId = maxima.at(0).instanceId;
-//                    }
+                    // collect all metrics
+                    // combined detection - primary metrics
+                    std::vector<float> ap_per_class(gt_class_map.size(), 0.0);
+                    std::vector<float> precision_per_class(gt_class_map.size(), 0.0);
+                    std::vector<float> recall_per_class(gt_class_map.size(), 0.0);
+//                    // metrics for instance labels (if available)
+//                    std::vector<float> instance_ap_per_class(gt_class_map.size(), 0.0);
+//                    std::vector<float> instance_precision_per_class(gt_class_map.size(), 0.0);
+//                    std::vector<float> instance_recall_per_class(gt_class_map.size(), 0.0);
+//                    // metrics for the global classifier (if used)
+//                    std::vector<float> global_ap_per_class(gt_class_map.size(), 0.0);
+//                    std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
+//                    std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
 
-//                    // only display additional classifiers if they are different from normal classification
-//                    summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
+                    for(auto item : gt_class_map)
+                    {
+                        std::string class_label = item.first;
+                        unsigned class_id = class_labels_map[class_label]; // TODO VS: does not work
+                        std::vector<DetectionObject> class_objects_gt = item.second;
 
-//                    if(classId != classIdglobal)
-//                    {
-//                        summaryFile << ", global class: " << classIdglobal;
-//                    }
-//                    summaryFile << std::endl;
+                        // if there are no detections for this class
+                        if(det_class_map.find(class_label) == det_class_map.end())
+                        {
+                            ap_per_class[class_id] = 0;
+                            precision_per_class[class_id] = 0;
+                            recall_per_class[class_id] = 0;
+//                            instance_ap_per_class[class_id] = 0;
+//                            instance_precision_per_class[class_id] = 0;
+//                            instance_recall_per_class[class_id] = 0;
+//                            global_ap_per_class[class_id] = 0;
+//                            global_precision_per_class[class_id] = 0;
+//                            global_recall_per_class[class_id] = 0;
+                            continue;
+                        }
+                        std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
 
+                        // match detections and ground truth to get list of tp and fp
+                        std::vector<int> tp, fp;
+                        float dist_threshold = 0.05; // TODO VS externalize, e.g. into ism file
+                        std::tie(tp, fp) = match_gt_objects(class_objects_gt, class_objects_det, dist_threshold);
+
+                        // compute precision and recall
+                        int num_gt = int(class_objects_gt.size());
+                        double precision, recall;
+                        std::tie(precision, recall) = get_precision_recall(tp, fp, num_gt);
+                        precision_per_class[class_id] = precision;
+                        recall_per_class[class_id] = recall;
+
+                        // compute average precision metric
+                        float ap = 0.0;
+                        float cumul_tp = 0.0;
+                        for(unsigned i = 0; i < tp.size(); i++)
+                        {
+                            if(tp[i] == 1)
+                            {
+                                cumul_tp += 1;
+                                ap += (cumul_tp / (i+1)) * (1.0/num_gt);
+                            }
+                        }
+                        ap_per_class[class_id] = ap;
+
+                        int cumul_fp = 0;
+                        for(auto elem : fp)
+                        {
+                            cumul_fp += elem;
+                        }
+
+                        // log class to summary
+                        summaryFile << "class " << class_id << ": " << class_label << ",\t tp: " << int(cumul_tp) << ",\t fp: " << cumul_fp << ",\t"
+                                    << "precision: " << precision << ",\t recall: " << recall << ",\t AP: " << ap << std::endl;
+                    }
 
                     // write processing time details to summary
                     double time_sum = 0;
@@ -744,27 +901,25 @@ int main(int argc, char **argv)
                     summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
                     summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
 
-                    float avg_pc_acc = 0;
-                    for(const auto &elem : averageAccuracyHelper)
+                    // compute average metrics
+                    float mAP = 0;
+                    float mPrec = 0;
+                    float mRec = 0;
+                    for(int idx = 0; idx < ap_per_class.size(); idx++)
                     {
-                        const std::pair<unsigned, unsigned> &p = elem.second;
-                        avg_pc_acc += (float)p.first/p.second;
+                        mAP += ap_per_class[idx];
+                        mPrec += precision_per_class[idx];
+                        mRec += recall_per_class[idx];
                     }
-                    avg_pc_acc /= averageAccuracyHelper.size();
+                    mAP /= ap_per_class.size();
+                    mPrec /= ap_per_class.size();
+                    mRec /= ap_per_class.size();
 
                     // complete and close summary file
                     summaryFile << std::endl << std::endl;
-                    summaryFile << " Accuracy: " << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %, Average per Class Accuracy: " <<
-                                   avg_pc_acc*100.0f << " %" << std::endl << std::endl;
-                    summaryFile << " result: " << numCorrectClasses << " of " << pointClouds.size() << " clouds classified correctly ("
-                                << ((float)numCorrectClasses/pointClouds.size())*100.0f << " %)\n";
-                    summaryFile << " result: " << numCorrectInstances << " of " << pointClouds.size() << " instances recognized correctly ("
-                                << ((float)numCorrectInstances/pointClouds.size())*100.0f << " %)\n";
-
-                    summaryFile << " result: " << numCorrectGlobal << " of " << pointClouds.size() << " clouds classified correctly with global descriptors ("
-                                << ((float)numCorrectGlobal/pointClouds.size())*100.0f << " %)\n\n";
-                    summaryFile << " both correct: " << numBothCorrect << " (" << ((float)numBothCorrect/pointClouds.size())*100.0f << " %)\n";
-                    summaryFile << " only global correct: " << numOnlyGlobalCorrect << " (" << ((float)numOnlyGlobalCorrect/pointClouds.size())*100.0f << " %)\n\n\n";
+                    summaryFile << "mAP: " << mAP << std::endl;
+                    summaryFile << "mean precision: " << mPrec << std::endl;
+                    summaryFile << "mean recall: " << mRec << std::endl;
 
                     summaryFile << " Total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
