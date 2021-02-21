@@ -117,7 +117,7 @@ LabelUsage parseFileList(std::string &input_file_name,
         }
         if (instance_label == "detection")
         {
-            LOG_ERROR("ERROR: You are using a detection data set with the classification eval_tool! Use the binary 'eval_tool_detection' instead.");
+            std::cerr << "ERROR: You are using a detection data set with the classification eval_tool! Use the binary 'eval_tool_detection' instead." << std::endl;
             exit(1);
         }
     }
@@ -397,6 +397,7 @@ int main(int argc, char **argv)
                     std::vector<unsigned> gt_class_ids;
                     std::vector<unsigned> gt_instance_ids;
 
+                    // TODO VS use this labels
                     // not used here, but might be needed some day
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
