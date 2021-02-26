@@ -95,6 +95,9 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     addParameter(m_use_voxel_filtering, "UseVoxelFiltering", false);
     addParameter(m_voxel_leaf_size, "VoxelLeafSize", 0.0015f);
 
+    // detection threshold for evaluation
+    addParameter(m_distance_detection_thresh, "DistanceThresholdDetection", 0.05f);
+
     addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
     addParameter(m_normal_radius, "NormalRadius", 0.05f);
     addParameter(m_consistent_normals_k, "ConsistentNormalsK", 10);

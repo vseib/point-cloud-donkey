@@ -649,9 +649,19 @@ int main(int argc, char **argv)
                 {
                     std::vector<std::string> pointClouds;
                     // load label information from training
+                    // TODO VS: check in both eval tools if this really works
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
                     instance_to_class_map = ism.getInstanceClassMap();
+                    // populate maps with loaded data
+                    for(auto &elem : class_labels_rmap)
+                    {
+                        class_labels_map.insert({elem.second, elem.first});
+                    }
+                    for(auto &elem : instance_labels_rmap)
+                    {
+                        instance_labels_map.insert({elem.second, elem.first});
+                    }
 
                     // determine label_usage: empty mapping means that no instance labels were given
                     if(instance_to_class_map.size() == 0)
@@ -721,14 +731,6 @@ int main(int argc, char **argv)
                     std::vector<DetectionObject> gt_objects;
                     std::vector<DetectionObject> detected_objects;
 
-                    int numCorrectClasses = 0;
-                    int numCorrectInstances = 0;
-                    std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
-
-                    int numCorrectGlobal = 0;
-                    int numBothCorrect = 0;
-                    int numOnlyGlobalCorrect = 0;
-
                     boost::timer::cpu_timer timer;
                     std::map<std::string, double> times;
                     for(unsigned i = 0; i < pointClouds.size(); i++)
@@ -746,7 +748,6 @@ int main(int argc, char **argv)
                         }
                         else
                         {
-                            //std::cout << "detected " << maxima.size() << " maxima" << std::endl;
                             // write detected maxima to detection log file
                             if (variables.count("output"))
                             {
@@ -813,6 +814,8 @@ int main(int argc, char **argv)
                     rearrangeObjects(gt_objects, gt_class_map);
                     rearrangeObjects(detected_objects, det_class_map);
 
+                    float dist_threshold = ism.getDetectionThreshold();
+
                     // collect all metrics
                     // combined detection - primary metrics
                     std::vector<float> ap_per_class(gt_class_map.size(), 0.0);
@@ -830,7 +833,7 @@ int main(int argc, char **argv)
                     for(auto item : gt_class_map)
                     {
                         std::string class_label = item.first;
-                        unsigned class_id = class_labels_map[class_label]; // TODO VS: does not work
+                        unsigned class_id = class_labels_map[class_label];
                         std::vector<DetectionObject> class_objects_gt = item.second;
 
                         // if there are no detections for this class
@@ -851,7 +854,6 @@ int main(int argc, char **argv)
 
                         // match detections and ground truth to get list of tp and fp
                         std::vector<int> tp, fp;
-                        float dist_threshold = 0.05; // TODO VS externalize, e.g. into ism file
                         std::tie(tp, fp) = match_gt_objects(class_objects_gt, class_objects_det, dist_threshold);
 
                         // compute precision and recall
@@ -881,8 +883,13 @@ int main(int argc, char **argv)
                         }
 
                         // log class to summary
-                        summaryFile << "class " << class_id << ": " << class_label << ",\t tp: " << int(cumul_tp) << ",\t fp: " << cumul_fp << ",\t"
-                                    << "precision: " << precision << ",\t recall: " << recall << ",\t AP: " << ap << std::endl;
+                        summaryFile << "class " << class_id << ": " << class_label
+                                    << std::setw(10) << std::setfill(' ') << " num gt: " << num_gt
+                                    << std::setw(10) << std::setfill(' ') << " tp: " << int(cumul_tp)
+                                    << std::setw(10) << std::setfill(' ') << " fp: " << cumul_fp
+                                    << std::setw(10) << std::setfill(' ') << " precision: " << precision
+                                    << std::setw(10) << std::setfill(' ') << " recall: " << recall
+                                    << std::setw(10) << std::setfill(' ') << " AP: " << ap << std::endl;
                     }
 
                     // write processing time details to summary
@@ -917,11 +924,11 @@ int main(int argc, char **argv)
 
                     // complete and close summary file
                     summaryFile << std::endl << std::endl;
-                    summaryFile << "mAP: " << mAP << std::endl;
-                    summaryFile << "mean precision: " << mPrec << std::endl;
-                    summaryFile << "mean recall: " << mRec << std::endl;
+                    summaryFile << "mAP: " << mAP << " (" << (mAP * 100.0f) << "%)" << std::endl;
+                    summaryFile << "mean precision: " << mPrec << " (" << (mPrec * 100.0f) << "%)" << std::endl;
+                    summaryFile << "mean recall: " << mRec << " (" << (mRec * 100.0f) << "%)" << std::endl << std::endl;
 
-                    summaryFile << " Total processing time: " << timer.format(4, "%w") << " seconds \n";
+                    summaryFile << "Total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
                 }
                 else

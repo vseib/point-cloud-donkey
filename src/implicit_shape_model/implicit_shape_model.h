@@ -199,6 +199,11 @@ namespace ism3d
             return m_instance_labels_primary;
         }
 
+        float getDetectionThreshold()
+        {
+            return m_distance_detection_thresh;
+        }
+
         // signals
         boost::signals2::signal<void(pcl::PointCloud<PointT>::ConstPtr)> m_signalPointCloud;
         boost::signals2::signal<void(const Utils::BoundingBox&)> m_signalBoundingBox;
@@ -284,6 +289,8 @@ namespace ism3d
         float m_ror_radius;
         bool m_use_voxel_filtering;
         float m_voxel_leaf_size;
+
+        float m_distance_detection_thresh;
 
         float m_normal_radius;
         int m_consistent_normals_k;
