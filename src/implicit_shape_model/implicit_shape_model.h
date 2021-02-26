@@ -204,6 +204,11 @@ namespace ism3d
             return m_distance_detection_thresh;
         }
 
+        bool isUsingGlobalFeatures()
+        {
+            return m_voting->isUsingGlobalFeatures();
+        }
+
         // signals
         boost::signals2::signal<void(pcl::PointCloud<PointT>::ConstPtr)> m_signalPointCloud;
         boost::signals2::signal<void(const Utils::BoundingBox&)> m_signalBoundingBox;

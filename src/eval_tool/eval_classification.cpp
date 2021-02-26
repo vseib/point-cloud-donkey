@@ -269,7 +269,6 @@ int main(int argc, char **argv)
                     std::vector<unsigned> gt_class_ids;
                     std::vector<unsigned> gt_instance_ids;
 
-                    // TODO VS use this labels
                     // not used here, but might be needed some day
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
@@ -489,6 +488,32 @@ int main(int argc, char **argv)
                                         numOnlyGlobalCorrect++;
                                     }
                                 }
+                            }
+                        }
+
+                        // write class id to class name mappings to summary
+                        if(label_usage == LabelUsage::CLASS_ONLY || label_usage == LabelUsage::CLASS_PRIMARY)
+                            summaryFile << "\n\nclass id to class name mapping:" << std::endl;
+                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+                            summaryFile << "\n\ninstance id to instance name mapping (used as primary labels, i.e. classes):" << std::endl;
+                        for(auto &elem : class_labels_rmap)
+                        {
+                            summaryFile << elem.first << ": " << elem.second << std::endl;
+                        }
+                        if(label_usage == LabelUsage::CLASS_PRIMARY)
+                        {
+                            summaryFile << "\ninstance id to instance name mapping:" << std::endl;
+                            for(auto &elem : instance_labels_rmap)
+                            {
+                                summaryFile << elem.first << ": " << elem.second << std::endl;
+                            }
+                        }
+                        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+                        {
+                            summaryFile << "\ninstance id to class id mapping:" << std::endl;
+                            for(auto &elem : instance_to_class_map)
+                            {
+                                summaryFile << elem.first << ": " << elem.second << std::endl;
                             }
                         }
 

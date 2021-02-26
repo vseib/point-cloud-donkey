@@ -120,6 +120,11 @@ namespace ism3d
             m_svm_path = path;
         }
 
+        bool isUsingGlobalFeatures()
+        {
+            return m_use_global_features;
+        }
+
     protected:
         Voting();
 

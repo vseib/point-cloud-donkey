@@ -195,7 +195,6 @@ int main(int argc, char **argv)
                 // train
                 ism.train();
 
-                // TODO VS: check if this really works in both eval_tools, need to save info to recover label_usage for detection
                 // store maps in the model object file
                 ism.setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
 
@@ -265,7 +264,6 @@ int main(int argc, char **argv)
                 {
                     std::vector<std::string> pointClouds;
                     // load label information from training
-                    // TODO VS: check in both eval tools if this really works
                     class_labels_rmap = ism.getClassLabels();
                     instance_labels_rmap = ism.getInstanceLabels();
                     instance_to_class_map = ism.getInstanceClassMap();
@@ -426,9 +424,14 @@ int main(int argc, char **argv)
                     // maps a class label id to list of objects
                     std::map<std::string, std::vector<DetectionObject>> gt_class_map;
                     std::map<std::string, std::vector<DetectionObject>> det_class_map;
+                    std::map<std::string, std::vector<DetectionObject>> det_class_map_global;
 
                     rearrangeObjects(gt_objects, gt_class_map);
                     rearrangeObjects(detected_objects, det_class_map);
+                    bool report_global_metrics = ism.isUsingGlobalFeatures();
+//                    report_global_metrics = true;
+                    if(report_global_metrics)
+                        rearrangeObjects(detected_objects, det_class_map_global, true);
 
                     float dist_threshold = ism.getDetectionThreshold();
 
@@ -437,22 +440,24 @@ int main(int argc, char **argv)
                     std::vector<float> ap_per_class(gt_class_map.size(), 0.0);
                     std::vector<float> precision_per_class(gt_class_map.size(), 0.0);
                     std::vector<float> recall_per_class(gt_class_map.size(), 0.0);
-//                    // metrics for instance labels (if available)
-//                    std::vector<float> instance_ap_per_class(gt_class_map.size(), 0.0);
-//                    std::vector<float> instance_precision_per_class(gt_class_map.size(), 0.0);
-//                    std::vector<float> instance_recall_per_class(gt_class_map.size(), 0.0);
-//                    // metrics for the global classifier (if used)
-//                    std::vector<float> global_ap_per_class(gt_class_map.size(), 0.0);
-//                    std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
-//                    std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
+                    // metrics for the global classifier (if used)
+                    std::vector<float> global_ap_per_class(gt_class_map.size(), 0.0);
+                    std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
+                    std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
 
-                    summaryFile << "  class      num gt   tp    fp   precision  recall   AP" << std::endl;
+                    summaryFile << "  class       num gt   tp    fp   precision  recall   AP";
+                    if(report_global_metrics)
+                                summaryFile << "        | global tp    fp   precision  recall   AP";
+                    summaryFile << std::endl;
 
                     for(auto item : gt_class_map)
                     {
                         std::string class_label = item.first;
                         unsigned class_id = class_labels_map[class_label];
                         std::vector<DetectionObject> class_objects_gt = item.second;
+                        int num_gt = int(class_objects_gt.size());
+                        int cumul_tp, cumul_fp;
+                        int global_cumul_tp, global_cumul_fp;
 
                         // if there are no detections for this class
                         if(det_class_map.find(class_label) == det_class_map.end())
@@ -460,58 +465,69 @@ int main(int argc, char **argv)
                             ap_per_class[class_id] = 0;
                             precision_per_class[class_id] = 0;
                             recall_per_class[class_id] = 0;
-//                            instance_ap_per_class[class_id] = 0;
-//                            instance_precision_per_class[class_id] = 0;
-//                            instance_recall_per_class[class_id] = 0;
-//                            global_ap_per_class[class_id] = 0;
-//                            global_precision_per_class[class_id] = 0;
-//                            global_recall_per_class[class_id] = 0;
-                            continue;
                         }
-                        std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
-
-                        // match detections and ground truth to get list of tp and fp
-                        std::vector<int> tp, fp;
-                        std::tie(tp, fp) = match_gt_objects(class_objects_gt, class_objects_det, dist_threshold);
-
-                        // compute precision and recall
-                        int num_gt = int(class_objects_gt.size());
-                        double precision, recall;
-                        std::tie(precision, recall) = get_precision_recall(tp, fp, num_gt);
-                        precision_per_class[class_id] = precision;
-                        recall_per_class[class_id] = recall;
-
-                        // compute average precision metric
-                        float ap = 0.0;
-                        float cumul_tp = 0.0;
-                        for(unsigned i = 0; i < tp.size(); i++)
+                        else
                         {
-                            if(tp[i] == 1)
+                            std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
+
+                            float precision, recall, ap;
+                            std::tie(precision, recall, ap, cumul_tp, cumul_fp) = computeMetrics(class_objects_gt,
+                                                                                             class_objects_det,
+                                                                                             dist_threshold);
+                            precision_per_class[class_id] = precision;
+                            recall_per_class[class_id] = recall;
+                            ap_per_class[class_id] = ap;
+                        }
+
+                        if(report_global_metrics)
+                        {
+                            // if there are no detections for this class in global detector
+                            if(det_class_map.find(class_label) == det_class_map.end())
                             {
-                                cumul_tp += 1;
-                                ap += (cumul_tp / (i+1)) * (1.0/num_gt);
+                                global_ap_per_class[class_id] = 0;
+                                global_precision_per_class[class_id] = 0;
+                                global_recall_per_class[class_id] = 0;
                             }
-                        }
-                        ap_per_class[class_id] = ap;
+                            else
+                            {
+                                std::vector<DetectionObject> class_objects_det = det_class_map_global.at(class_label);
 
-                        int cumul_fp = 0;
-                        for(auto elem : fp)
-                        {
-                            cumul_fp += elem;
+                                float precision, recall, ap;
+                                std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp) = computeMetrics(class_objects_gt,
+                                                                                                 class_objects_det,
+                                                                                                 dist_threshold);
+                                global_precision_per_class[class_id] = precision;
+                                global_recall_per_class[class_id] = recall;
+                                global_ap_per_class[class_id] = ap;
+                            }
                         }
 
                         // log class to summary
-                        unsigned label_length = class_label.size();
-                        std::stringstream iss;
-                        iss << std::round(recall*10000.0f)/10000.0f;
-                        unsigned recall_length = iss.str().size();
-                        summaryFile << std::setw(3) << std::setfill(' ') << class_id << " " << class_label
-                                    << std::setw(15-label_length) << std::setfill(' ') << num_gt
-                                    << std::setw(5) << std::setfill(' ') << int(cumul_tp)
-                                    << std::setw(6) << std::setfill(' ') << cumul_fp
-                                    << std::setw(9) << std::setfill(' ') << std::round(precision*10000.0f)/10000.0f << "     "
-                                    << std::round(recall*10000.0f)/10000.0f << std::setw(15-recall_length) << std::setfill(' ')
-                                    << std::round(ap*10000.0f)/10000.0f << std::endl;
+                        float ap = ap_per_class[class_id];
+                        float precision = precision_per_class[class_id];
+                        float recall = recall_per_class[class_id];
+                        float global_ap = global_ap_per_class[class_id];
+                        float global_precision = global_precision_per_class[class_id];
+                        float global_recall = global_recall_per_class[class_id];
+
+                        summaryFile << std::setw(3) << std::right << class_id << " "
+                                    << std::setw(13) << std::left << class_label
+                                    << std::setw(3) << std::right << num_gt
+                                    << std::setw(5) << cumul_tp
+                                    << std::setw(6) << cumul_fp << "   "
+                                    << std::setw(11) << std::left << std::round(precision*10000.0f)/10000.0f
+                                    << std::setw(9) << std::round(recall*10000.0f)/10000.0f
+                                    << std::setw(10) << std::round(ap*10000.0f)/10000.0f;
+                        if(report_global_metrics)
+                        {
+                            summaryFile << "| "
+                                        << std::setw(9) << std::right << global_cumul_tp
+                                        << std::setw(6) << global_cumul_fp << "   "
+                                        << std::setw(11) << std::left << std::round(global_precision*10000.0f)/10000.0f
+                                        << std::setw(9) << std::round(global_recall*10000.0f)/10000.0f
+                                        << std::setw(10) << std::round(global_ap*10000.0f)/10000.0f;
+                        }
+                        summaryFile << std::endl;
                     }
 
                     // write processing time details to summary
@@ -534,22 +550,40 @@ int main(int argc, char **argv)
                     float mAP = 0;
                     float mPrec = 0;
                     float mRec = 0;
+                    float global_mAP = 0;
+                    float global_mPrec = 0;
+                    float global_mRec = 0;
                     for(int idx = 0; idx < ap_per_class.size(); idx++)
                     {
                         mAP += ap_per_class[idx];
                         mPrec += precision_per_class[idx];
                         mRec += recall_per_class[idx];
+                        global_mAP += global_ap_per_class[idx];
+                        global_mPrec += global_precision_per_class[idx];
+                        global_mRec += global_recall_per_class[idx];
                     }
                     mAP /= ap_per_class.size();
                     mPrec /= ap_per_class.size();
                     mRec /= ap_per_class.size();
+                    global_mAP /= ap_per_class.size();
+                    global_mPrec /= ap_per_class.size();
+                    global_mRec /= ap_per_class.size();
+
+                    if(report_global_metrics)
+                    {
+                        summaryFile << std::endl << std::endl;
+                        summaryFile << "global detector metrics:" << std::endl;
+                        summaryFile << "global mAP:            " << std::setw(7) << std::round(global_mAP*10000.0f)/10000.0f    << " (" << std::round(global_mAP*10000.0f)/100.0f   << " %)" << std::endl;
+                        summaryFile << "global mean precision: " << std::setw(7) << std::round(global_mPrec*10000.0f)/10000.0f  << " (" << std::round(global_mPrec*10000.0f)/100.0f << " %)" << std::endl;
+                        summaryFile << "global mean recall:    " << std::setw(7) << std::round(global_mRec*10000.0f)/10000.0f   << " (" << std::round(global_mRec*10000.0f)/100.0f  << " %)" << std::endl;
+                    }
+                    summaryFile << std::endl << std::endl;
+                    summaryFile << "main metrics:" << std::endl;
+                    summaryFile << "       mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
+                    summaryFile << "       mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
+                    summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl << std::endl;
 
                     // complete and close summary file
-                    summaryFile << std::endl << std::endl;
-                    summaryFile << "mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
-                    summaryFile << "mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
-                    summaryFile << "mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl << std::endl;
-
                     summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
                 }
