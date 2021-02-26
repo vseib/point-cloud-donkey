@@ -191,13 +191,25 @@ namespace ism3d
             VotingMaximum instance_maximum;
             instance_maximum.classId = maximum.classId;
             // TODO VS: use only if
+            // if( ... secondary labels ...) --> else: init instance id and weight with class id and weight
             // 1. secondary labels are used
             // 2. feature type of training and test is the same (usually this is the case, but it's possible
             //    to use an SVM with a different descriptor type than was used for training the global KNN classifier)
-            classifyWithKNN(global_features, instance_maximum);
-            // fill in instance result into actual maximum
-            maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
-            maximum.globalHypothesis.instanceWeight = instance_maximum.globalHypothesis.instanceWeight;
+            if(global_features->at(0).descriptor.size() == m_global_features->at(0).descriptor.size())
+            {
+                classifyWithKNN(global_features, instance_maximum);
+                // fill in instance result into actual maximum
+                maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
+                maximum.globalHypothesis.instanceWeight = instance_maximum.globalHypothesis.instanceWeight;
+            }
+            else
+            {
+                LOG_ERROR("ERROR: Loaded descriptors and computed descriptors do not match in dimensionality!");
+                LOG_ERROR("       Loaded features have dimension " << m_global_features->at(0).descriptor.size() <<
+                          " while computed features have " << global_features->at(0).descriptor.size() << "!");
+                LOG_ERROR("Check your config (global feature type vs. SVM feature type)!");
+                exit(1);
+            }
         }
     }
 
@@ -238,9 +250,7 @@ namespace ism3d
                 // insert result
                 ISMFeature temp = m_global_features->at(indices[0].at(i));
                 float dist_squared = distances[0].at(i);
-                const float sigma = 0.1;
-                const float denom = 2 * sigma * sigma;
-                float score = std::exp(-dist_squared/denom);
+                float score = std::exp(-sqrt(dist_squared));
                 insertGlobalResult(max_global_voting, temp.classId, temp.instanceId, score);
             }
         }
@@ -260,7 +270,7 @@ namespace ism3d
                     global_result.classId = it.first;
                 }
             }
-            // TODO VS fix nan scores
+            // TODO VS - test again: determining best class based on score because score computation was changed!
             // use best class and compute score (NOTE: determining best class based on score did not work well)
             GlobalResultAccu gra = max_global_voting.at(global_result.classId);
             global_result.classWeight = gra.score_sum / gra.num_occurences;

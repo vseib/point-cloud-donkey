@@ -359,7 +359,6 @@ namespace ism3d
             }
             result.instanceId = max_id_weights;
             result.instanceWeight = instance_weights[max_id_weights];
-            // -----------------------------------------------------------------------------
 
             // accumulate global hypotheses and merge afterwards
             global_hyps.push_back(m.globalHypothesis);
