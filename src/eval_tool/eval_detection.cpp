@@ -1,7 +1,7 @@
 /*
  * BSD 3-Clause License
  *
- * Copyright (c) 2018, Viktor Seib, Norman Link
+ * Copyright (c) 2021, Viktor Seib
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,394 +31,10 @@
  *
  */
 
-#include <iostream>
-#include <vector>
-#include <fstream>
 #include <boost/program_options.hpp>
 #include <boost/program_options/errors.hpp>
 #include "../implicit_shape_model/implicit_shape_model.h"
-
-
-bool write_log_to_files = false;
-bool log_info = true;
-
-// determines how labels are used
-enum class LabelUsage
-{
-    CLASS_ONLY,        // only class labels, no instance labels
-    BOTH_GIVEN,        // both labels given, needs to be decided which is primary
-    CLASS_PRIMARY,     // use class labels as primary labels, instance labels are secondary
-    INSTANCE_PRIMARY   // use instance labels as primary labels, store class labels in look-up table
-};
-
-// mappings from real labels (string) to label ids and back
-std::map<std::string, unsigned> class_labels_map;
-std::map<std::string, unsigned> instance_labels_map;
-std::map<unsigned, std::string> class_labels_rmap;
-std::map<unsigned, std::string> instance_labels_rmap;
-// mapping from instance label ids to class label ids
-std::map<unsigned, unsigned> instance_to_class_map;
-LabelUsage label_usage;
-
-
-
-// represents one object instance, either detected or ground truth
-struct DetectionObject
-{
-    std::string class_label;
-    std::string instance_label;
-    std::string global_class_label; // only for detection, not in ground truth
-    Eigen::Vector3f position;
-    float visibility_ratio;     // only in ground truth, used to filter detections
-    float confidence;           // only for detection, not in ground truth
-    // using path because some datasets use repeating names in subfolders
-    std::string filepath;       // filename of gt annotations, not the point cloud
-
-    DetectionObject(std::string class_label, std::string instance_label, std::string global_class_label, Eigen::Vector3f position,
-                    float visibility_ratio, float confidence, std::string filepath)
-        : class_label(class_label), instance_label(instance_label), global_class_label(global_class_label), position(position),
-          visibility_ratio(visibility_ratio), confidence(confidence), filepath(filepath) {}
-
-    void print()
-    {
-        LOG_INFO("Object from " << filepath);
-        LOG_INFO("    class: " << class_label << ", instance: " << instance_label << ", visible: " << visibility_ratio << " at position: (" <<
-                 position.x() << ", " << position.y() << ", " << position.z() << "), confidence: " << confidence);
-    }
-};
-
-
-std::tuple<float,float>
-get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_positives, int num_gt)
-{
-    int tp = 0;
-    for(unsigned i = 0; i < true_positives.size(); i++)
-    {
-        tp += true_positives[i];
-    }
-
-    int fp = 0;
-    for(unsigned i = 0; i < false_positives.size(); i++)
-    {
-        fp += false_positives[i];
-    }
-
-    float precision = tp / float(fp + tp);
-    float recall = num_gt == 0 ? 0 : float(tp) / num_gt;
-
-    return {precision, recall};
-}
-
-std::tuple<std::vector<int>,std::vector<int>>
-match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
-                    std::vector<DetectionObject> &class_objects_det,
-                    float distance_threshold)
-{
-    // sort objects by confidence then loop over sorted list, starting with hightest conf
-    std::sort(class_objects_det.begin(), class_objects_det.end(), [](DetectionObject &obj1, DetectionObject &obj2)
-    {
-       return obj1.confidence > obj2.confidence;
-    });
-
-    std::vector<bool> used_gt(class_objects_gt.size(), false);
-    std::vector<int> tp(class_objects_det.size(), 0);
-    std::vector<int> fp(class_objects_det.size(), 0);
-
-    for(unsigned det_idx = 0; det_idx < class_objects_det.size(); det_idx++)
-    {
-        float best_dist = 0.0f;
-        int best_index = -1;
-
-        // find matching gt object with smallest distance
-        const DetectionObject &det_obj = class_objects_det[det_idx];
-        for(unsigned gt_idx = 0; gt_idx < class_objects_gt.size(); gt_idx++)
-        {
-            const DetectionObject &gt_obj = class_objects_gt[gt_idx];
-            if(det_obj.filepath != gt_obj.filepath)
-            {
-                continue;
-            }
-
-            float distance = (gt_obj.position - det_obj.position).norm();
-            // record index and smallest dist if this gt object was not used before
-            if(distance > best_dist && !used_gt[gt_idx])
-            {
-                best_dist = distance;
-                best_index = int(gt_idx);
-            }
-        }
-
-        if(best_dist > distance_threshold || best_index == -1)
-        {
-            fp[det_idx] = 1;
-        }
-        else
-        {
-            tp[det_idx] = 1;
-            used_gt[unsigned(best_index)] = true;
-        }
-    }
-
-    return {tp, fp};
-}
-
-void rearrangeObjects(std::vector<DetectionObject> &source_list,
-                      std::map<std::string, std::vector<DetectionObject>> &target_map)
-{
-    for(const auto &object : source_list)
-    {
-        if(target_map.find(object.class_label) != target_map.end())
-        {
-            target_map.at(object.class_label).push_back(object);
-        }
-        else // class id not yet in map
-        {
-            target_map.insert({object.class_label,{object}});
-        }
-    }
-}
-
-DetectionObject convertMaxToObj(const ism3d::VotingMaximum& max, std::string &filename)
-{
-    std::string class_name, instance_name, global_class;
-    // lookup real class ids if instances were used as primary labels
-    if(label_usage == LabelUsage::INSTANCE_PRIMARY)
-    {
-        class_name = class_labels_rmap[instance_to_class_map[max.classId]];
-        instance_name = instance_labels_rmap[max.classId]; // class id actually has the instance label
-        global_class = class_labels_rmap[instance_to_class_map[max.globalHypothesis.classId]];
-    }
-    else
-    {
-        class_name = class_labels_rmap[max.classId];
-        instance_name = instance_labels_rmap[max.instanceId];
-        global_class = class_labels_rmap[max.globalHypothesis.classId];
-    }
-
-    float confidence = max.weight; // TODO VS make conf not weight!
-    Eigen::Vector3f position(max.position[0], max.position[1], max.position[2]);
-    // create object
-    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename};
-}
-
-
-std::vector<DetectionObject> parseGtFile(std::string &filename)
-{
-    std::vector<DetectionObject> objects;
-
-    std::ifstream file(filename);
-    std::string line;
-    while(std::getline(file, line))
-    {
-        if(line == "")
-            continue;
-
-        std::stringstream iss(line);
-        std::string item;
-        std::vector<std::string> tokens;
-        while(std::getline(iss, item, ' '))
-        {
-            if(item == "")
-                continue;
-            tokens.push_back(item);
-        }
-
-        if(tokens.size() == 4 || tokens.size() == 5 || tokens.size() == 6)
-        {
-            std::string class_name = tokens[0];
-            std::string instance_name = class_name; // overwrite later if available
-            int offset = 0;
-
-            if(tokens.size() == 6) // gt annotation with visibility ratio and class and instance labels
-            {
-                instance_name = tokens[1];
-                offset += 1;
-            }
-            float visibility = 1.0f;
-            if(tokens.size() == 5) // visibility ratio given, no instance labels
-            {
-                std::string visibility_str = tokens[1+offset];
-                visibility_str = visibility_str.substr(1, visibility_str.find_first_of(')')-1);
-                visibility = std::stof(visibility_str);
-                offset += 1;
-            }
-            Eigen::Vector3f position(std::stof(tokens[1+offset]), std::stof(tokens[2+offset]), std::stof(tokens[3+offset]));
-
-            // create object
-            objects.emplace_back(class_name, instance_name, class_name, position, visibility, 1.0f, filename);
-        }
-        else
-        {
-            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 4, 5 or 6!");
-            exit(1);
-        }
-    }
-    return objects;
-}
-
-
-unsigned convertLabel(std::string& label,
-                      std::map<std::string, unsigned>& labels_map,
-                      std::map<unsigned, std::string>& labels_rmap)
-{
-    if(labels_map.find(label) != labels_map.end())
-    {
-        return labels_map[label];
-    }
-    else
-    {
-        size_t cur_size = labels_map.size();
-        labels_map.insert({label, cur_size});
-        labels_rmap.insert({cur_size, label});
-        return cur_size;
-    }
-}
-
-void updateInstanceClassMapping(unsigned instance_label, unsigned class_label)
-{
-    if(instance_to_class_map.find(instance_label) != instance_to_class_map.end())
-    {
-        // already added do nothing
-    }
-    else
-    {
-        instance_to_class_map.insert({instance_label, class_label});
-    }
-}
-
-void parseFileListDetectionTest(std::string &input_file_name,
-                                      std::vector<std::string> &filenames,
-                                      std::vector<std::string> &gt_files)
-{
-    // parse input
-    std::ifstream infile(input_file_name);
-    std::string file;
-    std::string gt_file;
-    std::string additional_flag;
-    std::string additional_flag_2;
-
-    // special treatment of first line: determine mode
-    infile >> file;     // in the first line: #
-    infile >> gt_file;  // in the first line: the mode ("train" or "test") - here: must be "test"
-    infile >> additional_flag; // in the first line mandatory: "detection"
-    infile >> additional_flag_2; // optional: "inst"
-
-    if(file == "#" && (gt_file == "train" || gt_file == "test"))
-    {
-        if("test" != gt_file)
-        {
-            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< "test" << "', but your input file says '" << gt_file << "'!");
-            exit(1);
-        }
-        if (additional_flag != "detection")
-        {
-            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
-            exit(1);
-        }
-        if (additional_flag_2 == "inst")
-        {
-            // don't care here
-        }
-
-        // if no instances are used, the first filename has already been read into variable "additional_flag_2"
-        file = additional_flag_2;
-        filenames.push_back(file);
-        infile >> gt_file;
-        gt_files.push_back(gt_file);
-        // read remaining lines
-        while(infile >> file >> gt_file)
-        {
-            if (file[0] == '#') continue; // allows to comment out lines
-            filenames.push_back(file);
-            gt_files.push_back(gt_file);
-        }
-    }
-}
-
-
-LabelUsage parseFileList(std::string &input_file_name,
-                   std::vector<std::string> &filenames,
-                   std::vector<unsigned> &class_labels,
-                   std::vector<unsigned> &instance_labels,
-                   std::string mode)
-{
-    // parse input
-    std::ifstream infile(input_file_name);
-    std::string file;
-    std::string class_label;
-    std::string additional_flag;
-    std::string additional_flag_2;
-    std::string instance_label;
-    bool using_instances = false;
-
-    // special treatment of first line: determine mode
-    infile >> file;         // in the first line: #
-    infile >> class_label;  // in the first line: the mode ("train" or "test")
-    infile >> additional_flag; // in the first line mandatory: "detection"
-    infile >> additional_flag_2; // optional: "inst"
-
-    if(file == "#" && (class_label == "train" || class_label == "test"))
-    {
-        if(mode != class_label)
-        {
-            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< mode << "', but your input file says '" << class_label << "'!");
-            exit(1);
-        }
-        if (additional_flag != "detection")
-        {
-            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
-            exit(1);
-        }
-        if (additional_flag_2 == "inst")
-        {
-            using_instances = true;
-        }
-    }
-
-    // process remaining lines
-    if (using_instances)
-    {
-        // other lines contain a filename, a class label and an instance label
-        while(infile >> file >> class_label >> instance_label)
-        {
-            if (file[0] == '#') continue; // allows to comment out lines
-            filenames.push_back(file);
-            unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-            unsigned converted_instance_label = convertLabel(instance_label, instance_labels_map, instance_labels_rmap);
-            updateInstanceClassMapping(converted_instance_label, converted_class_label);
-            class_labels.push_back(converted_class_label);
-            instance_labels.push_back(converted_instance_label);
-        }
-    }
-    else
-    {
-        // if no instances are used, the first filename has already been read into variable "additional_flag_2"
-        file = additional_flag_2;
-        infile >> class_label;
-
-        filenames.push_back(file);
-        unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-
-        class_labels.push_back(converted_class_label);
-        // read remaining lines
-        while(infile >> file >> class_label)
-        {
-            if (file[0] == '#') continue; // allows to comment out lines
-            filenames.push_back(file);
-            unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
-            class_labels.push_back(converted_class_label);
-        }
-    }
-
-    if(using_instances)
-    {
-        return LabelUsage::BOTH_GIVEN; // instance labels given, decide later which is primary
-    }
-    else
-    {
-        return LabelUsage::CLASS_ONLY; // no instance labels given, use only class labels
-    }
-}
+#include "eval_helpers_detection.h"
 
 
 int main(int argc, char **argv)
@@ -473,7 +89,7 @@ int main(int argc, char **argv)
                 {
                     // manually parse input file
                     std::string input_file_name = variables["inputfile"].as<std::string>();
-                    label_usage = parseFileList(input_file_name, filenames, class_labels, instance_labels, "train");
+                    label_usage = parseFileListDetectionTrain(input_file_name, filenames, class_labels, instance_labels, "train");
                 }
 
                 std::cout << "starting the training process" << std::endl;
@@ -830,6 +446,8 @@ int main(int argc, char **argv)
 //                    std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
 //                    std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
 
+                    summaryFile << "  class      num gt   tp    fp   precision  recall   AP" << std::endl;
+
                     for(auto item : gt_class_map)
                     {
                         std::string class_label = item.first;
@@ -883,13 +501,17 @@ int main(int argc, char **argv)
                         }
 
                         // log class to summary
-                        summaryFile << "class " << class_id << ": " << class_label
-                                    << std::setw(10) << std::setfill(' ') << " num gt: " << num_gt
-                                    << std::setw(10) << std::setfill(' ') << " tp: " << int(cumul_tp)
-                                    << std::setw(10) << std::setfill(' ') << " fp: " << cumul_fp
-                                    << std::setw(10) << std::setfill(' ') << " precision: " << precision
-                                    << std::setw(10) << std::setfill(' ') << " recall: " << recall
-                                    << std::setw(10) << std::setfill(' ') << " AP: " << ap << std::endl;
+                        unsigned label_length = class_label.size();
+                        std::stringstream iss;
+                        iss << std::round(recall*10000.0f)/10000.0f;
+                        unsigned recall_length = iss.str().size();
+                        summaryFile << std::setw(3) << std::setfill(' ') << class_id << " " << class_label
+                                    << std::setw(15-label_length) << std::setfill(' ') << num_gt
+                                    << std::setw(5) << std::setfill(' ') << int(cumul_tp)
+                                    << std::setw(6) << std::setfill(' ') << cumul_fp
+                                    << std::setw(9) << std::setfill(' ') << std::round(precision*10000.0f)/10000.0f << "     "
+                                    << std::round(recall*10000.0f)/10000.0f << std::setw(15-recall_length) << std::setfill(' ')
+                                    << std::round(ap*10000.0f)/10000.0f << std::endl;
                     }
 
                     // write processing time details to summary
@@ -899,7 +521,7 @@ int main(int argc, char **argv)
                         if(it.first == "complete") continue;
                         time_sum += (it.second / 1000);
                     }
-                    summaryFile << "\n\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
+                    summaryFile << "\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
                     summaryFile << "times per step:\n";
                     summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
                     summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
@@ -924,11 +546,11 @@ int main(int argc, char **argv)
 
                     // complete and close summary file
                     summaryFile << std::endl << std::endl;
-                    summaryFile << "mAP: " << mAP << " (" << (mAP * 100.0f) << "%)" << std::endl;
-                    summaryFile << "mean precision: " << mPrec << " (" << (mPrec * 100.0f) << "%)" << std::endl;
-                    summaryFile << "mean recall: " << mRec << " (" << (mRec * 100.0f) << "%)" << std::endl << std::endl;
+                    summaryFile << "mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
+                    summaryFile << "mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
+                    summaryFile << "mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl << std::endl;
 
-                    summaryFile << "Total processing time: " << timer.format(4, "%w") << " seconds \n";
+                    summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
                 }
                 else
