@@ -148,10 +148,15 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             VotingMaximum maximum;
             maximum.classId = classId;
             maximum.instanceId = max_id_weights;
+            maximum.weight = maximaValues[i];
             maximum.instanceWeight = instance_weights[max_id_weights];
             maximum.position = clusters[i];
-            maximum.weight = maximaValues[i];
             maximum.voteIndices = voteIndices[i];
+            // init global result with available data
+            maximum.globalHypothesis.classId = classId;
+            maximum.globalHypothesis.classWeight = maximaValues[i];
+            maximum.globalHypothesis.instanceId = max_id_weights;
+            maximum.globalHypothesis.instanceWeight = instance_weights[max_id_weights];
 
             std::vector<boost::math::quaternion<float>> quats;
             std::vector<float> weights;
@@ -257,12 +262,23 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     for (int i = 0; i < (int)maxima.size(); i++)
     {
+        // TODO VS: format output nicely
         const VotingMaximum& max = maxima[i];
-        LOG_INFO("maximum " << i << ", class: " << max.classId <<
-                 ", weight: " << max.weight <<
-                 ", instance: " << max.instanceId << " (" << max.instanceWeight << ")" <<
-                 ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
-                 ", num votes: " << max.voteIndices.size());
+        if(m_use_global_features)
+        {
+            LOG_INFO("maximum " << i << ", class: " << max.classId <<
+                     ", weight: " << max.weight <<
+                     ", instance: " << max.instanceId << " (" << max.instanceWeight << ")" <<
+                     ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
+                     ", num votes: " << max.voteIndices.size());
+        }
+        else
+        {
+            LOG_INFO("maximum " << i << ", class: " << max.classId <<
+                     ", weight: " << max.weight <<
+                     ", instance: " << max.instanceId << " (" << max.instanceWeight << ")" <<
+                     ", num votes: " << max.voteIndices.size());
+        }
     }
     return maxima;
 }
@@ -278,18 +294,21 @@ void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
     float sum = 0;
     float sum_instance = 0;
     float sum_global = 0;
+    float sum_instance_global = 0;
     for(const VotingMaximum &max : maxima)
     {
         sum += max.weight;
         sum_instance += max.instanceWeight;
         sum_global += max.globalHypothesis.classWeight;
+        sum_instance_global += max.globalHypothesis.instanceWeight;
     }
 
     for(VotingMaximum &max : maxima)
     {
-        max.weight /= sum;
-        max.instanceWeight /= sum_instance;
-        max.globalHypothesis.classWeight /= sum_global;
+        max.weight = sum != 0 ? max.weight/sum : 0;
+        max.instanceWeight = sum_instance != 0 ? max.instanceWeight/sum_instance : 0;
+        max.globalHypothesis.classWeight = sum_global != 0 ? max.globalHypothesis.classWeight/sum_global : 0;
+        max.globalHypothesis.instanceWeight = sum_instance_global != 0 ? max.globalHypothesis.instanceWeight/sum_instance_global : 0;
     }
 }
 
