@@ -153,6 +153,8 @@ namespace ism3d
 
         void normalizeWeights(std::vector<VotingMaximum> &maxima);
 
+        void softmaxWeights(std::vector<VotingMaximum> &maxima);
+
         std::map<unsigned, std::vector<Vote>> m_votes;
 
         float m_minThreshold;   // retrieve all maxima above the weight threshold

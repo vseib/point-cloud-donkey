@@ -244,7 +244,8 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-    normalizeWeights(maxima); // apply normalization: turn weights to probabilities
+//    normalizeWeights(maxima); // apply normalization: turn weights to probabilities
+    softmaxWeights(maxima);
 
     // add global features to result classification
     if(m_use_global_features)
@@ -253,7 +254,8 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
         // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-        normalizeWeights(maxima);
+//        normalizeWeights(maxima);
+        softmaxWeights(maxima);
     }
 
     // only keep the best k maxima, if specified
@@ -309,6 +311,29 @@ void Voting::normalizeWeights(std::vector<VotingMaximum> &maxima)
         max.instanceWeight = sum_instance != 0 ? max.instanceWeight/sum_instance : 0;
         max.globalHypothesis.classWeight = sum_global != 0 ? max.globalHypothesis.classWeight/sum_global : 0;
         max.globalHypothesis.instanceWeight = sum_instance_global != 0 ? max.globalHypothesis.instanceWeight/sum_instance_global : 0;
+    }
+}
+
+void Voting::softmaxWeights(std::vector<VotingMaximum> &maxima)
+{
+    float sum = 0;
+    float sum_instance = 0;
+    float sum_global = 0;
+    float sum_instance_global = 0;
+    for(const VotingMaximum &max : maxima)
+    {
+        sum += std::exp(max.weight);
+        sum_instance += std::exp(max.instanceWeight);
+        sum_global += std::exp(max.globalHypothesis.classWeight);
+        sum_instance_global += std::exp(max.globalHypothesis.instanceWeight);
+    }
+
+    for(VotingMaximum &max : maxima)
+    {
+        max.weight = std::exp(max.weight) / sum;
+        max.instanceWeight = std::exp(max.instanceWeight) / sum_instance;
+        max.globalHypothesis.classWeight = std::exp(max.globalHypothesis.classWeight) / sum_global;
+        max.globalHypothesis.instanceWeight = std::exp(max.globalHypothesis.instanceWeight) / sum_instance_global;
     }
 }
 
