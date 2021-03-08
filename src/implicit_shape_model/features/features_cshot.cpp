@@ -48,6 +48,28 @@ namespace ism3d
             pcl::compute3DCentroid(*pointCloudWithoutNaNNormals, centroid);
         }
 
+        // temporary workaround to fix race conditions in OMP version of CSHOT in PCL
+        if (shotEst.sRGB_LUT[0] < 0)
+        {
+          for (int i = 0; i < 256; i++)
+          {
+            float f = static_cast<float> (i) / 255.0f;
+            if (f > 0.04045)
+              shotEst.sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
+            else
+              shotEst.sRGB_LUT[i] = f / 12.92f;
+          }
+
+          for (int i = 0; i < 4000; i++)
+          {
+            float f = static_cast<float> (i) / 4000.0f;
+            if (f > 0.008856)
+              shotEst.sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
+            else
+              shotEst.sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
+          }
+        }
+
         shotEst.setInputCloud(keypoints);
         shotEst.setInputReferenceFrames(referenceFrames);
         shotEst.setSearchMethod(search);
