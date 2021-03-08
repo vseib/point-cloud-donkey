@@ -30,6 +30,28 @@ namespace ism3d
         addParameter(m_e_bins, "ShortShotEBins", 2);
         addParameter(m_a_bins, "ShortShotABins", 8);
         addParameter(m_bin_type, "ShortShotBinType", std::string("auto"));
+
+        // initialize look up tables here, to avoid race conditions as in PCL when initialized in method RGB2CIELAB();
+        if (sRGB_LUT[0] < 0)
+        {
+          for (int i = 0; i < 256; i++)
+          {
+            float f = static_cast<float> (i) / 255.0f;
+            if (f > 0.04045)
+              sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
+            else
+              sRGB_LUT[i] = f / 12.92f;
+          }
+
+          for (int i = 0; i < 4000; i++)
+          {
+            float f = static_cast<float> (i) / 4000.0f;
+            if (f > 0.008856)
+              sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
+            else
+              sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
+          }
+        }
     }
 
     FeaturesSHORTCSHOT::~FeaturesSHORTCSHOT()
@@ -610,26 +632,6 @@ namespace ism3d
     void FeaturesSHORTCSHOT::RGB2CIELAB (unsigned char R, unsigned char G, unsigned char B,
                                          float &L, float &A, float &B2)
     {
-      if (sRGB_LUT[0] < 0)
-      {
-        for (int i = 0; i < 256; i++)
-        {
-          float f = static_cast<float> (i) / 255.0f;
-          if (f > 0.04045)
-            sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
-          else
-            sRGB_LUT[i] = f / 12.92f;
-        }
-
-        for (int i = 0; i < 4000; i++)
-        {
-          float f = static_cast<float> (i) / 4000.0f;
-          if (f > 0.008856)
-            sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
-          else
-            sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
-        }
-      }
 
       float fr = sRGB_LUT[R];
       float fg = sRGB_LUT[G];
