@@ -1276,6 +1276,7 @@ void ImplicitShapeModel::trainSVM(std::map<unsigned, std::vector<pcl::PointCloud
 }
 
 
+// TODO VS: move to debug_utils.cpp
 void ImplicitShapeModel::writeFeaturesToDisk(std::string file_name,
                                              const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
                                              const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &globalFeatures,

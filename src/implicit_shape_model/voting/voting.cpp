@@ -108,7 +108,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         #pragma omp parallel for
         for (int i = 0; i < (int)clusters.size(); i++)
         {
-            if (maximaValues[i] < m_minThreshold || voteIndices.at(i).size() < m_minVotesThreshold)
+            if (voteIndices.at(i).size() < m_minVotesThreshold)
                 continue;
 
             const std::vector<int>& clusterVotes = voteIndices[i];
@@ -116,6 +116,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             if (clusterVotes.size() == 0)
                 continue;
 
+            // TODO VS this should only be executed if secondary labels are used
             // determine instance id based on all ids and corresponding vote weights
             std::map<unsigned, float> instance_weights;
             for(unsigned idx = 0; idx < reweightedClusterVotes.size(); idx++)
@@ -244,8 +245,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-//    normalizeWeights(maxima); // apply normalization: turn weights to probabilities
-    softmaxWeights(maxima);
 
     // add global features to result classification
     if(m_use_global_features)
@@ -254,9 +253,21 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
         // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
-//        normalizeWeights(maxima);
-        softmaxWeights(maxima);
     }
+
+    // turn weights to probabilities
+    normalizeWeights(maxima);
+//    softmaxWeights(maxima);
+
+    // filter low weight maxima
+    filtered_maxima.clear();
+    for (int i = 0; i < (int)maxima.size(); i++)
+    {
+        if(maxima[i].weight < m_minThreshold)
+            continue;
+        filtered_maxima.push_back(maxima[i]);
+    }
+    maxima = filtered_maxima;
 
     // only keep the best k maxima, if specified
     if (m_bestK > 0 && maxima.size() >= m_bestK)
