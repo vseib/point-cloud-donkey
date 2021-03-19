@@ -450,11 +450,17 @@ int main(int argc, char **argv)
                                 summaryFile << "        | global tp    fp   precision  recall   AP";
                     summaryFile << std::endl;
 
+                    // these variables sum over the whole dataset
+                    int num_gt_dataset = 0;
+                    int cumul_tp_dataset = 0;
+                    int cumul_fp_dataset = 0;
+
                     for(auto item : gt_class_map)
                     {
                         std::string class_label = item.first;
                         unsigned class_id = class_labels_map[class_label];
                         std::vector<DetectionObject> class_objects_gt = item.second;
+                        // these variables sum over each class
                         int num_gt = int(class_objects_gt.size());
                         int cumul_tp, cumul_fp;
                         int global_cumul_tp, global_cumul_fp;
@@ -528,7 +534,18 @@ int main(int argc, char **argv)
                                         << std::setw(10) << std::round(global_ap*10000.0f)/10000.0f;
                         }
                         summaryFile << std::endl;
+
+                        // accumulate values of complete dataset
+                        num_gt_dataset += num_gt;
+                        cumul_tp_dataset += cumul_tp;
+                        cumul_fp_dataset += cumul_fp;
                     }
+
+                    // store sums
+                    summaryFile << "-------------------------------------------------------------" << std::endl;
+                    summaryFile << "Sums:" << std::setw(15) << std::right << num_gt_dataset
+                                << std::setw(5) << std::right << cumul_tp_dataset
+                                << std::setw(6) << std::right << cumul_fp_dataset << std::endl;
 
                     // write processing time details to summary
                     double time_sum = 0;
