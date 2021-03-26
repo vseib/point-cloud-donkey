@@ -153,6 +153,9 @@ add_library(implicit_shape_model
     third_party/pcl_shot_na_lrf/shot_na_lrf.cpp
     third_party/pcl_shot_na_lrf/shot_na_lrf.hpp
     third_party/pcl_shot_na_lrf/shot_na_lrf.h
+    third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_with_eigenvalues.cpp
+    third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_omp_with_eigenvalues.hpp
+    third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_omp_with_eigenvalues.h
 )
 
 # link library with dependencies
