@@ -31,7 +31,7 @@ The following table summarizes classification results on some datasets. For more
 
 | RGB-D Data Set | Base Pipeline<sup>[3](#fnbasep2)</sup> | Base Pipeline with Short CSHOT<sup>[5](#fnbasescsh)</sup> |
 | ---  | ---    | --- | 
-|   | class[6](#icarsc21supp) / instance accuracy | class[6](#icarsc21supp) / instance accuracy | 
+|   | class<sup>[6](#icarsc21supp)</sup> / instance accuracy | class<sup>[6](#icarsc21supp)</sup> / instance accuracy | 
 | [Washington RGB-D](https://rgbd-dataset.cs.washington.edu/) (partial) | 91.6 / 83.4 | 91.0 / 82.8 |
 | [BigBird](https://rll.berkeley.edu/bigbird/) | 84.0 / 71.2 | 91.0 / 81.7 |
 | [YCB](https://www.ycbbenchmarks.com/) | 87.9 / 73.2 | 81.4 / 68.6 |
@@ -41,7 +41,8 @@ The following table summarizes classification results on some datasets. For more
 
 ## Acknowledgments
 
-The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub in [Norman's repository](https://github.com/Norman0406).
+The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub:
+* [Norman's repository](https://github.com/Norman0406).
 
 Further, I would like to thank the developers of third party libraries used in this project: 
 * [Compact Geometric Features](https://marckhoury.github.io/CGF/)
