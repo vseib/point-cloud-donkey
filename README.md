@@ -15,7 +15,7 @@ PointCloudDonkey is a customizable pipeline based on the <a href="http://pointcl
 
 The following table summarizes classification results on some datasets. For more information please refer to the publications linked in the [Citing](#Citing) section.
 
-| Dataset | Base Pipeline<sup>[2](#fnbasep)</sup> | Base Pipeline<sup>[3](#fnbasep2)</sup> | Extended Pipeline<sup>[4](#fnbasepext)</sup> |
+| 3D-Data Set | Base Pipeline<sup>[2](#fnbasep)</sup> | Base Pipeline<sup>[3](#fnbasep2)</sup> | Extended Pipeline<sup>[4](#fnbasepext)</sup> |
 | ---  | ---    | --- | --- |
 | Aim@Shape<sup>[1](#fnaim)</sup> | 85.0 | 90.0 | 93.5 |
 | [McGill 3D Shape Benchmark](http://www.cim.mcgill.ca/~shape/benchMark/) | - |85.2 | 86.6 |
@@ -28,6 +28,14 @@ The following table summarizes classification results on some datasets. For more
 <a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf) and [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf)<br>
 <a name="fnbasep">3</a>: Optimized parameters in training [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf) <br> 
 <a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
+
+| RGB-D Data Set | Base Pipeline<sup>[3](#fnbasep2)</sup> | Base Pipeline with Short CSHOT<sup>[5](#fnbasescsh)</sup> |
+| ---  | ---    | --- | 
+| [Washington RGB-D](https://rgbd-dataset.cs.washington.edu/) (partial) | 91.6/83.4 | 91.0/82.8 |
+| [BigBird](https://rll.berkeley.edu/bigbird/) | 84.0/71.2 | 91.0/81.7 |
+| [YCB](https://www.ycbbenchmarks.com/) | 87.9/73.2 | 81.4/68.6 |
+
+<a name="fnbasescsh">5</a>: TODO [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf) <br>
 
 ## Acknowledgments
 
