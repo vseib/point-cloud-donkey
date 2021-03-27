@@ -30,8 +30,8 @@ The following table summarizes classification results on some datasets. For more
 <a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
 
 | RGB-D Data Set | Base Pipeline<sup>[3](#fnbasep2)</sup> | Base Pipeline with Short CSHOT<sup>[5](#fnbasescsh)</sup> |
-|   | class / instance accuracy | class / instance accuracy | 
 | ---  | ---    | --- | 
+|   | class / instance accuracy | class / instance accuracy | 
 | [Washington RGB-D](https://rgbd-dataset.cs.washington.edu/) (partial) | 91.6/83.4 | 91.0/82.8 |
 | [BigBird](https://rll.berkeley.edu/bigbird/) | 84.0 / 71.2 | 91.0 / 81.7 |
 | [YCB](https://www.ycbbenchmarks.com/) | 87.9 / 73.2 | 81.4 / 68.6 |
