@@ -1,0 +1,85 @@
+
+------------------------------------------------------------------------
+
+Washington RGB-D Data Set:
+
+* used partially
+* used only 3 first instances per class
+    * e.g. class "apple", used instances "apple_1", "apple_2", "apple_3"
+
+------------------------------------------------------------------------
+
+BigBird Data Set:
+
+* self assigned object instances to classes
+* most instances form its own class (i.e. one instance per class)
+    * e.g. class "3m_high_tack_spray_adhesive" comprises the instance "3m_high_tack_spray_adhesive"
+* grouped instances to classes are:
+    * class "band_aid", instances matching "band_aid_*"
+    * class "campbells", instances matching "campbells_*" 
+    * class "chewy_dipps", instances matching "chewy_dipps_*"  
+    * class "clif_crunch", instances matching "clif_crunch_*"  
+    * class "clif_zbar", instances matching "clif_z*"
+    * class "cup_noodles", instances matching "cup_noodles_*" 
+    * class "dove", instances matching "dove_*" 
+    * class "eating_right_for_healthy_living", instances matching "eating_*" 
+    * class "haagen_dazs", instances matching "haagen_dazs_*" 
+    * class "honey_bunches_of_oats", instances matching "honey_bunches_*"
+    * class "hunts", instances matching "hunts_*" 
+    * class "krylon", instances matching "krylon_*"  
+    * class "mom_to_mom", instances matching "mom_to_mom_*" 
+    * class "nature_valley", instances matching "nature_valley_*" 
+    * class "nutrigrain", instances matching "nutrigrain_*" 
+    * class "palmolive", instances matching "palmolive_*" 
+    * class "pop", instances matching "pop_*" 
+    * class "quaker", instances matching "quaker_*"  
+    * class "softsoap", instances matching "softsoap_*" 
+    * class "south_beach", instances matching "south_beach_*" 
+    * class "v8_fusion", instances matching "v8_fusion_*" 
+    * class "vo5", instances matching "vo5_*" 
+    * class "white_rain_sensations", instances matching "white_rain_sensations_*" 
+
+------------------------------------------------------------------------
+
+YCB Data Set:
+
+* objects that could not be reconstructed and are excluded from evaluation:
+    broken url
+        063-e_marbles
+    missing depth data
+        025-mug
+    missing mask data
+        046-plastic_bolt
+        063-b_marbles
+        063-c_marbles
+        063-f_marbles
+    useless (converted data looks like random points)
+        023_wine_glass
+        030-fork
+        031_spoon
+        032_knife
+        038-padlock
+        039-key
+        040_large_marker
+        041_small_marker
+        047-plastic_nut
+        049_small_clamp
+        050_medium_clamp
+        062_dice
+        063-d_marbles
+        072-d_toy_airplane
+        072-f_toy_airplane
+        072-g_toy_airplane 
+
+* self assigned object instances to classes
+* most instances form its own class (i.e. one instance per class)
+    * e.g. class "01_chips_can" comprises the instance "01_chips_can"
+* grouped instances to classes are:
+    * class "11-18_fruit", instances with ids 11 through 18
+    * class "43-44_screwdriver", instances with ids 43 and 44
+    * class "51-52_clamp", instances with ids 51 and 52
+    * class "53-58_ball", instances with ids 53 through 58
+    * class "65_cups", instances matching "65_*"  
+    * class "72_toy_airplane", instances matching "72_*"  
+    * class "73_lego_duplo", instances matching "73_*"  
+
