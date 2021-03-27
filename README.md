@@ -45,6 +45,7 @@ The development of this framework started during the Master's thesis of Norman L
 * [Norman's repository](https://github.com/Norman0406).
 
 Further, I would like to thank the developers of third party libraries used in this project: 
+* [Point Cloud Library](https://github.com/PointCloudLibrary/pcl)
 * [Compact Geometric Features](https://marckhoury.github.io/CGF/)
 * [cnpy Library](https://github.com/rogersce/cnpy)
 * [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
