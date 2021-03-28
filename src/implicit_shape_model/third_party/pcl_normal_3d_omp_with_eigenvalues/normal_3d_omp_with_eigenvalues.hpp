@@ -67,8 +67,8 @@ pcl::NormalEstimationOMPWithEigVals<PointInT, PointOutT>::computeFeature (PointC
   std::vector<float> nn_dists (k_);
 
   // VS added
-  extra_output_.clear();
-  extra_output_.points.resize(output.points.size());
+  eigen_values_->clear();
+  eigen_values_->points.resize(output.points.size());
 
   output.is_dense = true;
   // Save a few cycles by not checking every point for NaN/Inf values if the cloud is set to dense
@@ -96,9 +96,10 @@ pcl::NormalEstimationOMPWithEigVals<PointInT, PointOutT>::computeFeature (PointC
       output.points[idx].normal_z = n[2];
 
       // VS added
-      extra_output_.points[idx].x = eigen_values(2);
-      extra_output_.points[idx].y = eigen_values(1);
-      extra_output_.points[idx].z = eigen_values(0);
+      // eigen values in descending order
+      eigen_values_->points[idx].x = eigen_values(2);
+      eigen_values_->points[idx].y = eigen_values(1);
+      eigen_values_->points[idx].z = eigen_values(0);
 
       flipNormalTowardsViewpointMod (input_->points[(*indices_)[idx]], vpx_, vpy_, vpz_,
                                   output.points[idx].normal[0], output.points[idx].normal[1], output.points[idx].normal[2]);
@@ -130,9 +131,10 @@ pcl::NormalEstimationOMPWithEigVals<PointInT, PointOutT>::computeFeature (PointC
       output.points[idx].normal_z = n[2];
 
       // VS added
-      extra_output_.points[idx].x = eigen_values(2);
-      extra_output_.points[idx].y = eigen_values(1);
-      extra_output_.points[idx].z = eigen_values(0);
+      // eigen values in descending order
+      eigen_values_->points[idx].x = eigen_values(2);
+      eigen_values_->points[idx].y = eigen_values(1);
+      eigen_values_->points[idx].z = eigen_values(0);
 
       flipNormalTowardsViewpointMod (input_->points[(*indices_)[idx]], vpx_, vpy_, vpz_,
                                   output.points[idx].normal[0], output.points[idx].normal[1], output.points[idx].normal[2]);

@@ -212,6 +212,7 @@ namespace pcl
       , vpy_ (0)
       , vpz_ (0)
       , use_sensor_origin_ (true)
+      , eigen_values_(new pcl::PointCloud<PointInT>())
       {
         feature_name_ = "NormalEstimationOMPWithEigVals";
         setNumberOfThreads(nr_threads);
@@ -299,7 +300,9 @@ namespace pcl
 
   public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    pcl::PointCloud<PointInT> extra_output_; // TODO VS: rename, create a getter, make protected
+
+    /** eigen values in descending order */
+    typename pcl::PointCloud<PointInT>::Ptr eigen_values_;
   };
 }
 

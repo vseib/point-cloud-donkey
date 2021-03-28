@@ -36,6 +36,7 @@
 #define PCL_NO_PRECOMPILE
 #include <pcl/search/kdtree.h>
 #include <pcl/features/normal_3d_omp.h>
+#include "third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_omp_with_eigenvalues.hpp"
 #include <pcl/features/integral_image_normal.h>
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/filters/filter.h>
@@ -480,20 +481,22 @@ bool ImplicitShapeModel::add_normals(const std::string& filename, const std::str
     }
 
     pcl::PointCloud<PointT>::Ptr pointCloud(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<PointT>::Ptr eigenValues;
     pcl::PointCloud<pcl::Normal>::Ptr normals;
     pcl::PointCloud<PointT>::Ptr pointsWithoutNaN;
+    pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan;
     pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN;
 
     // extract position point cloud
     pcl::copyPointCloud(*points, *pointCloud);
 
     LOG_INFO("computing normals");
-    computeNormals(pointCloud, normals, searchTree);
+    computeNormals(pointCloud, eigenValues, normals, searchTree);
 
     LOG_ASSERT(normals->size() == pointCloud->size());
 
     // filter normals with NaN and corresponding points
-    filterNormals(pointCloud, normals, pointsWithoutNaN, normalsWithoutNaN);
+    filterNormals(pointCloud, eigenValues, normals, pointsWithoutNaN, eigenValuesWithoutNan, normalsWithoutNaN);
 
     LOG_ASSERT(pointsWithoutNaN.get() != 0);
     LOG_ASSERT(normalsWithoutNaN.get() != 0);
@@ -783,8 +786,10 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     }
 
     pcl::PointCloud<PointT>::Ptr pointCloud(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<PointT>::Ptr eigenValues;
     pcl::PointCloud<pcl::Normal>::Ptr normals;
     pcl::PointCloud<PointT>::Ptr pointsWithoutNaN;
+    pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan;
     pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN;
 
     // extract position point cloud
@@ -805,7 +810,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         // compute normals on the cloud
         timer_normals.start();
         LOG_INFO("computing normals");
-        computeNormals(pointCloud, normals, searchTree);
+        computeNormals(pointCloud, eigenValues, normals, searchTree);
         timer_normals.stop();
     }
     else
@@ -819,7 +824,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     LOG_ASSERT(normals->size() == pointCloud->size());
 
     // filter normals with NaN and corresponding points
-    filterNormals(pointCloud, normals, pointsWithoutNaN, normalsWithoutNaN);
+    filterNormals(pointCloud, eigenValues, normals, pointsWithoutNaN, eigenValuesWithoutNan, normalsWithoutNaN);
 
     LOG_ASSERT(pointsWithoutNaN.get() != 0);
     LOG_ASSERT(normalsWithoutNaN.get() != 0);
@@ -883,20 +888,27 @@ const Voting* ImplicitShapeModel::getVoting() const
 }
 
 
-void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
-                                        pcl::PointCloud<pcl::Normal>::Ptr& normals,
+void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr points,
+                                        pcl::PointCloud<PointT>::Ptr eigen_values,
+                                        pcl::PointCloud<pcl::Normal>::Ptr normals,
                                         pcl::search::Search<PointT>::Ptr searchTree) const
 {
     LOG_ASSERT(normals.get() == 0);
     normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
 
-    if (model->isOrganized())
+    if (points->isOrganized())
     {
+        // TODO VS: check if detection datasets are organized in training and testing !!! if yes: also test with other normals
+
         pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(model);
+        normalEst.setInputCloud(points);
+        // TODO VS: test this
+//        normalEst.setNormalEstimationMethod(normalEst.COVARIANCE_MATRIX);
         normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
         normalEst.setMaxDepthChangeFactor(0.02f);
         normalEst.setNormalSmoothingSize(10.0f);
+        // TODO VS: test this
+//        normalEst.setBorderPolicy(normalEst.BORDER_POLICY_MIRROR);
 
         // flip normals toward scene viewpoint
         LOG_INFO("orienting normals toward viewpoint");
@@ -909,8 +921,8 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
         LOG_INFO("computing consistent normal orientation (using method " << m_consistent_normals_method <<")");
 
         // prepare PCL normal estimation object
-        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(model);
+        pcl::NormalEstimationOMPWithEigVals<PointT, pcl::Normal> normalEst;
+        normalEst.setInputCloud(points);
         normalEst.setSearchMethod(searchTree);
         normalEst.setRadiusSearch(m_normal_radius);
         normalEst.setNumberOfThreads(m_num_threads);
@@ -919,14 +931,15 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
 
         if(m_consistent_normals_method == 0)
         {
-            // no consitent orientation - just compute
+            // orient consistently towards the view point
+            normalEst.setViewPoint(0,0,0);
             normalEst.compute(*normals);
         }
         else if(m_consistent_normals_method == 1)
         {
             // move model to origin, then point normals away from origin
             pcl::PointCloud<PointT>::Ptr model_no_centroid(new pcl::PointCloud<PointT>());
-            pcl::copyPointCloud(*model, *model_no_centroid);
+            pcl::copyPointCloud(*points, *model_no_centroid);
 
             // compute the object centroid
             Eigen::Vector4f centroid4f;
@@ -953,7 +966,7 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
         else if(m_consistent_normals_method == 2)
         {
             normalEst.compute(*normals); // this is only needed for curvature at each point
-            orient.processSHOTLRF(model, normals, normals, searchTree);
+            orient.processSHOTLRF(points, normals, normals, searchTree);
         }
 #ifdef USE_VCGLIB
         else if(m_consistentNormalsMethod == 3)
@@ -965,16 +978,25 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr model,
         {
             LOG_WARN("Invalid consistent normals method: " << m_consistent_normals_method << "! Skipping consistent normals.");
         }
+
+        // get eigenvalues if proper feature type is selected
+        if(normalEst.feature_name_ == "NormalEstimationOMPWithEigVals")
+        {
+            eigen_values = normalEst.eigen_values_;
+        }
     }
 }
 
 
-void ImplicitShapeModel::filterNormals(pcl::PointCloud<PointT>::ConstPtr model,
+void ImplicitShapeModel::filterNormals(pcl::PointCloud<PointT>::ConstPtr points,
+                                       pcl::PointCloud<PointT>::ConstPtr eigenValues,
                                        pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                                       pcl::PointCloud<PointT>::Ptr& modelWithoutNaN,
-                                       pcl::PointCloud<pcl::Normal>::Ptr& normalsWithoutNaN)
+                                       pcl::PointCloud<PointT>::Ptr pointsWithoutNaN,
+                                       pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                       pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN)
 {
-    LOG_ASSERT(modelWithoutNaN.get() == 0);
+    LOG_ASSERT(pointsWithoutNaN.get() == 0);
+    LOG_ASSERT(eigenValuesWithoutNan.get() == 0);
     LOG_ASSERT(normalsWithoutNaN.get() == 0);
 
     // filter NaN normals
@@ -983,9 +1005,14 @@ void ImplicitShapeModel::filterNormals(pcl::PointCloud<PointT>::ConstPtr model,
     pcl::removeNaNNormalsFromPointCloud(*normals, *normalsWithoutNaN, mapping);
 
     // create new point cloud without NaN normals
-    modelWithoutNaN = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
+    pointsWithoutNaN = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
+    // ... and without corresponding eigenvalues
+    eigenValuesWithoutNan = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
     for (int i = 0; i < (int)mapping.size(); i++)
-        modelWithoutNaN->push_back(model->at(mapping[i]));
+    {
+        pointsWithoutNaN->push_back(points->at(mapping[i]));
+        eigenValuesWithoutNan->push_back(eigenValues->at(mapping[i]));
+    }
 }
 
 Json::Value ImplicitShapeModel::iChildConfigsToJson() const

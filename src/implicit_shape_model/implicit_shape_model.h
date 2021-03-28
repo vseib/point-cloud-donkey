@@ -234,14 +234,17 @@ namespace ism3d
             computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr, bool, boost::timer::cpu_timer&, boost::timer::cpu_timer &timer_keypoints,
                             bool compute_global);
 
-        void computeNormals(pcl::PointCloud<PointT>::ConstPtr,
-                            pcl::PointCloud<pcl::Normal>::Ptr&,
-                            pcl::search::Search<PointT>::Ptr) const;
+        void computeNormals(pcl::PointCloud<PointT>::ConstPtr points,
+                            pcl::PointCloud<PointT>::Ptr eigen_values,
+                            pcl::PointCloud<pcl::Normal>::Ptr normals,
+                            pcl::search::Search<PointT>::Ptr search) const;
 
-        void filterNormals(pcl::PointCloud<PointT>::ConstPtr model,
+        void filterNormals(pcl::PointCloud<PointT>::ConstPtr points,
+                           pcl::PointCloud<PointT>::ConstPtr eigenValues,
                            pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                           pcl::PointCloud<PointT>::Ptr& modelWithoutNaN,
-                           pcl::PointCloud<pcl::Normal>::Ptr& normalsWithoutNaN);
+                           pcl::PointCloud<PointT>::Ptr pointsWithoutNaN,
+                           pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                           pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN);
 
         void writeFeaturesToDisk(std::string file_name,
                                  const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features,
