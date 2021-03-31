@@ -39,6 +39,9 @@ namespace ism3d
                                                             pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                             pcl::search::Search<PointT>::Ptr search);
 
+        float computeKPQ(const std::vector<int> &pointIdxs,
+                         pcl::PointCloud<PointT>::Ptr eigen_values);
+
     private:
         float m_leafSize;
     };
