@@ -828,6 +828,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
 
     LOG_ASSERT(pointsWithoutNaN.get() != 0);
     LOG_ASSERT(normalsWithoutNaN.get() != 0);
+    LOG_ASSERT(eigenValuesWithoutNan.get() != 0);
     LOG_ASSERT(pointsWithoutNaN->size() == normalsWithoutNaN->size());
 
     if(m_enable_signals)
@@ -889,9 +890,9 @@ const Voting* ImplicitShapeModel::getVoting() const
 
 
 void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr points,
-                                        pcl::PointCloud<PointT>::Ptr eigen_values,
-                                        pcl::PointCloud<pcl::Normal>::Ptr normals,
-                                        pcl::search::Search<PointT>::Ptr searchTree) const
+                                        pcl::PointCloud<PointT>::Ptr &eigen_values,
+                                        pcl::PointCloud<pcl::Normal>::Ptr &normals,
+                                        pcl::search::Search<PointT>::Ptr &searchTree) const
 {
     LOG_ASSERT(normals.get() == 0);
     normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
@@ -991,9 +992,9 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr points
 void ImplicitShapeModel::filterNormals(pcl::PointCloud<PointT>::ConstPtr points,
                                        pcl::PointCloud<PointT>::ConstPtr eigenValues,
                                        pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                                       pcl::PointCloud<PointT>::Ptr pointsWithoutNaN,
-                                       pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
-                                       pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN)
+                                       pcl::PointCloud<PointT>::Ptr &pointsWithoutNaN,
+                                       pcl::PointCloud<PointT>::Ptr &eigenValuesWithoutNan,
+                                       pcl::PointCloud<pcl::Normal>::Ptr &normalsWithoutNaN)
 {
     LOG_ASSERT(pointsWithoutNaN.get() == 0);
     LOG_ASSERT(eigenValuesWithoutNan.get() == 0);
@@ -1011,7 +1012,10 @@ void ImplicitShapeModel::filterNormals(pcl::PointCloud<PointT>::ConstPtr points,
     for (int i = 0; i < (int)mapping.size(); i++)
     {
         pointsWithoutNaN->push_back(points->at(mapping[i]));
-        eigenValuesWithoutNan->push_back(eigenValues->at(mapping[i]));
+        if(eigenValues->size() == normals->size())
+        {
+            eigenValuesWithoutNan->push_back(eigenValues->at(mapping[i]));
+        }
     }
 }
 

@@ -235,32 +235,32 @@ namespace ism3d
                             bool compute_global);
 
         void computeNormals(pcl::PointCloud<PointT>::ConstPtr points,
-                            pcl::PointCloud<PointT>::Ptr eigen_values,
-                            pcl::PointCloud<pcl::Normal>::Ptr normals,
-                            pcl::search::Search<PointT>::Ptr search) const;
+                            pcl::PointCloud<PointT>::Ptr &eigen_values,
+                            pcl::PointCloud<pcl::Normal>::Ptr &normals,
+                            pcl::search::Search<PointT>::Ptr &search) const;
 
         void filterNormals(pcl::PointCloud<PointT>::ConstPtr points,
                            pcl::PointCloud<PointT>::ConstPtr eigenValues,
                            pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                           pcl::PointCloud<PointT>::Ptr pointsWithoutNaN,
-                           pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
-                           pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN);
+                           pcl::PointCloud<PointT>::Ptr &pointsWithoutNaN,
+                           pcl::PointCloud<PointT>::Ptr &eigenValuesWithoutNan,
+                           pcl::PointCloud<pcl::Normal>::Ptr &normalsWithoutNaN);
 
         void writeFeaturesToDisk(std::string file_name,
-                                 const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features,
-                                 const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures,
-                                 const std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes);
+                                 const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+                                 const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &globalFeatures,
+                                 const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes);
 
         void readFeaturesFromDisk(std::string file_name,
-                                  std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features,
-                                  std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &globalFeatures,
-                                  std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes);
+                                  std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
+                                  std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &globalFeatures,
+                                  std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes);
 
         // removes all features with NAN in the given input; output: filtered list
         pcl::PointCloud<ISMFeature>::Ptr removeNaNFeatures(pcl::PointCloud<ISMFeature>::ConstPtr modelFeatures);
 
         std::map<unsigned, pcl::PointCloud<PointT>::Ptr > analyzeVotingSpacesForDebug
-                            (const std::map<unsigned, std::vector<Voting::Vote> > &all_votes,
+                            (const std::map<unsigned, std::vector<Voting::Vote>> &all_votes,
                              pcl::PointCloud<PointNormalT>::Ptr points);
 
         void addMaximaForDebug(std::map<unsigned, pcl::PointCloud<PointT>::Ptr> &all_votings, std::vector<VotingMaximum> &positions);
