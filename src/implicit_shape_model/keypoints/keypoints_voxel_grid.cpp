@@ -26,14 +26,13 @@ namespace ism3d
     }
 
     pcl::PointCloud<PointT>::ConstPtr KeypointsVoxelGrid::iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr points,
-                                                                            pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                                            pcl::PointCloud<PointT>::ConstPtr,
-                                                                            pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                                            pcl::search::Search<PointT>::Ptr)
-    {
-        pcl::VoxelGrid<PointT> voxelGrid;
-        voxelGrid.setInputCloud(points);
-        voxelGrid.setLeafSize(m_leafSize, m_leafSize, m_leafSize);
+                                                                            pcl::PointCloud<PointT>::ConstPtr eigenValues,
+                                                                            pcl::PointCloud<pcl::Normal>::ConstPtr normals,
+                                                                            pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                                            pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                                            pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
+                                                                            pcl::search::Search<PointT>::Ptr search)
+    {       
 
         // compute keypoints
         pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());

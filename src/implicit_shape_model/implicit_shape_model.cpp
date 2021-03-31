@@ -839,9 +839,9 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     LOG_INFO("computing keypoints");
     timer_keypoints.start();
     m_keypoints_detector->setNumThreads(m_num_threads);
-    pcl::PointCloud<PointT>::ConstPtr keypoints = (*m_keypoints_detector)(pointCloud, normals,
-                                                                         pointsWithoutNaN, normalsWithoutNaN,
-                                                                         searchTree);
+    pcl::PointCloud<PointT>::ConstPtr keypoints = (*m_keypoints_detector)(pointCloud, eigenValues, normals,
+                                                                          pointsWithoutNaN, eigenValuesWithoutNan,
+                                                                          normalsWithoutNaN, searchTree);
     timer_keypoints.stop();
 
     // compute descriptors for keypoints

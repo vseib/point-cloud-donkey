@@ -29,9 +29,11 @@ namespace ism3d
     }
 
     pcl::PointCloud<PointT>::ConstPtr KeypointsISS3D::iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr points,
+                                                                        pcl::PointCloud<PointT>::ConstPtr eigenValues,
                                                                         pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                                                                        pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaNNormals,
-                                                                        pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN,
+                                                                        pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                                        pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                                        pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                                         pcl::search::Search<PointT>::Ptr search)
     {
         //const double normalRadius = 0.06;

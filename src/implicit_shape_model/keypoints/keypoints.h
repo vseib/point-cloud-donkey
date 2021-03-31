@@ -37,17 +37,22 @@ namespace ism3d
         /**
          * @brief Interface function to compute keypoints on the input point cloud.
          * @param points the input point cloud
+         * @param eigenValues eigen values of the tangent plane for each normal (x, y, z in descending order)
          * @param normals normals for the input point cloud (normals->size() == points->size())
          * @param pointsWithoutNaNNormals the input point cloud without points with corresponding
+         * NaN normals
+         * @param eigenValues eigenValues of the tangent plane without points with corresponding
          * NaN normals
          * @param normalsWithoutNaN normals without NaN values (normalsWithoutNaN->size() == pointsWithoutNaNNormals->size())
          * @param search the input search tree
          * @return a point cloud containing keypoints
          */
         pcl::PointCloud<PointT>::ConstPtr operator()(pcl::PointCloud<PointT>::ConstPtr points,
+                                                     pcl::PointCloud<PointT>::ConstPtr eigenValues,
                                                      pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                                                     pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaNNormals,
-                                                     pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN,
+                                                     pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                     pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                     pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                      pcl::search::Search<PointT>::Ptr search);
 
         /**
@@ -59,11 +64,13 @@ namespace ism3d
     protected:
         Keypoints();
 
-        virtual pcl::PointCloud<PointT>::ConstPtr iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr,
-                                                                    pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                                    pcl::PointCloud<PointT>::ConstPtr,
-                                                                    pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                                    pcl::search::Search<PointT>::Ptr) = 0;
+        virtual pcl::PointCloud<PointT>::ConstPtr iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr points,
+                                                                    pcl::PointCloud<PointT>::ConstPtr eigenValues,
+                                                                    pcl::PointCloud<pcl::Normal>::ConstPtr normals,
+                                                                    pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                                    pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                                    pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
+                                                                    pcl::search::Search<PointT>::Ptr search) = 0;
 
         int getNumThreads() const;
 

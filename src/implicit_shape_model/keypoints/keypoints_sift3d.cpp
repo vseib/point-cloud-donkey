@@ -22,10 +22,12 @@ namespace ism3d
     }
 
     pcl::PointCloud<PointT>::ConstPtr KeypointsSIFT3D::iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr points,
-                                                                           pcl::PointCloud<pcl::Normal>::ConstPtr normals,
-                                                                           pcl::PointCloud<PointT>::ConstPtr pointsWithoutNaNNormals,
-                                                                           pcl::PointCloud<pcl::Normal>::ConstPtr normalsWithoutNaN,
-                                                                           pcl::search::Search<PointT>::Ptr search)
+                                                                         pcl::PointCloud<PointT>::ConstPtr eigenValues,
+                                                                         pcl::PointCloud<pcl::Normal>::ConstPtr normals,
+                                                                         pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                                         pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                                         pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
+                                                                         pcl::search::Search<PointT>::Ptr search)
     {
         // create new point cloud and set curvature as intensity (SIFT 3D will then use curvature as "intensity")
         pcl::PointCloud<pcl::PointXYZI>::Ptr newCloud(new pcl::PointCloud<pcl::PointXYZI>());

@@ -30,11 +30,13 @@ namespace ism3d
         std::string getType() const;
 
     protected:
-        pcl::PointCloud<PointT>::ConstPtr iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr,
-                                                            pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                            pcl::PointCloud<PointT>::ConstPtr,
-                                                            pcl::PointCloud<pcl::Normal>::ConstPtr,
-                                                            pcl::search::Search<PointT>::Ptr);
+        pcl::PointCloud<PointT>::ConstPtr iComputeKeypoints(pcl::PointCloud<PointT>::ConstPtr points,
+                                                            pcl::PointCloud<PointT>::ConstPtr eigenValues,
+                                                            pcl::PointCloud<pcl::Normal>::ConstPtr normals,
+                                                            pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
+                                                            pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                            pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
+                                                            pcl::search::Search<PointT>::Ptr search);
 
     private:
         double m_salientRadius;
