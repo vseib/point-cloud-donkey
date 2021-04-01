@@ -13,7 +13,6 @@
 #define PCL_NO_PRECOMPILE
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
-
 #include <fstream>
 
 namespace ism3d
@@ -37,15 +36,21 @@ namespace ism3d
     {
 
         // TODO VS params
-        bool filter_keypoints = true;
         int knn_kpq = 100;
-        float filter_threshold = 0.005f; // e.g. 0.005 good for method "curvature"
+        float filter_threshold_geometry = 0.005f; // e.g. 0.005 good for method "curvature"
         float filter_cutoff = 0.5f; // value between 0 and 1
-        std::string method = "curvature"; // one of: "curvature", "gaussian", "kpq"
-        std::string type = "cutoff"; // one of: "cutoff", "threshold", "auto"
-        // TODO VS: rethink auto
+        std::string filter_method_geometry = "none"; // one of: "curvature", "gaussian", "kpq", "none"
+        std::string filter_type_geometry = "cutoff"; // one of: "cutoff", "threshold", "auto"
 
-        if(!filter_keypoints)
+        std::string filter_method_color = "color";
+        std::string filter_type_color = "threshold";
+        float filter_threshold_color = 0.02f; // e.g. 0.02 good for color
+        // TODO VS extract parameter from color distance method
+
+        // TODO VS disable filtering in training
+
+
+        if(filter_method_geometry == "none" && filter_method_color == "none")
         {
             pcl::VoxelGrid<PointT> voxelGrid;
             voxelGrid.setInputCloud(points);
@@ -58,14 +63,22 @@ namespace ism3d
         }
         else
         {
-            if(method != "curvature" && method != "gaussian" && method != "kpq")
+            if(filter_method_geometry != "none" && filter_method_geometry != "curvature" &&
+                    filter_method_geometry != "gaussian" && filter_method_geometry != "kpq")
             {
-                LOG_ERROR("Unsupported keypoint filter method: " << method);
+                LOG_ERROR("Unsupported keypoint filter method: " << filter_method_geometry);
                 exit(1);
             }
-            if(type != "cutoff" && type != "threshold" && type != "auto")
+            if(filter_type_geometry != "none" && filter_type_geometry != "cutoff" &&
+                    filter_type_geometry != "threshold" && filter_type_geometry != "auto")
             {
-                LOG_ERROR("Unsupported keypoint filter type: " << type);
+                LOG_ERROR("Unsupported keypoint filter type: " << filter_type_geometry);
+                exit(1);
+            }
+
+            if(filter_method_geometry == "kpq" && filter_type_geometry == "auto")
+            {
+                LOG_ERROR("Filter type " << filter_type_geometry << " is not supported with filter method " << filter_method_geometry);
                 exit(1);
             }
 
@@ -86,20 +99,23 @@ namespace ism3d
             std::vector<float> curv;
             std::vector<float> ks;
             std::vector<float> kpq;
-
             std::vector<float> ks_unsorted;
             std::vector<float> kpq_unsorted;
 
+            std::vector<float> color_scores;
+            std::vector<float> color_scores_unsorted;
 
             pcl::KdTreeFLANN<PointNormalT> pts_with_normals_tree;
             pts_with_normals_tree.setInputCloud(points_with_normals); // NOTE: search on original cloud
             std::vector<int> point_idxs;
             std::vector<float> point_dists;
 
+            ColorConversion& cc = ColorConversionStatic::getColorConversion();
+
             for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
             {
                 // PCL curvature
-                PointNormalT pn1 = keypoints_with_normals->at(idx);
+                const PointNormalT &pn1 = keypoints_with_normals->at(idx);
                 curv.push_back(pn1.curvature);
 
                 // KPQ (keypoint quality)
@@ -117,12 +133,19 @@ namespace ism3d
                 // idea for later: overwrite curvature by the value value that is currently used
                 kpq_unsorted.push_back(kpqval);
                 ks_unsorted.push_back(pn2.x * pn2.y);
+
+
+                // -------- filtering based on color ------------------------
+                float color_score = computeColorScore(point_idxs, points_with_normals, pn1, cc);
+                color_scores.push_back(color_score);
+                color_scores_unsorted.push_back(color_score);
             }
 
             // sort to determine cutoff threshold
             std::sort(curv.begin(), curv.end());
             std::sort(ks.begin(), ks.end());
             std::sort(kpq.begin(), kpq.end());
+            std::sort(color_scores.begin(), color_scores.end());
 
 
 
@@ -135,6 +158,9 @@ namespace ism3d
             std::vector<int> curv_hist(hist_size, 0);
             std::vector<int> ks_hist(hist_size, 0);
             std::vector<int> kpq_hist(hist_size, 0);
+
+            float hist_step_color = (color_scores.back() - color_scores.front()) / hist_size;
+            std::vector<int> color_hist(hist_size, 0);
 
             for(auto val : curv)
             {
@@ -162,111 +188,127 @@ namespace ism3d
                 kpq_hist[kpq_bin]++;
             }
 
-
-
-//            std::ofstream curv_file;
-//            curv_file.open("/home/vseib/Desktop/curv_hist.txt", std::ios_base::app);
-//            for(auto val : curv_hist)
-//            {
-//                curv_file << val << ", ";
-//            }
-//            curv_file << std::endl;
-//            curv_file.close();
-
-//            std::ofstream ks_file;
-//            ks_file.open("/home/vseib/Desktop/ks_hist.txt", std::ios_base::app);
-//            for(auto val : curv_hist)
-//            {
-//                ks_file << val << ", ";
-//            }
-//            ks_file << std::endl;
-//            ks_file.close();
-
-//            std::ofstream kpq_file;
-//            kpq_file.open("/home/vseib/Desktop/kpq_hist.txt", std::ios_base::app);
-//            for(auto val : kpq_hist)
-//            {
-//                kpq_file << val << ", ";
-//            }
-//            kpq_file << std::endl;
-//            kpq_file.close();
-
-
-
-            LOG_INFO("------------------------------------");
-            unsigned cutoff_index = unsigned(filter_cutoff * curv.size());
-
-            // will automatically determine cutoff index
-            if(type == "auto")
+            for(auto val : color_scores)
             {
-                std::vector<int> hist;
-                if(method == "curvature")
-                    hist = curv_hist;
-                if(method == "gaussian")
-                    hist = ks_hist;
-                if(method == "kpq")
-                    hist = kpq_hist;
+                int color_bin = (val - color_scores.front()) / hist_step_color;
+                color_bin = color_bin < 0 ? 0 : color_bin;
+                color_bin = color_bin >= color_hist.size() ? color_hist.size() - 1 : color_bin;
+                color_hist[color_bin]++;
+            }
 
-                // TODO VS: experimental based on histogramm - check code again, check if compatible with KPQ!
-                cutoff_index = 0;
-                for(int xxx = 0; xxx < hist.size()-2; xxx++)
+
+
+            if(filter_method_geometry != "none")
+            {
+                LOG_INFO("------------------------------------");
+                unsigned cutoff_index = unsigned(filter_cutoff * curv.size());
+
+                // will automatically determine cutoff index
+                if(filter_type_geometry == "auto")
                 {
-                    cutoff_index += hist[xxx];
-                    int diff_1 = hist[xxx+1] - hist[xxx];
-                    int diff_2 = hist[xxx+2] - hist[xxx+1];
-                    if(diff_1*2 < diff_2)
+                    std::vector<int> hist;
+                    if(filter_method_geometry == "curvature")
+                        hist = curv_hist;
+                    if(filter_method_geometry == "gaussian")
+                        hist = ks_hist;
+                    if(filter_method_geometry == "kpq")
+                        hist = kpq_hist;
+
+                    // TODO VS: experimental based on histogramm - check code again, check if compatible with KPQ!
+                    cutoff_index = 0;
+                    for(int xxx = 0; xxx < hist.size()-2; xxx++)
                     {
-                        cutoff_index += hist[xxx+1];
-                        break;
+                        cutoff_index += hist[xxx];
+                        int diff_1 = hist[xxx+1] - hist[xxx];
+                        int diff_2 = hist[xxx+2] - hist[xxx+1];
+                        if(diff_1*2 < diff_2)
+                        {
+                            cutoff_index += hist[xxx+1];
+                            break;
+                        }
                     }
                 }
-            }
 
 
-            float thresh_curv = curv.at(cutoff_index);
-            float thresh_ks = ks.at(cutoff_index);
-            float thresh_kpq = kpq.at(cutoff_index);
+                float thresh_curv = curv.at(cutoff_index);
+                float thresh_ks = ks.at(cutoff_index);
+                float thresh_kpq = kpq.at(cutoff_index);
 
 
-            if(type == "cutoff")
+                if(filter_type_geometry == "cutoff")
+                {
+                    if(filter_method_geometry == "curvature")
+                        filter_threshold_geometry = thresh_curv;
+                    if(filter_method_geometry == "gaussian")
+                        filter_threshold_geometry = thresh_ks;
+                    if(filter_method_geometry == "kpq")
+                        filter_threshold_geometry = thresh_kpq;
+                }
+
+                LOG_INFO(curv.front() << "  " << thresh_curv  << "  " << curv.back());
+                LOG_INFO(ks.front() << "  " << thresh_ks << "  " << ks.back());
+                LOG_INFO(kpq.front() << "  " << thresh_kpq << "  " << kpq.back());
+
+                // copy only point information without normals
+                pcl::PointCloud<PointT>::Ptr keypoints_temp(new pcl::PointCloud<PointT>());
+                pcl::copyPointCloud(*keypoints_with_normals, *keypoints_temp);
+
+                pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
+
+                for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+                {
+                    PointNormalT pn1 = keypoints_with_normals->at(idx);
+
+                    float compare;
+                    if(filter_method_geometry == "curvature")
+                        compare = pn1.curvature;
+                    if(filter_method_geometry == "gaussian")
+                        compare = ks_unsorted[idx];
+                    if(filter_method_geometry == "kpq")
+                        compare = kpq_unsorted[idx];
+
+                    if(compare >= filter_threshold_geometry)
+                        keypoints->push_back(keypoints_temp->at(idx));
+                }
+
+                LOG_INFO("--------- nachher: " << keypoints->size());
+
+                return keypoints;
+
+            } // end geometric filtering
+
+
+            if(filter_method_color != "none")
             {
-                if(method == "curvature")
-                    filter_threshold = thresh_curv;
-                if(method == "gaussian")
-                    filter_threshold = thresh_ks;
-                if(method == "kpq")
-                    filter_threshold = thresh_kpq;
+                LOG_INFO("------------------------------------");
+                unsigned cutoff_index = unsigned(filter_cutoff * color_scores.size());
+
+                float thresh_color = color_scores.at(cutoff_index);
+
+                if(filter_type_color == "cutoff")
+                {
+                    filter_threshold_color = thresh_color;
+                }
+
+                LOG_INFO(color_scores.front() << "  " << thresh_color  << "  " << color_scores.back());
+
+                // copy only point information without normals
+                pcl::PointCloud<PointT>::Ptr keypoints_temp(new pcl::PointCloud<PointT>());
+                pcl::copyPointCloud(*keypoints_with_normals, *keypoints_temp);
+
+                pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
+
+                for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+                {
+                    if(color_scores_unsorted[idx] >= filter_threshold_color)
+                        keypoints->push_back(keypoints_temp->at(idx));
+                }
+
+                LOG_INFO("--------- nachher: " << keypoints->size());
+                return keypoints;
+
             }
 
-            LOG_INFO(curv.front() << "  " << thresh_curv  << "  " << curv.back());
-            LOG_INFO(ks.front() << "  " << thresh_ks << "  " << ks.back());
-            LOG_INFO(kpq.front() << "  " << thresh_kpq << "  " << kpq.back());
-
-            // copy only point information without normals
-            pcl::PointCloud<PointT>::Ptr keypoints_temp(new pcl::PointCloud<PointT>());
-            pcl::copyPointCloud(*keypoints_with_normals, *keypoints_temp);
-
-            pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
-
-            for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
-            {
-                PointNormalT pn1 = keypoints_with_normals->at(idx);
-
-                float compare;
-                if(method == "curvature")
-                    compare = pn1.curvature;
-                if(method == "gaussian")
-                    compare = ks_unsorted[idx];
-                if(method == "kpq")
-                    compare = kpq_unsorted[idx];
-
-                if(compare >= filter_threshold)
-                    keypoints->push_back(keypoints_temp->at(idx));
-            }
-
-            LOG_INFO("--------- nachher: " << keypoints->size());
-
-            return keypoints;
         }
     }
 
@@ -277,7 +319,7 @@ namespace ism3d
     // Performance Evaluation of 3D Keypoint DetectorsFederico Tombari
     // see equation 9
     float KeypointsVoxelGrid::computeKPQ(const std::vector<int> &pointIdxs,
-                                         pcl::PointCloud<PointT>::Ptr eigen_values)
+                                         pcl::PointCloud<PointT>::Ptr eigen_values) const
     {
         float max_k1 = std::numeric_limits<float>::min();
         float min_k2 = std::numeric_limits<float>::max();
@@ -287,7 +329,7 @@ namespace ism3d
 
         for(int idx : pointIdxs)
         {
-            PointT eigen = eigen_values->at(idx);
+            const PointT &eigen = eigen_values->at(idx);
             float k_1 = eigen.x;
             float k_2 = eigen.y;
             // K is Gaussian curvature: k1 * k2
@@ -307,6 +349,42 @@ namespace ism3d
 
         return kpq;
     }
+
+    float KeypointsVoxelGrid::computeColorScore(const std::vector<int> &pointIdxs,
+                                                pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
+                                                const PointNormalT &ref,
+                                                const ColorConversion &cc) const
+    {
+        // compute reference color
+        unsigned char redRef   = ref.r;
+        unsigned char greenRef = ref.g;
+        unsigned char blueRef  = ref.b;
+        float LRef, aRef, bRef;
+        cc.RgbToCieLabNormalized(redRef, greenRef, blueRef, LRef, aRef, bRef);
+
+        // compute colors in support
+        int num_color_bins = 20;
+        float threshold = 1.0f/num_color_bins;
+        int num_distant_color = 0;
+        for(int idx : pointIdxs)
+        {
+            const PointNormalT &point = points_with_normals->at(idx);
+            unsigned char red = point.r;
+            unsigned char green = point.g;
+            unsigned char blue = point.b;
+            float L, a, b;
+            cc.RgbToCieLabNormalized(red, green, blue, L, a, b);
+            float distance = cc.getColorDistance(L, a, b, LRef, aRef, bRef);
+            if(distance > threshold)
+            {
+                num_distant_color++;
+            }
+        }
+
+        // compute score
+        return float(num_distant_color) / pointIdxs.size();
+    }
+
 
 
     std::string KeypointsVoxelGrid::getTypeStatic()

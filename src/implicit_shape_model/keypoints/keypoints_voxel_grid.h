@@ -12,6 +12,7 @@
 #define ISM3D_KEYPOINTSVOXELGRID_H
 
 #include "keypoints.h"
+#include "../third_party/pcl_color_conversion/color_conversion.h"
 
 namespace ism3d
 {
@@ -40,7 +41,12 @@ namespace ism3d
                                                             pcl::search::Search<PointT>::Ptr search);
 
         float computeKPQ(const std::vector<int> &pointIdxs,
-                         pcl::PointCloud<PointT>::Ptr eigen_values);
+                         pcl::PointCloud<PointT>::Ptr eigen_values) const;
+
+        float computeColorScore(const std::vector<int> &pointIdxs,
+                                pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
+                                const PointNormalT &ref,
+                                const ColorConversion &cc) const;
 
     private:
         float m_leafSize;

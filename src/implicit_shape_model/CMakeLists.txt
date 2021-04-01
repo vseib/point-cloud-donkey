@@ -150,6 +150,8 @@ add_library(implicit_shape_model
     third_party/liblzf-3.6/lzf_d.c
     third_party/cnpy/cnpy.cpp
     third_party/cgf/cgf.cpp
+    third_party/pcl_color_conversion/color_conversion.cpp
+    third_party/pcl_color_conversion/color_conversion.h
     third_party/pcl_shot_na_lrf/shot_na_lrf.cpp
     third_party/pcl_shot_na_lrf/shot_na_lrf.hpp
     third_party/pcl_shot_na_lrf/shot_na_lrf.h
