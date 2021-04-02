@@ -13,6 +13,7 @@
 
 #include "keypoints.h"
 #include "../third_party/pcl_color_conversion/color_conversion.h"
+#include <pcl/features/principal_curvatures.h>
 
 namespace ism3d
 {
@@ -41,7 +42,7 @@ namespace ism3d
                                                             pcl::search::Search<PointT>::Ptr search);
 
         float computeKPQ(const std::vector<int> &pointIdxs,
-                         pcl::PointCloud<PointT>::Ptr eigen_values) const;
+                         pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principle_curvatures) const;
 
         float computeColorScore(const std::vector<int> &pointIdxs,
                                 pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
@@ -50,6 +51,7 @@ namespace ism3d
 
     private:
         float m_leafSize;
+        float m_max_similar_color_distance;
     };
 }
 
