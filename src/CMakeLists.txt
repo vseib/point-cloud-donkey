@@ -124,6 +124,12 @@ add_executable(eval_tool
 )
 target_link_libraries(eval_tool implicit_shape_model ${Boost_LIBRARIES})
 
+add_executable(eval_tool_detection
+    eval_tool/eval_detection.cpp
+)
+target_link_libraries(eval_tool_detection implicit_shape_model ${Boost_LIBRARIES})
+
+
 
 #ISM add normals tool
 #add_executable(add_normals_tool
