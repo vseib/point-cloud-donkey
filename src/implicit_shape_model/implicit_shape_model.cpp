@@ -703,6 +703,26 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
                                     bool hasNormals, boost::timer::cpu_timer& timer_normals, boost::timer::cpu_timer& timer_keypoints,
                                     bool compute_global)
 {
+    if(m_use_statistical_outlier_removal)
+    {
+        // filter cloud to remove outliers
+        LOG_INFO("performing statistical outlier removal");
+        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
+        m_stat_outlier_rem.setInputCloud(points);
+        m_stat_outlier_rem.filter(*filtered);
+        points = filtered;
+    }
+    if(m_use_radius_outlier_removal)
+    {
+        // filter cloud to remove outliers
+        LOG_INFO("performing radius outlier removal");
+        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
+        m_radius_outlier_rem.setInputCloud(points);
+        m_radius_outlier_rem.filter(*filtered);
+        points = filtered;
+    }
     if(m_use_smoothing)
     {
         // smooth cloud to remove noise in normal's orientation
@@ -742,26 +762,6 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         filtered->width = points->width;
         filtered->height = points->height;
         filtered->is_dense = false;
-        points = filtered;
-    }
-    if(m_use_statistical_outlier_removal)
-    {
-        // filter cloud to remove outliers
-        LOG_INFO("performing statistical outlier removal");
-        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
-        filtered->is_dense = false;
-        m_stat_outlier_rem.setInputCloud(points);
-        m_stat_outlier_rem.filter(*filtered);
-        points = filtered;
-    }
-    if(m_use_radius_outlier_removal)
-    {
-        // filter cloud to remove outliers
-        LOG_INFO("performing radius outlier removal");
-        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
-        filtered->is_dense = false;
-        m_radius_outlier_rem.setInputCloud(points);
-        m_radius_outlier_rem.filter(*filtered);
         points = filtered;
     }
     if(m_use_voxel_filtering)
