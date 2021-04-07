@@ -14,6 +14,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
 #include <fstream>
+#include <boost/algorithm/string.hpp>
 
 namespace ism3d
 {
@@ -22,16 +23,16 @@ namespace ism3d
         addParameter(m_leafSize, "LeafSize", 0.1f);
 
         // TODO VS include all of these params into config files
-//        addParameter(m_filter_method_geometry, "FilterMethodGeometry", std::string("None"));
-//        addParameter(m_filter_type_geometry, "FilterTypeGeometry", std::string("CutOff"));
-//        addParameter(m_filter_threshold_geometry, "FilterThresholdGeometry", 0.005f);
+        addParameter(m_filter_method_geometry, "FilterMethodGeometry", std::string("None"));
+        addParameter(m_filter_type_geometry, "FilterTypeGeometry", std::string("CutOff"));
+        addParameter(m_filter_threshold_geometry, "FilterThresholdGeometry", 0.005f);
 
-//        addParameter(m_filter_method_color, "FilterMethodColor", std::string("None"));
-//        addParameter(m_filter_type_color, "FilterTypeColor", std::string("CutOff"));
-//        addParameter(m_filter_threshold_color, "FilterThresholdColor", 0.02f);
+        addParameter(m_filter_method_color, "FilterMethodColor", std::string("None"));
+        addParameter(m_filter_type_color, "FilterTypeColor", std::string("CutOff"));
+        addParameter(m_filter_threshold_color, "FilterThresholdColor", 0.02f);
 
         addParameter(m_max_similar_color_distance, "MaxSimilarColorDistance", 0.05f);
-//        addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
+        addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
     }
 
     KeypointsVoxelGrid::~KeypointsVoxelGrid()
@@ -47,17 +48,21 @@ namespace ism3d
                                                                             pcl::search::Search<PointT>::Ptr search)
     {      
         int knn_kpq = 100;
-        float m_filter_threshold_geometry = 0.005f; // e.g. 0.005 good for method "curvature"
-        float m_filter_cutoff_ratio = 0.5f; // value between 0 and 1
-        std::string m_filter_method_geometry = "gaussian"; // one of: "curvature", "gaussian", "kpq", "none"
-        std::string m_filter_type_geometry = "cutoff"; // one of: "cutoff", "threshold", "auto"
-        std::string m_filter_method_color = "none"; // one of: "color_distance", "none"
-        std::string m_filter_type_color = "threshold";  // one of: "cutoff", "threshold"
-        float m_filter_threshold_color = 0.02f; // e.g. 0.02 good for color
+        // TODO VS document these values in default config
+//        m_filter_threshold_geometry = 0.005f; // e.g. 0.005 good for method "curvature"
+//        m_filter_cutoff_ratio = 0.5f; // value between 0 and 1
+//        m_filter_method_geometry = "none"; // one of: "curvature", "gaussian", "kpq", "none"
+//        m_filter_type_geometry = "cutoff"; // one of: "cutoff", "threshold", "auto"
+//        m_filter_method_color = "none"; // one of: "color_distance", "none"
+//        m_filter_type_color = "threshold";  // one of: "cutoff", "threshold"
+//        m_filter_threshold_color = 0.02f; // e.g. 0.02 good for color
 
         // TODO VS disable filtering in training
-        // TODO VS: when params are loaded, perform "to lower" on the strings
 
+        boost::algorithm::to_lower(m_filter_method_geometry);
+        boost::algorithm::to_lower(m_filter_method_color);
+        boost::algorithm::to_lower(m_filter_type_geometry);
+        boost::algorithm::to_lower(m_filter_type_color);
 
         if(m_filter_method_geometry == "none" && m_filter_method_color == "none")
         {
