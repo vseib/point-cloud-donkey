@@ -17,11 +17,9 @@ add_definitions(${PCL_DEFINITIONS})
 find_package(VTK REQUIRED)
 include(${VTK_USE_FILE})
 
-set(CMAKE_INCLUDE_PATH "/usr/share/qt4/include")
-find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-include(${QT_USE_FILE})
+find_package(Qt5 COMPONENTS Core Gui REQUIRED)
 
-qt4_wrap_cpp(MOCS_HDRS
+qt5_wrap_cpp(MOCS_HDRS
     render_view.h
 )
 

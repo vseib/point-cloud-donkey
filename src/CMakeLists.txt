@@ -44,10 +44,7 @@ add_subdirectory(vtk_utils)
 find_package(VTK REQUIRED)
 include(${VTK_USE_FILE})
 
-set(CMAKE_INCLUDE_PATH "/usr/share/qt4/include")
-find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-include(${QT_USE_FILE})
-
+find_package(Qt5 COMPONENTS Core Gui REQUIRED)
 include_directories(
     SYSTEM
     ${QT_INCLUDE_DIR}
@@ -84,7 +81,7 @@ include_directories(
 
 
 #ISM ground truth gui
-qt4_wrap_cpp(GROUND_TRUTH_MOCS_HDRS
+qt5_wrap_cpp(GROUND_TRUTH_MOCS_HDRS
     ground_truth_gui/ground_truth_gui.h
 )
 add_executable(ground_truth_gui
@@ -92,7 +89,7 @@ add_executable(ground_truth_gui
     ground_truth_gui/ground_truth_gui.cpp
     ${GROUND_TRUTH_MOCS_HDRS}
 )
-target_link_libraries(ground_truth_gui implicit_shape_model vtk_utils ${QT_LIBRARIES} ${VTK_LIBRARIES} QVTK ${Boost_LIBRARIES})
+target_link_libraries(ground_truth_gui implicit_shape_model vtk_utils ${QT_LIBRARIES} ${VTK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 #Tools to compare with other approaches
