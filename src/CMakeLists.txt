@@ -69,16 +69,15 @@ include_directories(
 
 
 #ISM model gui #TODO VS do not build now - include later when ROS re-integration starts
-#qt4_wrap_cpp(MODEL_MOCS_HDRS
-#    model_gui/model_gui.h
-#)
-#add_executable(model_gui
-#    model_gui/main.cpp
-#    model_gui/model_gui.cpp
-#    ${MODEL_MOCS_HDRS}
-#)
-# target_link_libraries(model_gui vtk_utils ${QT_LIBRARIES} ${PCL_LIBRARIES} ${VTK_LIBRARIES} QVTK ${Boost_LIBRARIES})
-
+qt5_wrap_cpp(MODEL_MOCS_HDRS
+    model_gui/model_gui.h
+)
+add_executable(model_gui
+    model_gui/main.cpp
+    model_gui/model_gui.cpp
+    ${MODEL_MOCS_HDRS}
+)
+target_link_libraries(model_gui vtk_utils ${QT_LIBRARIES} ${PCL_LIBRARIES} ${VTK_LIBRARIES} ${Boost_LIBRARIES})
 
 #ISM ground truth gui
 qt5_wrap_cpp(GROUND_TRUTH_MOCS_HDRS
