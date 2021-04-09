@@ -52,20 +52,19 @@ include_directories(
 
 
 #ISM training gui #TODO VS do not build now - include later when ROS re-integration starts
-#qt4_wrap_cpp(TRAINING_MOCS_HDRS
-#    training_gui/training_gui.h
-#    training_gui/model_dlg.h
-#    training_gui/ism_worker.h
-#)
-#add_executable(training_gui
-#    training_gui/main.cpp
-#    training_gui/training_gui.cpp
-#    training_gui/model_dlg.cpp
-#    training_gui/ism_worker.cpp
-#    ${TRAINING_MOCS_HDRS}
-#)
-#target_link_libraries(training_gui vtk_utils implicit_shape_model
-#    ${QT_LIBRARIES} ${VTK_LIBRARIES} QVTK ${Boost_LIBRARIES})
+qt5_wrap_cpp(TRAINING_MOCS_HDRS
+    training_gui/training_gui.h
+    training_gui/model_dlg.h
+    training_gui/ism_worker.h
+)
+add_executable(training_gui
+    training_gui/main.cpp
+    training_gui/training_gui.cpp
+    training_gui/model_dlg.cpp
+    training_gui/ism_worker.cpp
+    ${TRAINING_MOCS_HDRS}
+)
+target_link_libraries(training_gui vtk_utils implicit_shape_model ${QT_LIBRARIES} ${VTK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 #ISM model gui #TODO VS do not build now - include later when ROS re-integration starts
