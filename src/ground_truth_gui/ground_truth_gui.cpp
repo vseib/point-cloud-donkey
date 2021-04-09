@@ -157,7 +157,9 @@ void GroundTruthGUI::drawCloud()
         }
     }
     else {
-        for (int i = 0; i < (int)m_cloud->size(); i += downsampling) {
+        for (int i = 0; i < (int)m_cloud->size(); i += downsampling)
+        {
+            // TODO VS create vtk points object directly
             m_displayCloud->push_back(m_cloud->at(i));
         }
     }
@@ -168,7 +170,8 @@ void GroundTruthGUI::drawCloud()
     colors->SetNumberOfComponents(3);
 
     // create points from point cloud
-    for (size_t i = 0; i < m_displayCloud->size(); i += downsampling) {
+    for (size_t i = 0; i < m_displayCloud->size(); i += downsampling) // TODO VS: remove this downsampling
+    {
         const PointT& point = m_displayCloud->at(i);
 
         points->InsertNextPoint(point.x, point.y, point.z);
@@ -241,6 +244,7 @@ void GroundTruthGUI::computeNormals()
 
     pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
 
+    // TODO VS: rethink using the voxelgrid
     pcl::VoxelGrid<PointT> grid;
     grid.setLeafSize(0.002, 0.002, 0.002);
     grid.setInputCloud(m_cloud);
@@ -252,9 +256,10 @@ void GroundTruthGUI::computeNormals()
     pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
     normalEst.setInputCloud(cloud);
     normalEst.setSearchMethod(search);
-    normalEst.setRadiusSearch(0.02);
+    normalEst.setRadiusSearch(0.02);  // TODO VS: make this a GUI parameter
     normalEst.setNumberOfThreads(4);
     normalEst.compute(*cloudNormals);
+    // TODO VS: add consistent normals according to pcl normals 0
 
     std::cout << "skipping computing consistent orientation" << std::endl;
 
@@ -277,7 +282,12 @@ void GroundTruthGUI::computeNormals()
 
     QString filename = QFileDialog::getSaveFileName(this, "Save Scene", QString(), tr("PCD-Files (*.pcd);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
 
-    if (!filename.isEmpty()) {
+    if (!filename.isEmpty())
+    {
+        if(!filename.contains(QString(".pcd")))
+        {
+            filename.append(".pcd");
+        }
         pcl::io::savePCDFileBinary(filename.toStdString(), *newCloud);
     }
 }
@@ -380,6 +390,10 @@ void GroundTruthGUI::exportGroundTruth()
 
     if (!filename.isEmpty()) {
         std::ofstream file;
+        if(!filename.contains(QString(".txt")))
+        {
+            filename.append(".txt");
+        }
         file.open(filename.toStdString().c_str(), ios::out);
         QString scene = QString::fromStdString(m_sceneFile);
         file << "ISM3D ground truth data, scene: \"" << QFileInfo(scene).fileName().toStdString() << "\"\n";

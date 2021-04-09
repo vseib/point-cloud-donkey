@@ -60,8 +60,8 @@ private:
     pcl::PointCloud<PointT>::Ptr m_cloud;
     pcl::PointCloud<PointT>::Ptr m_displayCloud;
     std::vector<pcl::PointCloud<PointT>::ConstPtr> m_models;
-    std::vector<vtkSmartPointer<vtkActor> > m_modelActors;
-    std::vector<vtkSmartPointer<vtkTransform> > m_transforms;
+    std::vector<vtkSmartPointer<vtkActor>> m_modelActors;
+    std::vector<vtkSmartPointer<vtkTransform>> m_transforms;
     std::vector<std::string> m_modelFiles;
     std::string m_sceneFile;
 
