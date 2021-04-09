@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(implicit_shape_model_2)
+project(implicit_shape_model)
 
 # set build type
 set(CMAKE_BUILD_TYPE Release)
