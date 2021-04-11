@@ -144,40 +144,44 @@ QGroupBox* GroundTruthGUI::createNavigatorGeneral()
 }
 
 void GroundTruthGUI::drawCloud()
-{
-    m_displayCloud->clear();
-
-    // downsample
-    const int downsampling = 1;
-    if (m_cloud->isOrganized()) {
-        for (int i = 0; i < (int)m_cloud->width; i += downsampling) {
-            for (int j = 0; j < (int)m_cloud->height; j += downsampling) {
-                m_displayCloud->push_back(m_cloud->at(i, j));
-            }
-        }
-    }
-    else {
-        for (int i = 0; i < (int)m_cloud->size(); i += downsampling)
-        {
-            // TODO VS create vtk points object directly
-            m_displayCloud->push_back(m_cloud->at(i));
-        }
-    }
-
+{   
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 
     vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
     colors->SetNumberOfComponents(3);
 
-    // create points from point cloud
-    for (size_t i = 0; i < m_displayCloud->size(); i += downsampling) // TODO VS: remove this downsampling
-    {
-        const PointT& point = m_displayCloud->at(i);
+    m_displayCloud->clear();
 
-        points->InsertNextPoint(point.x, point.y, point.z);
-        //colors->InsertNextTuple3(255, 255, 255);
-        colors->InsertNextTuple3(0, 0, 0);
+    // downsample
+    const int downsampling = 1;
+    if (m_cloud->isOrganized())
+    {
+        for (int i = 0; i < (int)m_cloud->width; i += downsampling)
+        {
+            for (int j = 0; j < (int)m_cloud->height; j += downsampling)
+            {
+                m_displayCloud->points.emplace_back(m_cloud->at(i, j));
+
+                const PointT& point = m_cloud->at(i, j);
+                points->InsertNextPoint(point.x, point.y, point.z);
+                //colors->InsertNextTuple3(255, 255, 255);
+                colors->InsertNextTuple3(0, 0, 0);
+            }
+        }
     }
+    else
+    {
+        for (int i = 0; i < (int)m_cloud->size(); i += downsampling)
+        {
+            m_displayCloud->points.emplace_back(m_cloud->at(i));
+
+            const PointT& point = m_cloud->at(i);
+            points->InsertNextPoint(point.x, point.y, point.z);
+            //colors->InsertNextTuple3(255, 255, 255);
+            colors->InsertNextTuple3(0, 0, 0);
+        }
+    }
+
 
     vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
     for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
