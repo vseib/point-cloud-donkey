@@ -129,6 +129,22 @@ QGroupBox* GroundTruthGUI::createNavigatorGeneral()
     connect(btComputeNormals, SIGNAL(clicked()), this, SLOT(computeNormals()));
     btComputeNormals->setText("Compute Normals");
 
+    QLabel* lbNormalRadius = new QLabel(this);
+    lbNormalRadius->setText("Normal Radius:");
+
+    m_normalRadiusLineEdit = new QLineEdit(this);
+    m_normalRadiusLineEdit->setToolTip(QString("Normals radius [m]"));
+    m_normalRadiusLineEdit->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_normalRadiusLineEdit->setText("0.05");
+
+    QLabel* lbNormalMethod = new QLabel(this);
+    lbNormalMethod->setText("Normal Method:");
+
+    m_normalMethodLineEdit = new QLineEdit(this);
+    m_normalMethodLineEdit->setToolTip(QString("Normals method (0 or 1): 0 orient toward viewpoint, 1 orient away from centroid"));
+    m_normalMethodLineEdit->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_normalMethodLineEdit->setText("0");
+
     QVBoxLayout* layout = new QVBoxLayout();
     layout->addWidget(btReset);
     layout->addWidget(btLoadScene);
@@ -136,6 +152,10 @@ QGroupBox* GroundTruthGUI::createNavigatorGeneral()
     layout->addWidget(btRemoveModel);
     layout->addWidget(btExportGroundTruth);
     layout->addWidget(btComputeNormals);
+    layout->addWidget(lbNormalRadius);
+    layout->addWidget(m_normalRadiusLineEdit);
+    layout->addWidget(lbNormalMethod);
+    layout->addWidget(m_normalMethodLineEdit);
 
     QGroupBox* groupBox = new QGroupBox(this);
     groupBox->setTitle("General");
@@ -243,46 +263,62 @@ void GroundTruthGUI::loadScene()
 
 void GroundTruthGUI::computeNormals()
 {
-    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     pcl::PointCloud<pcl::Normal>::Ptr cloudNormals(new pcl::PointCloud<pcl::Normal>());
-
     pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
-
-    // TODO VS: rethink using the voxelgrid
-    pcl::VoxelGrid<PointT> grid;
-    grid.setLeafSize(0.002, 0.002, 0.002);
-    grid.setInputCloud(m_cloud);
-    grid.filter(*cloud);
 
     std::cout << "computing normals" << std::endl;
 
+    float normal_radius = m_normalRadiusLineEdit->text().toFloat();
+
     // compute normals
     pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-    normalEst.setInputCloud(cloud);
+    normalEst.setInputCloud(m_displayCloud);
     normalEst.setSearchMethod(search);
-    normalEst.setRadiusSearch(0.02);  // TODO VS: make this a GUI parameter
+    normalEst.setRadiusSearch(normal_radius);
     normalEst.setNumberOfThreads(4);
-    normalEst.compute(*cloudNormals);
-    // TODO VS: add consistent normals according to pcl normals 0
 
-    std::cout << "skipping computing consistent orientation" << std::endl;
+    std::cout << "computing consistent orientation" << std::endl;
 
-//    // compute consistent orientation
-//    try {
-//        ism3d::NormalOrientation orient;
-//        orient.processEMST(cloud, cloudNormals, cloudNormals);
-//    }
-//    catch (std::exception& e) {
-//        std::cout << "exception: " << e.what() << std::endl;
-//    }
-//    catch (...) {
-//        std::cout << "unknown exception" << std::endl;
-//    }
+    int consistent_normals_method = m_normalMethodLineEdit->text().toInt();
+    if(consistent_normals_method == 0)
+    {
+        // orient consistently towards the view point
+        normalEst.setViewPoint(0,0,0);
+        normalEst.compute(*cloudNormals);
+    }
+    else if(consistent_normals_method == 1)
+    {
+        // move model to origin, then point normals away from origin
+        pcl::PointCloud<PointT>::Ptr model_no_centroid(new pcl::PointCloud<PointT>());
+        pcl::copyPointCloud(*m_displayCloud, *model_no_centroid);
+
+        // compute the object centroid
+        Eigen::Vector4f centroid4f;
+        pcl::compute3DCentroid(*model_no_centroid, centroid4f);
+        Eigen::Vector3f centroid(centroid4f[0], centroid4f[1], centroid4f[2]);
+        // remove centroid for normal computation
+        for(PointT& point : model_no_centroid->points)
+        {
+            point.x -= centroid.x();
+            point.y -= centroid.y();
+            point.z -= centroid.z();
+        }
+        normalEst.setInputCloud(model_no_centroid);
+        normalEst.setViewPoint(0,0,0);
+        normalEst.compute(*cloudNormals);
+        // invert normals
+        for(pcl::Normal& norm : cloudNormals->points)
+        {
+            norm.normal_x *= -1;
+            norm.normal_y *= -1;
+            norm.normal_z *= -1;
+        }
+    }
 
     std::cout << "concatenating" << std::endl;
 
     pcl::PointCloud<PointNormalT>::Ptr newCloud(new pcl::PointCloud<PointNormalT>());
-    pcl::concatenateFields(*cloud, *cloudNormals, *newCloud);
+    pcl::concatenateFields(*m_displayCloud, *cloudNormals, *newCloud);
 
     QString filename = QFileDialog::getSaveFileName(this, "Save Scene", QString(), tr("PCD-Files (*.pcd);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
 

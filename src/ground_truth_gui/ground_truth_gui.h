@@ -10,6 +10,7 @@
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QSlider>
+#include <QLineEdit>
 
 // PCL
 #ifndef Q_MOC_RUN
@@ -49,6 +50,9 @@ private slots:
 private:
     QGroupBox* createNavigatorApplication();
     QGroupBox* createNavigatorGeneral();
+
+    QLineEdit* m_normalRadiusLineEdit;
+    QLineEdit* m_normalMethodLineEdit;
 
     void drawCloud();
     void updateCameras();
