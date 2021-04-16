@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1)
 project(ism_3d_new)
 
 # set build type
 set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+set(CMAKE_CXX_STANDARD 17)
 
 # find pcl
 find_package(PCL REQUIRED)
@@ -109,7 +109,7 @@ target_link_libraries(ground_truth_gui implicit_shape_model vtk_utils ${QT_LIBRA
 #    eval_comparison/pcl_orcg/pcl_orcg.cpp
 #)
 #target_link_libraries(eval_pcl_orcg ${PCL_LIBRARIES} implicit_shape_model ${Boost_LIBRARIES})
-
+#set_property(TARGET eval_pcl_orcg PROPERTY CXX_STANDARD 14)
 
 
 
