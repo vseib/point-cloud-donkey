@@ -17,7 +17,7 @@
 
 // PCL
 #include <pcl/point_types.h>
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //#include <pcl/ros/conversions.h>
 //#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/voxel_grid.h>
@@ -40,8 +40,8 @@
 #include <Eigen/Core>
 
 // Plane Segmentation
-// TODO VS temporarily (?) disabling ROS - or is PlaneDetection unrelated to ROS?
-//#include "PlaneDetection.h" // see: /home/vseib/git/homer/experimental/Libraries/PlaneDetection/src/PlaneDetection.h
+// NOTE temporarily disabling PlaneDetection
+//#include "PlaneDetection.h" // see: ~/git/homer/experimental/Libraries/PlaneDetection/src/PlaneDetection.h
 
 
 float deg2rad(float deg)
@@ -52,38 +52,31 @@ float deg2rad(float deg)
 ModelGUI::ModelGUI(QWidget* parent)
     : QWidget(parent),
       m_isLoaded(false),
-      m_updateCloud(true),
-      m_cloudFromSensor(false),
+      m_updateSensorCloud(true), // NOTE: with ROS disabled this is unused
+      m_drawSensorCloud(false), // NOTE: with ROS disabled will be always false
       m_annotationMode(false),
-      m_showRGBCloud(false),
-      m_currentLabelIndex(0),
-      m_maxScale(3),
-      m_maxPos(2.5)
+      m_cloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>()),
+      m_displayCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>()),
+      m_currentLabelIndex(0)
 {
-    //srand(time(0));
     srand(0);
 
+    // NOTE temporarily disabling ROS - don't need the timer without ROS
     // init qt related
-    m_spinTimer = new QTimer(this);
-    m_spinTimer->setInterval(30);
-    connect(m_spinTimer, SIGNAL(timeout()), this, SLOT(spinOnce()));
-    m_spinTimer->start();
-
-    // create pcl data
-    m_cloud = pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-    m_displayCloud = pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-
-    m_voxelGrid.setLeafSize(0.005, 0.005, 0.005);
-    m_voxelGrid.setInputCloud(m_cloud);
+//    m_spinTimer = new QTimer(this);
+//    m_spinTimer->setInterval(30);
+//    connect(m_spinTimer, SIGNAL(timeout()), this, SLOT(spinOnce()));
+//    m_spinTimer->start();
 
     // subscribe to ros topic to acquire depth images
     // TODO handle both topics: registered and normal points, registered should be painted in RGB
-    // TODO VS temporarily (?) disabling ROS
-    //m_subPoints = m_node.subscribe<sensor_msgs::PointCloud2>("/camera/depth_registered/points", 1000, &ModelGUI::cbPoints, this);
+    // NOTE temporarily disabling ROS
+    //m_subPoints = m_node.subscribe<sensor_msgs::PointCloud2>("/camera/depth_registered/points", 10, &ModelGUI::cbPoints, this);
 
     setWindowTitle("ISM3D - Model GUI");
 
     // init annotation variables, NOTE: all lists must have same length
+    // TODO VS: init from config files to avoid recompiling if other labels are used
     m_annotationIDs.push_back(2);
     m_annotationIDs.push_back(6);
     m_annotationIDs.push_back(5);
@@ -102,10 +95,10 @@ ModelGUI::ModelGUI(QWidget* parent)
 
     // create vtk views
     m_renderView = new RenderView(this);
-    m_renderView->getRendererFront()->SetBackground(0,0,0);
-    m_renderView->getRendererTop()->SetBackground(0,0,0);
-    m_renderView->getRendererSide()->SetBackground(0,0,0);
-    m_renderView->getRendererScene()->SetBackground(0,0,0);
+    m_renderView->getRendererFront()->SetBackground(255,255,255);
+    m_renderView->getRendererTop()->SetBackground(255,255,255);
+    m_renderView->getRendererSide()->SetBackground(255,255,255);
+    m_renderView->getRendererScene()->SetBackground(255,255,255);
 
     connect(m_renderView, SIGNAL(moveXY(float,float)), SLOT(moveXY(float,float)));
     connect(m_renderView, SIGNAL(moveYZ(float,float)), SLOT(moveYZ(float,float)));
@@ -117,8 +110,7 @@ ModelGUI::ModelGUI(QWidget* parent)
     connect(m_renderView, SIGNAL(rotateY(float, Eigen::Vector3f)), SLOT(rotateY(float, Eigen::Vector3f)));
     connect(m_renderView, SIGNAL(rotateZ(float, Eigen::Vector3f)), SLOT(rotateZ(float, Eigen::Vector3f)));
 
-    /*m_drawTimer.setSingleShot(true);
-    connect(&m_drawTimer, SIGNAL(timeout()), SLOT(activateCloud()));*/
+    m_segmentColor = {0, 240, 160};
 
     // add points
     m_points = vtkSmartPointer<vtkPolyData>::New();
@@ -149,6 +141,9 @@ ModelGUI::ModelGUI(QWidget* parent)
     m_cubeActor->GetProperty()->SetRepresentationToWireframe();
     m_cubeActor->GetProperty()->SetLighting(false);
     m_cubeActor->SetUserTransform(m_cubeTrans);
+    // NOTE: this method expects the color to be between 0 and 1
+    m_cubeActor->GetProperty()->SetColor(m_segmentColor[0]/255.0,m_segmentColor[1]/255.0,m_segmentColor[2]/255.0);
+    m_cubeActor->GetProperty()->SetLineWidth(2);
 
     // add cube axes
     m_cubeAxes = vtkSmartPointer<vtkAxesActor>::New();
@@ -170,7 +165,8 @@ ModelGUI::ModelGUI(QWidget* parent)
     navigatorLayout->addWidget(createNavigatorApplication());
     navigatorLayout->addWidget(createNavigatorGeneral());
     navigatorLayout->addWidget(createNavigatorAnnotation());
-    navigatorLayout->addWidget(createNavigatorPlaneSegmentation());
+    // NOTE temporarily disabling PlaneDetection
+    //navigatorLayout->addWidget(createNavigatorPlaneSegmentation());
     navigatorLayout->addItem(new QSpacerItem(150, 0, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
     // put it all together
@@ -180,7 +176,6 @@ ModelGUI::ModelGUI(QWidget* parent)
     this->setLayout(layout);
 
     resetTransform();
-
     resize(1024, 768);
 }
 
@@ -205,9 +200,10 @@ QGroupBox* ModelGUI::createNavigatorApplication()
 
 QGroupBox* ModelGUI::createNavigatorGeneral()
 {
-    m_btPauseResume = new QPushButton(this);
-    connect(m_btPauseResume, SIGNAL(clicked()), SLOT(pauseResume()));
-    m_btPauseResume->setText("Pause");
+    // NOTE temporarily disabling ROS
+//    m_btPauseResume = new QPushButton(this);
+//    connect(m_btPauseResume, SIGNAL(clicked()), SLOT(pauseResume()));
+//    m_btPauseResume->setText("Pause");
 
     QPushButton* btReset = new QPushButton(this);
     connect(btReset, SIGNAL(clicked()), this, SLOT(reset()));
@@ -257,7 +253,7 @@ QGroupBox* ModelGUI::createNavigatorGeneral()
     btDownsample->setText("Grid Sample");
 
     QVBoxLayout* layout = new QVBoxLayout();
-    layout->addWidget(m_btPauseResume);
+//    layout->addWidget(m_btPauseResume); // NOTE temporarily disabling ROS
     layout->addWidget(btReset);
     layout->addWidget(btImportCloud);
     layout->addWidget(btExportCloud);
@@ -278,9 +274,9 @@ QGroupBox* ModelGUI::createNavigatorGeneral()
 
 QGroupBox* ModelGUI::createNavigatorAnnotation()
 {
-    QPushButton* btStartAnnotation = new QPushButton(this);
-    btStartAnnotation->setText("Start Annotation");
-    connect(btStartAnnotation, SIGNAL(clicked()), this, SLOT(startAnnotation()));
+    m_StartStopAnnotation = new QPushButton(this);
+    m_StartStopAnnotation->setText("Start Annotation");
+    connect(m_StartStopAnnotation, SIGNAL(clicked()), this, SLOT(startAnnotation()));
 
     QComboBox* annotationBox = new QComboBox(this);
     for(unsigned i = 0; i < m_annotationNames.size(); i++)
@@ -294,7 +290,7 @@ QGroupBox* ModelGUI::createNavigatorAnnotation()
     connect(btSetLabel, SIGNAL(clicked()), this, SLOT(setLabel()));
 
     QVBoxLayout* layout = new QVBoxLayout();
-    layout->addWidget(btStartAnnotation);
+    layout->addWidget(m_StartStopAnnotation);
     layout->addWidget(annotationBox);
     layout->addWidget(btSetLabel);
 
@@ -320,42 +316,42 @@ QGroupBox* ModelGUI::createNavigatorPlaneSegmentation()
     return groupBox;
 }
 
-
-void ModelGUI::spinOnce()
-{
-    // TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
+//void ModelGUI::spinOnce()
+//{
 //    if (!ros::ok())
 //        this->close();
 
 //    ros::spinOnce();
 
-    if (m_isLoaded)
-        drawCloud();
+//    if (m_isLoaded)
+//        drawCloud();
 
-    m_renderView->update();
-}
+//    m_renderView->update();
+//}
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //void ModelGUI::cbPoints(const sensor_msgs::PointCloud2::ConstPtr& pointCloud)
 //{
 //    if (m_isLoaded)
 //        return;
 
-//    if (m_updateCloud) {
+//    if (m_updateSensorCloud) {
 //        pcl::PointCloud<pcl::PointXYZRGB> cloud;
 //        pcl::fromROSMsg(*pointCloud, cloud);
 //        pcl::copyPointCloud(cloud, *m_cloud);
 //        drawCloud();
-//        m_cloudFromSensor = true;
+//        m_drawSensorCloud = true;
 //    }
 //}
 
 void ModelGUI::drawCloud()
 {
     // downsample
-    const int downsampling = 2;
+    const int downsampling = 1;
     m_displayCloud->clear();
-    if (m_cloudFromSensor) {
+    if (m_drawSensorCloud) // NOTE: never true with ROS disabled
+    {
         if (m_cloud->isOrganized()) {
             for (int i = 0; i < (int)m_cloud->width; i += downsampling) {
                 for (int j = 0; j < (int)m_cloud->height; j += downsampling) {
@@ -369,9 +365,11 @@ void ModelGUI::drawCloud()
             }
         }
     }
-    else {
+    else
+    {
         m_cloud->clear();
-        for (int i = 0; i < m_pointClouds.size(); i++) {
+        for (int i = 0; i < m_pointClouds.size(); i++)
+        {
             if (i == m_list->currentRow() && !m_chkEnableSegmentation->isChecked())
                 continue;
 
@@ -379,9 +377,8 @@ void ModelGUI::drawCloud()
             const Eigen::Matrix4f& transform = m_transforms[i];
             pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
             pcl::transformPointCloudWithNormals(*pointCloud, *transformed, transform);
-            *m_cloud += *transformed;
+            *m_displayCloud += *transformed;
         }
-        m_voxelGrid.filter(*m_displayCloud);
     }
 
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
@@ -390,14 +387,12 @@ void ModelGUI::drawCloud()
     colors->SetNumberOfComponents(3);
 
     // create points from point cloud
-    for (size_t i = 0; i < m_displayCloud->size(); i++) {
+    for (size_t i = 0; i < m_displayCloud->size(); i++)
+    {
         const pcl::PointXYZRGBNormal& point = m_displayCloud->at(i);
 
         points->InsertNextPoint(point.x, point.y, point.z);
-        if(m_annotationMode || m_showRGBCloud)
-            colors->InsertNextTuple3(point.r, point.g, point.b);
-        else
-            colors->InsertNextTuple3(255, 255, 255);
+        colors->InsertNextTuple3(point.r, point.g, point.b);
     }
 
     vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
@@ -410,19 +405,48 @@ void ModelGUI::drawCloud()
     m_points->Modified();
     m_renderView->update();
 
-    m_cloudFromSensor = false;
+    m_drawSensorCloud = false;
 }
+
+
+void ModelGUI::drawCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::ConstPtr cloud)
+{
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+
+    vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colors->SetNumberOfComponents(3);
+
+    // create points from point cloud
+    for (size_t i = 0; i < cloud->size(); i++) {
+        const pcl::PointXYZRGBNormal& point = cloud->at(i);
+
+        points->InsertNextPoint(point.x, point.y, point.z);
+        colors->InsertNextTuple3(point.r, point.g, point.b);
+    }
+
+    vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
+    for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
+        conn->InsertNextCell(1, &i);
+
+    m_curPoints->SetPoints(points);
+    m_curPoints->GetPointData()->SetScalars(colors);
+    m_curPoints->SetVerts(conn);
+    m_curPoints->Modified();
+    m_renderView->update();
+}
+
 
 void ModelGUI::updateBox()
 {
     vtkSmartPointer<vtkLinearTransform> invT;
-    if (m_cubeActor->GetVisibility() == true)
+    if (m_cubeActor->GetVisibility())
         invT = m_cubeTrans->GetLinearInverse();
 
     vtkSmartPointer<vtkPoints> points = m_points->GetPoints();
     vtkSmartPointer<vtkDataArray> colors = m_points->GetPointData()->GetScalars();
 
-    for (int i = 0; i < points->GetNumberOfPoints(); i++) {
+    for (int i = 0; i < points->GetNumberOfPoints(); i++)
+    {
         double* point = points->GetPoint(i);
         double* color = colors->GetTuple3(i);
 
@@ -438,44 +462,30 @@ void ModelGUI::updateBox()
                     transPoint[2] < -0.5) {
                 color[0] = color[1] = color[2] = 50;
             }
-            else {
-                color[0] = color[1] = color[2] = 255;
+            else
+            {
+                if(m_annotationMode) // in annotation mode use label color instead of default segmentation color
+                {
+                    Eigen::Vector3d selected_color = m_annotationColors.at(m_currentLabelIndex);
+                    color[0] = selected_color[0];
+                    color[1] = selected_color[1];
+                    color[2] = selected_color[2];
+                }
+                else
+                {
+                    color[0] = m_segmentColor[0];
+                    color[1] = m_segmentColor[1];
+                    color[2] = m_segmentColor[2];
+                }
             }
 
             colors->SetTuple3(i, color[0], color[1], color[2]);
         }
     }
     m_points->Modified();
-}
-
-void ModelGUI::drawCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::ConstPtr cloud)
-{
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-
-    vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-    colors->SetNumberOfComponents(3);
-
-    // create points from point cloud
-    for (size_t i = 0; i < cloud->size(); i++) {
-        const pcl::PointXYZRGBNormal& point = cloud->at(i);
-
-        points->InsertNextPoint(point.x, point.y, point.z);
-        if(m_annotationMode || m_showRGBCloud)
-            colors->InsertNextTuple3(point.r, point.g, point.b);
-        else
-            colors->InsertNextTuple3(255, 255, 255);
-    }
-
-    vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
-    for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
-        conn->InsertNextCell(1, &i);
-
-    m_curPoints->SetPoints(points);
-    m_curPoints->GetPointData()->SetScalars(colors);
-    m_curPoints->SetVerts(conn);
-    m_curPoints->Modified();
     m_renderView->update();
 }
+
 
 void ModelGUI::indexChanged(int index)
 {
@@ -492,11 +502,6 @@ void ModelGUI::indexChanged(int index)
     }
 }
 
-void ModelGUI::activateCloud()
-{
-    activateCurCloud(false);
-    drawCloud();
-}
 
 void ModelGUI::activateCurCloud(bool activate)
 {
@@ -516,17 +521,18 @@ void ModelGUI::activateCurCloud(bool activate)
     }
 }
 
-void ModelGUI::pauseResume()
-{
-    if (m_updateCloud) {
-        m_updateCloud = false;
-        m_btPauseResume->setText("Resume");
-    }
-    else {
-        m_updateCloud = true;
-        m_btPauseResume->setText("Pause");
-    }
-}
+// NOTE temporarily disabling ROS - makes this method unused
+//void ModelGUI::pauseResume()
+//{
+//    if (m_updateSensorCloud) {
+//        m_updateSensorCloud = false;
+//        m_btPauseResume->setText("Resume");
+//    }
+//    else {
+//        m_updateSensorCloud = true;
+//        m_btPauseResume->setText("Pause");
+//    }
+//}
 
 void ModelGUI::reset()
 {
@@ -540,11 +546,10 @@ void ModelGUI::reset()
     }
 
     resetTransform();
-
     m_isLoaded = false;
-    m_updateCloud = true;
-    m_btPauseResume->setText("Pause");
-
+    m_updateSensorCloud = true;
+    // NOTE temporarily disabling ROS
+    //m_btPauseResume->setText("Pause");
     m_renderView->reset();
     m_renderView->update();
 }
@@ -611,7 +616,7 @@ void ModelGUI::segment()
     enableSegmentation(false);
     resetTransform();
 
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 }
 
 void ModelGUI::merge()
@@ -624,7 +629,7 @@ void ModelGUI::merge()
         *m_cloud += *transformed;
     }
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr newCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-    m_voxelGrid.filter(*newCloud);
+    pcl::copyPointCloud(*m_cloud, *newCloud);
 
     m_pointClouds.clear();
     m_transforms.clear();
@@ -686,7 +691,7 @@ void ModelGUI::downsample()
         // filter point cloud using PCL voxel grid filter
         pcl::VoxelGrid<pcl::PCLPointCloud2> vgFilter;
         vgFilter.setInputCloud(inputPoints);
-        float voxelSize = 0.002f;
+        float voxelSize = 0.005f;
         vgFilter.setLeafSize(voxelSize, voxelSize, voxelSize);
         vgFilter.filter(*downsampledPoints);
         // convert to templated point cloud
@@ -701,29 +706,31 @@ void ModelGUI::downsample()
 
 void ModelGUI::importCloud()
 {
-    m_updateCloud = false;
     QString filename = QFileDialog::getOpenFileName(this, "Load Point-Cloud", QString(), tr("PCD-Files (*.pcd);;All Files (*)"));
 
-    if (!filename.isEmpty()) {
+    if (!filename.isEmpty())
+    {
         pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-
-        if (pcl::io::loadPCDFile(filename.toStdString(), *cloud) >= 0) {
-            m_isLoaded = true;
+        if (pcl::io::loadPCDFile(filename.toStdString(), *cloud) >= 0)
+        {
+            m_updateSensorCloud = false;
             m_pointClouds.push_back(cloud);
+            // crashes here with c++ standard below 17, needs Eigen aligned allocator
+            // see http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
             m_transforms.push_back(Eigen::Matrix4f::Identity());
             m_curPointsTransform->Identity();
             m_list->addItem(QFileInfo(filename).fileName());
             m_list->setCurrentRow(m_list->count() - 1);
             m_btMerge->setEnabled(true);
+            m_isLoaded = true;
         }
     }
-    m_updateCloud = true;
 }
 
 void ModelGUI::exportCloud()
 {
-    bool wasUpdating = m_updateCloud;
-    m_updateCloud = false;
+    bool wasUpdating = m_updateSensorCloud;
+    m_updateSensorCloud = false;
 
     /*if (m_pointClouds.size() == 0) {
         QMessageBox::warning(this, "Warning", "no point clouds loaded");
@@ -732,7 +739,12 @@ void ModelGUI::exportCloud()
 
     QString filename = QFileDialog::getSaveFileName(this, "Save Point-Cloud", QString(), tr("PCD-Files (*.pcd);;All Files (*)"));
 
-    if (!filename.isEmpty()) {
+    if (!filename.isEmpty())
+    {
+        if(!filename.contains(QString(".pcd")))
+        {
+            filename.append(".pcd");
+        }
         if (m_isLoaded)
         {
             if(m_annotationMode)
@@ -744,35 +756,14 @@ void ModelGUI::exportCloud()
                 pcl::io::savePCDFileBinary(filename.toStdString(), *m_pointClouds[0]);
             }
         }
-        else {
-            // compute normals
-            pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr newCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-            pcl::copyPointCloud(*m_cloud, *newCloud);
-            /*if (m_cloud->isOrganized()) {
-                pcl::IntegralImageNormalEstimation<pcl::PointXYZRGBNormal, pcl::PointXYZRGBNormal> ne;
-                ne.setNormalEstimationMethod(ne.AVERAGE_3D_GRADIENT);
-                ne.setMaxDepthChangeFactor(0.02f);
-                ne.setNormalSmoothingSize(10.0f);
-                ne.setInputCloud(m_cloud);
-                ne.compute(*newCloud);
-            }
-            else */{
-                pcl::NormalEstimationOMP<pcl::PointXYZRGBNormal, pcl::PointXYZRGBNormal> ne;
-                pcl::search::KdTree<pcl::PointXYZRGBNormal>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGBNormal>);
-                ne.setSearchMethod(tree);
-                ne.setRadiusSearch(0.05f);
-                ne.setNumberOfThreads(4);
-                ne.useSensorOriginAsViewPoint();
-                ne.setInputCloud(m_cloud);
-                ne.compute(*newCloud);
-            }
-
-            pcl::io::savePCDFileBinary(filename.toStdString(), *newCloud);
+        else
+        {
+            pcl::io::savePCDFileBinary(filename.toStdString(), *m_cloud);
         }
     }
 
     if (wasUpdating)
-        m_updateCloud = true;
+        m_updateSensorCloud = true;
 }
 
 void ModelGUI::enableSegmentation(bool enabled)
@@ -1010,6 +1001,7 @@ void ModelGUI::startAnnotation()
 {
     if(m_isLoaded && !m_annotationMode)
     {
+        m_StartStopAnnotation->setText("Stop Annotation");
         m_annotationMode = true;
         drawCloud(m_pointClouds.at(0));
 
@@ -1029,12 +1021,20 @@ void ModelGUI::startAnnotation()
         label_cloud->width = m_pointClouds.at(0)->width;
 
         m_annotated_cloud = label_cloud;
+        updateBox();
+    }
+    else if(m_isLoaded && m_annotationMode)
+    {
+        m_StartStopAnnotation->setText("Start Annotation");
+        m_annotationMode = false;
+        updateBox();
     }
 }
 
 void ModelGUI::labelSelected(int index)
 {
     m_currentLabelIndex = index;
+    updateBox();
 }
 
 void ModelGUI::setLabel()
@@ -1102,40 +1102,38 @@ void ModelGUI::setLabel()
     enableSegmentation(false);
     resetTransform();
 
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 }
 
 void ModelGUI::removeGroundPlane()
 {
-    if(m_pointClouds.size() == 0) return;
+    std::cout << "------------- NOTE: plane segmentation is currently disabled!" << std::endl;
+//    if(m_pointClouds.size() == 0) return;
 
-    m_showRGBCloud = true;
+//    // manually create cloud without normals for plane detection
+//    pcl::PointCloud<pcl::PointXYZRGB>::Ptr newCloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+//    for(unsigned i = 0; i < m_pointClouds[0]->size(); i++)
+//    {
+//        pcl::PointXYZRGBNormal p = m_pointClouds[0]->points.at(i);
+//        pcl::PointXYZRGB pn;
+//        pn.x = p.x;
+//        pn.y = p.y;
+//        pn.z = p.z;
+//        pn.rgb = p.rgb;
+//        newCloud->push_back(pn);
+//    }
+//    newCloud->height = 1;
+//    newCloud->width = newCloud->size();
+//    newCloud->is_dense = false;
 
-    // manually create cloud without normals for plane detection
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr newCloud(new pcl::PointCloud<pcl::PointXYZRGB>());
-    for(unsigned i = 0; i < m_pointClouds[0]->size(); i++)
-    {
-        pcl::PointXYZRGBNormal p = m_pointClouds[0]->points.at(i);
-        pcl::PointXYZRGB pn;
-        pn.x = p.x;
-        pn.y = p.y;
-        pn.z = p.z;
-        pn.rgb = p.rgb;
-        newCloud->push_back(pn);
-    }
-    newCloud->height = 1;
-    newCloud->width = newCloud->size();
-    newCloud->is_dense = false;
-
-    // plane detection params
-    float curvature = 0.01;
-    float distance = 0.01;
-    int num_points = 1000;
-    float angle = 30;
-    angle = angle * M_PI / 180;
+//    // plane detection params
+//    float curvature = 0.01;
+//    float distance = 0.01;
+//    int num_points = 1000;
+//    float angle = 30;
+//    angle = angle * M_PI / 180;
 
     // detect planes
-    std::cout << "------------- NOTE: plane segmentation is currently disabled!" << std::endl;
 //    std::vector<Plane> plane_list;
 //    PlaneDetection *plane_detector = new PlaneDetection(curvature, angle, distance, num_points, false);
 //    plane_detector->detectPlanes(newCloud, plane_list);

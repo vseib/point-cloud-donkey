@@ -1,7 +1,7 @@
 #ifndef MODELGUI_H
 #define MODELGUI_H
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 // ROS
 //#include "ros/ros.h"
 //#include "sensor_msgs/PointCloud2.h"
@@ -39,14 +39,13 @@ public:
     ~ModelGUI();
 
 private slots:
-    void spinOnce();
-    void pauseResume();
+    // void spinOnce(); // NOTE temporarily disabling ROS
+    // void pauseResume(); // NOTE temporarily disabling ROS
     void reset();
     void segment();
     void importCloud();
     void exportCloud();
     void enableSegmentation(bool);
-    void activateCloud();
     void indexChanged(int);
     void merge();
     void smooth();
@@ -68,7 +67,7 @@ private slots:
     void rotateZ(float, Eigen::Vector3f);
 
 protected:
-    // TODO VS temporarily (?) disabling ROS
+    // NOTE temporarily disabling ROS
     //void cbPoints(const sensor_msgs::PointCloud2::ConstPtr& points);
 
 private:
@@ -85,40 +84,47 @@ private:
     void updateCameras();
     void resetTransform();
 
-    // TODO VS temporarily (?) disabling ROS
-//    ros::NodeHandle m_node;
-//    ros::Subscriber m_subPoints;
+    // NOTE temporarily disabling ROS
+    // ros::NodeHandle m_node;
+    // ros::Subscriber m_subPoints;
 
+    // indicates that a cloud was loaded manually, sets drawing the cloud at m_pointClouds[0]
+    // once a cloud is loaded, sensor clouds will not be drawn anymore until button Reset is pressed
     bool m_isLoaded;
-    bool m_updateCloud;
-    bool m_cloudFromSensor;
-    const float m_maxScale;
-    const float m_maxPos;
+    // set to true each time ROS callback is triggered, will draw m_cloud once per callback
+    bool m_drawSensorCloud;
+    // whether or not the currently stored cloud in m_cloud will be updated on ROS callback,
+    // only valid if m_isLoaded == false
+    bool m_updateSensorCloud;
 
     bool m_annotationMode;
     std::vector<int> m_annotationIDs;
     std::vector<std::string> m_annotationNames;
     std::vector<Eigen::Vector3d> m_annotationColors;
     int m_currentLabelIndex;
-
-    bool m_showRGBCloud;
+    // color for segmentation box and points
+    std::vector<int> m_segmentColor;
 
     // Qt items
     QTimer* m_spinTimer;
     QPushButton* m_btPauseResume;
     QPushButton* m_btSegment;
+    QPushButton* m_StartStopAnnotation;
     QPushButton* m_btMerge;
     QCheckBox* m_chkEnableSegmentation;
     QTimer m_drawTimer;
     QListWidget* m_list;
-
     RenderView* m_renderView;
 
-    std::vector<pcl::PointCloud<pcl::PointXYZRGBNormal>::ConstPtr> m_pointClouds;
+    // holds the transforms to each cloud in m_pointClouds,
+    // transforms are applied to corresponding cloud before drawing
     std::vector<Eigen::Matrix4f> m_transforms;
+    // data used to draw when m_isLoaded == true
+    std::vector<pcl::PointCloud<pcl::PointXYZRGBNormal>::ConstPtr> m_pointClouds;
+    // data used to draw when m_drawSensorCloud == true
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr m_cloud;
+    // actually drawn cloud, content switched to m_cloud or m_pointClouds
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr m_displayCloud;
-    pcl::VoxelGrid<pcl::PointXYZRGBNormal> m_voxelGrid;
 
     pcl::PointCloud<pcl::PointXYZRGBL>::Ptr m_annotated_cloud;
 
