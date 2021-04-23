@@ -52,11 +52,17 @@ namespace ism3d
         LOG_INFO("writing object to files: " << file << ", " << fileData);
 
         // get relative path from ism file to data file
+        int pos = fileData.find_last_of('/');
+        std::string fileDataNoPath;
+        if(pos != fileData.npos)
+            fileDataNoPath = fileData.substr(pos+1);
+        else
+            fileDataNoPath = fileData;
 
         // create JSON config object
         Json::Value configJson(Json::objectValue);
         configJson["ObjectConfig"] = configToJson();
-        configJson["ObjectData"] = fileData; //relative.string();
+        configJson["ObjectData"] = fileDataNoPath; //relative.string();
         if(m_use_svm)
         {
             // this is to be easily accessible in the config file
