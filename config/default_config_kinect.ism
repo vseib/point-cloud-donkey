@@ -1,0 +1,134 @@
+{
+   "ObjectConfig" : {
+      "Children" : {
+         "Clustering" : {
+            "Type" : "None"
+         },
+         "Codebook" : {
+            "Children" : {
+               "ActivationStrategy" : {
+                  "Parameters" : {
+                     "K" : 1
+                  },
+                  "Type" : "KNN"
+               }
+            },
+            "Parameters" : {
+               "PartialShotType" : "front",
+               "RandomCodebookFactor" : 1.0,
+               "UseClassWeight" : false,
+               "UseCodewordWeight" : false,
+               "UseMatchingWeight" : false,
+               "UsePartialShot" : false,
+               "UseRandomCodebook" : false,
+               "UseVoteWeight" : false,
+               "DirectlyAssignCodewords": false
+            }
+         },
+         "FeatureWeighting" : {
+            "Parameters" : {
+               "DistanceThreshold" : 0.05,
+               "ExtractFromList" : "front",
+               "Factor" : 0.75,
+               "KSearch" : 10,
+               "UseIterativeRanking" : false,
+               "UseFeaturePosition" : false,
+               "ScoreIncrementType" : 1
+            },
+            "Type" : "Uniform"
+         },
+         "Features" : {
+            "Parameters" : {
+               "Radius" : 0.05,
+               "ReferenceFrameRadius" : 0.05,
+               "ReferenceFrameType" : "SHOT",
+               "ShortShotBinType": "auto",
+               "ShortShotDims": 128,
+               "ShortShotRBins": 1,
+               "ShortShotEBins": 1,
+               "ShortShotABins": 8,
+               "ShortShotMinRadius": 0.1,
+               "ShortShotLogRadius": false
+            },
+            "Type" : "CSHOT"
+         },
+         "GlobalFeatures" : {
+            "Parameters" : {
+               "Radius" : 0.1,
+               "ReferenceFrameRadius" : 0.05,
+               "ReferenceFrameType" : "SHOT",
+               "ShortShotBinType": "auto",
+               "ShortShotDims": 192,
+               "ShortShotRBins": 1,
+               "ShortShotEBins": 1,
+               "ShortShotABins": 8,
+               "ShortShotMinRadius": 0.1,
+               "ShortShotLogRadius": false
+            },
+            "Type" : "CSHOT_GLOBAL"
+         },
+         "Keypoints" : {
+            "Parameters" : {
+               "LeafSize" : 0.02
+            },
+            "Type" : "VoxelGrid"
+         },
+         "Voting" : {
+            "Parameters" : {
+               "AverageRotation" : true,
+               "Bandwidth" : 0.045,
+               "BestK" : -1,
+               "BinOrBandwidthFactor" : 1.0,
+               "BinOrBandwidthType" : "Config",
+               "GlobalFeatureInfluenceType" : 5,
+               "GlobalFeaturesK" : 1,
+               "GlobalFeaturesStrategy" : "SVM",
+               "GlobalParamMinSvmScore" : 0.6999999880790710,
+               "GlobalParamRateLimit" : 0.6000000238418579,
+               "GlobalParamWeightFactor" : 2.25,
+               "Kernel" : "Gaussian",
+               "MaxFilterType" : "None",
+               "MaxIter" : 1000,
+               "MaximaSuppression" : "Average",
+               "MinThreshold" : 0.0,
+               "MinVotesThreshold" : 1,
+               "SingleObjectMaxType" : "Default",
+               "SingleObjectMode" : true,
+               "Threshold" : 0.001000000047497451,
+               "UseGlobalFeatures" : false
+            },
+            "Type" : "MeanShift"
+         }
+      },
+      "Parameters" : {
+         "BoundingBoxType" : "AABB",
+         "ConsistentNormalsK" : 10,
+         "ConsistentNormalsMethod" : 1,
+         "DistanceType" : "ChiSquared",
+         "EnableVotingAnalysis" : false,
+         "FLANNExactMatch" : false,
+         "FLANNNumKDTrees" : 4,
+         "NormalRadius" : 0.005000000074505806,
+         "NumThreads" : 0,
+         "SetColorToZero" : false,
+         "SvmAutoTrain" : true,
+         "SvmOneVsAllTraining" : true,
+         "SvmParamC" : 7.410,
+         "SvmParamGamma" : 2.960,
+         "SvmParamKfold" : 10,
+         "UseSvmTraining" : false,
+         "UseSmoothing" : false,
+         "SmoothingPolynomialOrder" : 1,
+         "SmoothingRadius" : 0.01,
+         "UseStatisticalOutlierRemoval" : false,
+         "OutlierRemovalMeanK" : 20,
+         "OutlierRemovalStddevMul" : 2.0,
+         "UseRadiusOutlierRemoval" : false,
+         "OutlierRemovalMinNeighbors" : 10,
+         "OutlierRemovalRadius" : 0.005,
+         "UseVoxelFiltering" : false,
+         "VotingAnalysisOutputPath" : "/home/vseib/Desktop/voting_analysis",
+         "VoxelLeafSize" : 0.0015
+      }
+   }
+}
