@@ -202,7 +202,6 @@ void GroundTruthGUI::drawCloud()
         }
     }
 
-
     vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
     for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
         conn->InsertNextCell(1, &i);

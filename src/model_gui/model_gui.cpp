@@ -59,8 +59,6 @@ ModelGUI::ModelGUI(QWidget* parent)
       m_displayCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>()),
       m_currentLabelIndex(0)
 {
-    srand(0);
-
     // NOTE temporarily disabling ROS - don't need the timer without ROS
     // init qt related
 //    m_spinTimer = new QTimer(this);
