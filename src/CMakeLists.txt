@@ -38,6 +38,7 @@ endif()
 add_subdirectory(implicit_shape_model)
 file(COPY implicit_shape_model/third_party/cgf/compress.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 file(COPY implicit_shape_model/third_party/cgf/embedding.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/bin/)
+#file(COPY ../config/default_config_kinect.ism DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 
 add_subdirectory(vtk_utils)
 
