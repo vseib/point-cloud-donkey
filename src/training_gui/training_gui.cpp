@@ -9,10 +9,10 @@
 #include "../implicit_shape_model/codebook/codebook.h"
 #include "../implicit_shape_model/codebook/codeword_distribution.h"
 #include "../implicit_shape_model/voting/voting.h"
+#include "../implicit_shape_model/voting/voting_mean_shift.h"
 #include "../implicit_shape_model/utils/exception.h"
-#include "../implicit_shape_model/utils/utils.h"
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //#include <pcl_conversions/pcl_conversions.h>
 
 #include <boost/algorithm/string.hpp>
@@ -31,7 +31,7 @@
 
 // PCL
 #include <pcl/point_types.h>
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //#include <pcl/ros/conversions.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/io/pcd_io.h>
@@ -74,28 +74,28 @@ void getColor(int index, double& r, double& g, double& b)
 TrainingGUI::TrainingGUI(QWidget* parent)
     : QWidget(parent),
       m_isLoaded(false),
-      m_updateCloud(true)
+      m_isDetecting(false),
+      m_updateSensorCloud(true), // NOTE: with ROS disabled this is unused
+      m_detectCloud(new pcl::PointCloud<PointNormalT>()),
+      m_cloud(new pcl::PointCloud<PointNormalT>()),
+      m_normals(new pcl::PointCloud<pcl::Normal>()),
+      m_displayCloud(new pcl::PointCloud<PointNormalT>())
 {
     srand(0);
-
     buildTable(1000);
 
     colorTable[0][0] = 0;
     colorTable[0][1] = 0;
     colorTable[0][2] = 1;
 
+    // NOTE temporarily disabling ROS - however using the timer to update render views
     // init qt related
     m_spinTimer = new QTimer(this);
-    m_spinTimer->setInterval(15);
+    m_spinTimer->setInterval(100);
     connect(m_spinTimer, SIGNAL(timeout()), this, SLOT(spinOnce()));
     m_spinTimer->start();
 
-    // create pcl data
-    m_detectCloud = pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-    m_cloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
-    m_displayCloud = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
-
-    // TODO VS temporarily (?) disabling ROS
+    // NOTE temporarily disabling ROS
     // subscribe to ros topic to acquire depth images
     //m_subPoints = m_node.subscribe<sensor_msgs::PointCloud2>("/camera/depth_registered/points", 1000, &TrainingGUI::cbPoints, this);
 
@@ -103,6 +103,9 @@ TrainingGUI::TrainingGUI(QWidget* parent)
 
     // create vtk views
     m_renderView = new RenderView(this);
+    m_renderView->getRendererFront()->SetBackground(255,255,255);
+    m_renderView->getRendererTop()->SetBackground(255,255,255);
+    m_renderView->getRendererSide()->SetBackground(255,255,255);
 
     // add points
     m_points = vtkSmartPointer<vtkPolyData>::New();
@@ -112,12 +115,13 @@ TrainingGUI::TrainingGUI(QWidget* parent)
     m_pointsActor->SetMapper(pointsMapper);
     m_pointsActor->GetProperty()->SetPointSize(1);
 
-    m_renderView->addActorToScene(m_pointsActor);
+//    m_renderView->addActorToScene(m_pointsActor);
+    m_renderView->addActorToAll(m_pointsActor);
 
     // create navigator panes
     m_navApplication = createNavigatorApplication();
-    m_navGeneral = createNavigatorGeneral();
-    m_navISM = createNavigatorISM();
+    m_navGeneral = createNavigatorTraining();
+    m_navISM = createNavigatorDetect();
 
     QVBoxLayout* navigatorLayout = new QVBoxLayout();
     navigatorLayout->addWidget(m_navApplication);
@@ -133,12 +137,13 @@ TrainingGUI::TrainingGUI(QWidget* parent)
 
     // create ism class
     m_ism = new ism3d::ImplicitShapeModel();
+    m_ism->readObject("default_config_kinect.ism", true);
     m_ism->m_signalPointCloud.connect(boost::bind(&TrainingGUI::signalPointCloud, this, _1));
     m_ism->m_signalBoundingBox.connect(boost::bind(&TrainingGUI::signalBoundingBox, this, _1));
     m_ism->m_signalNormals.connect(boost::bind(&TrainingGUI::signalNormals, this, _1, _2));
     m_ism->m_signalFeatures.connect(boost::bind(&TrainingGUI::signalFeatures, this, _1));
-    //m_ism->m_signalCodebook.connect(boost::bind(&TrainingGUI::signalCodebook, this, _1));
     m_ism->m_signalMaxima.connect(boost::bind(&TrainingGUI::signalMaxima, this, _1));
+//    m_ism->m_signalCodebook.connect(boost::bind(&TrainingGUI::signalCodebook, this, _1));
 
     resize(1024, 768);
 }
@@ -154,8 +159,13 @@ QGroupBox* TrainingGUI::createNavigatorApplication()
     btClose->setText("Close");
     connect(btClose, SIGNAL(clicked()), this, SLOT(close()));
 
+    QPushButton* btReset = new QPushButton(this);
+    connect(btReset, SIGNAL(clicked()), this, SLOT(reset()));
+    btReset->setText("Reset");
+
     QVBoxLayout* layout = new QVBoxLayout();
     layout->addWidget(btClose);
+    layout->addWidget(btReset);
 
     QGroupBox* groupBox = new QGroupBox(this);
     groupBox->setTitle("Application");
@@ -163,68 +173,73 @@ QGroupBox* TrainingGUI::createNavigatorApplication()
     return groupBox;
 }
 
-QGroupBox* TrainingGUI::createNavigatorGeneral()
+QGroupBox* TrainingGUI::createNavigatorTraining()
 {
-    m_btPauseResume = new QPushButton(this);
-    connect(m_btPauseResume, SIGNAL(clicked()), SLOT(pauseResume()));
-    m_btPauseResume->setText("Pause");
+     // NOTE temporarily disabling ROS
+//    m_btPauseResume = new QPushButton(this);
+//    connect(m_btPauseResume, SIGNAL(clicked()), SLOT(pauseResume()));
+//    m_btPauseResume->setText("Pause");
 
-    QPushButton* btReset = new QPushButton(this);
-    connect(btReset, SIGNAL(clicked()), this, SLOT(reset()));
-    btReset->setText("Reset");
+    QPushButton* btClear = new QPushButton(this);
+    btClear->setText("Clear ISM");
+    connect(btClear, SIGNAL(clicked()), this, SLOT(clearISM()));
+
+    QPushButton* btLoadConfig = new QPushButton(this);
+    connect(btLoadConfig, SIGNAL(clicked()), this, SLOT(loadConfig()));
+    btLoadConfig->setText("Load Train Config");
 
     QPushButton* btAddModel = new QPushButton(this);
     connect(btAddModel, SIGNAL(clicked()), this, SLOT(addModel()));
-    btAddModel->setText("Add training model");
+    btAddModel->setText("Add Cloud");
+
+    QPushButton* btTrain = new QPushButton(this);
+    btTrain->setText("Train ISM");
+    connect(btTrain, SIGNAL(clicked()), this, SLOT(trainModel()));
+
+    QPushButton* btSave = new QPushButton(this);
+    btSave->setText("Save ISM");
+    connect(btSave, SIGNAL(clicked()), this, SLOT(save()));
+
+    QVBoxLayout* layout = new QVBoxLayout();
+//    layout->addWidget(m_btPauseResume); // NOTE temporarily disabling ROS
+    layout->addWidget(btClear);
+    layout->addWidget(btLoadConfig);
+    layout->addWidget(btAddModel);
+    layout->addWidget(btTrain);
+    layout->addWidget(btSave);
+
+    QGroupBox* groupBox = new QGroupBox(this);
+    groupBox->setTitle("Training");
+    groupBox->setLayout(layout);
+    return groupBox;
+}
+
+QGroupBox* TrainingGUI::createNavigatorDetect()
+{
+    QPushButton* btLoad = new QPushButton(this);
+    btLoad->setText("Load ISM");
+    connect(btLoad, SIGNAL(clicked()), this, SLOT(load()));
 
     QPushButton* btLoadScene = new QPushButton(this);
     connect(btLoadScene, SIGNAL(clicked()), this, SLOT(loadScene()));
     btLoadScene->setText("Load Scene");
 
-    QVBoxLayout* layout = new QVBoxLayout();
-    layout->addWidget(m_btPauseResume);
-    layout->addWidget(btReset);
-    layout->addWidget(btAddModel);
-    layout->addWidget(btLoadScene);
-
-    QGroupBox* groupBox = new QGroupBox(this);
-    groupBox->setTitle("General");
-    groupBox->setLayout(layout);
-    return groupBox;
-}
-
-QGroupBox* TrainingGUI::createNavigatorISM()
-{
-    QPushButton* btLoad = new QPushButton(this);
-    btLoad->setText("Load");
-    connect(btLoad, SIGNAL(clicked()), this, SLOT(load()));
-
-    QPushButton* btSave = new QPushButton(this);
-    btSave->setText("Save");
-    connect(btSave, SIGNAL(clicked()), this, SLOT(save()));
-
-    QPushButton* btClear = new QPushButton(this);
-    btClear->setText("Clear");
-    connect(btClear, SIGNAL(clicked()), this, SLOT(clearISM()));
-
     QPushButton* btDetect = new QPushButton(this);
     btDetect->setText("Detect");
     connect(btDetect, SIGNAL(clicked()), this, SLOT(detectISM()));
 
-    QPushButton* btTrain = new QPushButton(this);
-    btTrain->setText("Train");
-    connect(btTrain, SIGNAL(clicked()), this, SLOT(trainModel()));
-
     m_chkShowFeatures = new QCheckBox(this);
     m_chkShowFeatures->setText("Show Features");
+    m_chkShowFeatures->setChecked(false);
 
-    m_chkInvertNormals = new QCheckBox(this);
-    m_chkInvertNormals->setText("Invert Normals");
-    m_chkInvertNormals->setChecked(false);
+    m_chkShowKeypoints = new QCheckBox(this);
+    m_chkShowKeypoints->setText("Show Keypoints");
+    m_chkShowKeypoints->setChecked(true);
 
     m_chkShowNormals = new QCheckBox(this);
     m_chkShowNormals->setText("Show Normals");
     m_chkShowNormals->setChecked(false);
+    connect(m_chkShowNormals, SIGNAL(clicked(bool)), this, SLOT(updateRenderView(bool)));
 
     m_chkShowAllVotes = new QCheckBox(this);
     m_chkShowAllVotes->setText("Show non-max votes");
@@ -257,13 +272,11 @@ QGroupBox* TrainingGUI::createNavigatorISM()
 
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->addWidget(btLoad);
-    layout->addWidget(btSave);
-    layout->addWidget(btClear);
+    layout->addWidget(btLoadScene);
     layout->addWidget(btDetect);
-    layout->addWidget(btTrain);
-    layout->addWidget(m_chkInvertNormals);
     layout->addWidget(m_chkShowNormals);
     layout->addWidget(m_chkShowFeatures);
+    layout->addWidget(m_chkShowKeypoints);
     layout->addWidget(m_chkShowVotes);
     layout->addWidget(m_chkShowAllVotes);
     layout->addWidget(m_chkShowBbAndCenters);
@@ -274,7 +287,7 @@ QGroupBox* TrainingGUI::createNavigatorISM()
     layout->addWidget(m_onlyShowClassLine);
 
     m_implicitShapeModel = new QGroupBox(this);
-    m_implicitShapeModel->setTitle("Implicit Shape Model");
+    m_implicitShapeModel->setTitle("Detection");
     m_implicitShapeModel->setLayout(layout);
 
     return m_implicitShapeModel;
@@ -287,14 +300,14 @@ void TrainingGUI::spinOnce()
 
     m_renderView->update();
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //    if (!ros::ok())
 //        this->close();
 
 //    ros::spinOnce();
 }
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //void TrainingGUI::cbPoints(const sensor_msgs::PointCloud2::ConstPtr& pointCloud)
 //{
 //    if (m_isLoaded)
@@ -308,43 +321,46 @@ void TrainingGUI::spinOnce()
 
 void TrainingGUI::drawCloud()
 {
-    // downsample
-    const int downsampling = 1;
-    m_displayCloud->clear();
-    if (m_cloud->isOrganized()) {
-        for (int i = 0; i < (int)m_cloud->width; i += downsampling) {
-            for (int j = 0; j < (int)m_cloud->height; j += downsampling) {
-                m_displayCloud->push_back(m_cloud->at(i, j));
-            }
-        }
-    }
-    else {
-        for (int i = 0; i < (int)m_cloud->size(); i += downsampling) {
-            m_displayCloud->push_back(m_cloud->at(i));
-        }
-    }
-
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 
     vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
     colors->SetNumberOfComponents(3);
 
-    // create points from point cloud
-    for (size_t i = 0; i < m_displayCloud->size(); i++) {
-        const pcl::PointXYZRGB& point = m_displayCloud->points[i];
-        points->InsertNextPoint(point.x, point.y, point.z);
+    m_displayCloud->clear();
 
-        if(point.r == 0 && point.g == 0 && point.b == 0)
-            colors->InsertNextTuple3(255, 0, 0);
-        else
+    // downsample
+    const int downsampling = 1;
+    if (m_cloud->isOrganized())
+    {
+        for (int i = 0; i < (int)m_cloud->width; i += downsampling)
+        {
+            for (int j = 0; j < (int)m_cloud->height; j += downsampling)
+            {
+                m_displayCloud->points.emplace_back(m_cloud->at(i, j));
+
+                const PointNormalT& point = m_cloud->at(i,j);
+                points->InsertNextPoint(point.x, point.y, point.z);
+                colors->InsertNextTuple3(point.r, point.g, point.b);
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < (int)m_cloud->size(); i += downsampling)
+        {
+            m_displayCloud->points.emplace_back(m_cloud->at(i));
+
+            const PointNormalT& point = m_cloud->at(i);
+            points->InsertNextPoint(point.x, point.y, point.z);
             colors->InsertNextTuple3(point.r, point.g, point.b);
+        }
     }
 
     vtkSmartPointer<vtkCellArray> conn = vtkSmartPointer<vtkCellArray>::New();
     for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
         conn->InsertNextCell(1, &i);
 
-    m_pointsActor->GetProperty()->SetPointSize(5);
+    m_pointsActor->GetProperty()->SetPointSize(2);
 
     m_points->SetPoints(points);
     m_points->GetPointData()->SetScalars(colors);
@@ -352,17 +368,18 @@ void TrainingGUI::drawCloud()
     m_points->Modified();
 }
 
-void TrainingGUI::pauseResume()
-{
-    if (m_updateCloud) {
-        m_updateCloud = false;
-        m_btPauseResume->setText("Resume");
-    }
-    else {
-        m_updateCloud = true;
-        m_btPauseResume->setText("Pause");
-    }
-}
+// NOTE temporarily disabling ROS - makes this method unused
+//void TrainingGUI::pauseResume()
+//{
+//    if (m_updateCloud) {
+//        m_updateCloud = false;
+//        m_btPauseResume->setText("Resume");
+//    }
+//    else {
+//        m_updateCloud = true;
+//        m_btPauseResume->setText("Pause");
+//    }
+//}
 
 void TrainingGUI::reset()
 {
@@ -374,48 +391,50 @@ void TrainingGUI::reset()
     }
 
     m_isLoaded = false;
-    m_updateCloud = true;
-    m_btPauseResume->setText("Pause");
+    m_updateSensorCloud = true;
+    // NOTE temporarily disabling ROS
+    //m_btPauseResume->setText("Pause");
 
     m_renderView->reset();
 }
 
 void TrainingGUI::addModel()
 {
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 
     ModelDlg dlg;
     dlg.exec();
 
-    if (dlg.isValid()) {
+    if (dlg.isValid())
+    {
         // get data
         unsigned classId = dlg.getClassId();
         const QString& filename = dlg.getFilename();
 
         // load the model
-        pcl::PointCloud<PointNormalT>::Ptr model(new pcl::PointCloud<PointNormalT>());
+        pcl::PointCloud<PointNormalT>::Ptr cloud(new pcl::PointCloud<PointNormalT>());
 
         if (filename.endsWith(".pcd", Qt::CaseInsensitive)) {
-            if (pcl::io::loadPCDFile(filename.toStdString(), *model) < 0)
+            if (pcl::io::loadPCDFile(filename.toStdString(), *cloud) < 0)
                 QMessageBox::warning(this, "Error", "Could not load PCD file!");
             else {
                 m_ism->addTrainingModel(filename.toStdString(), classId, classId); // TODO VS: for now setting instance id to class id
                 m_cloud->clear();
                 m_detectCloud->clear();
-                pcl::copyPointCloud(*model, *m_cloud);
-                pcl::copyPointCloud(*model, *m_detectCloud);
+                pcl::copyPointCloud(*cloud, *m_cloud);
+                pcl::copyPointCloud(*cloud, *m_detectCloud);
                 m_isLoaded = true;
             }
         }
         else if (filename.endsWith(".ply", Qt::CaseInsensitive)) {
-            if (pcl::io::loadPLYFile(filename.toStdString(), *model) < 0)
+            if (pcl::io::loadPLYFile(filename.toStdString(), *cloud) < 0)
                 QMessageBox::warning(this, "Error", "Could not load PLY file!");
             else {
                 m_ism->addTrainingModel(filename.toStdString(), classId, classId); // TODO VS: for now setting instance id to class id
                 m_cloud->clear();
                 m_detectCloud->clear();
-                pcl::copyPointCloud(*model, *m_cloud);
-                pcl::copyPointCloud(*model, *m_detectCloud);
+                pcl::copyPointCloud(*cloud, *m_cloud);
+                pcl::copyPointCloud(*cloud, *m_detectCloud);
                 m_isLoaded = true;
             }
         }
@@ -423,12 +442,12 @@ void TrainingGUI::addModel()
             QMessageBox::warning(this, "Error", "Invalid file extension");
     }
 
-    m_updateCloud = true;
+    m_updateSensorCloud = true;
 }
 
 void TrainingGUI::loadScene()
 {
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 
     QString filename = QFileDialog::getOpenFileName(this, "Load Scene", QString(), tr("PCD-Files (*.pcd);;PLY-Files (*.ply);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
 
@@ -456,8 +475,29 @@ void TrainingGUI::loadScene()
             QMessageBox::warning(this, "Error", "Invalid file extension");
     }
 
-    m_updateCloud = true;
+    m_updateSensorCloud = true;
 }
+
+
+void TrainingGUI::loadConfig()
+{
+    m_updateSensorCloud = false;
+
+    QString filename = QFileDialog::getOpenFileName(this, "Load Train Config", QString(), tr("ISM-Files (*.ism);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
+
+    if (!filename.isEmpty())
+    {
+        if (filename.endsWith(".ism", Qt::CaseInsensitive))
+        {
+            m_ism->readObject(filename.toStdString(), true);
+        }
+        else
+            QMessageBox::warning(this, "Error", "Invalid file extension");
+    }
+
+    m_updateSensorCloud = true;
+}
+
 
 void TrainingGUI::load()
 {
@@ -493,26 +533,20 @@ void TrainingGUI::save()
     }
 }
 
-int i = 0;
 
 void TrainingGUI::trainModel()
 {
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 
     m_renderView->reset();
     m_renderView->setStatus("Training...");
 
     m_navGeneral->setEnabled(false);
     m_navISM->setEnabled(false);
-
-    /*Eigen::Affine3f objTransform(Eigen::Translation3f(0, 0, 0));
-    objTransform *= Eigen::AngleAxisf(0.5f, Eigen::Vector3f(1, 0, 0));
-    objTransform *= Eigen::Translation3f(-0.4, 0.5, 0.5);
-    pcl::transformPointCloud(*m_cloud, *m_cloud, objTransform);*/
-
     m_cloud->clear();
 
-    if (m_isLoaded) {
+    if (m_isLoaded)
+    {
         // train
         try {
             // start training on a separate thread
@@ -540,12 +574,11 @@ void TrainingGUI::trainModel()
             trainingFinished(false);
         }
     }
-    else {
+    else
+    {
         QMessageBox::warning(this, "Warning", "No training models loaded.");
         trainingFinished(false);
     }
-
-    i = 0;
 }
 
 void TrainingGUI::trainingFinished(bool successful)
@@ -561,7 +594,7 @@ void TrainingGUI::trainingFinished(bool successful)
 
 void TrainingGUI::detectISM()
 {
-    m_updateCloud = false;
+    m_updateSensorCloud = false;
 
     m_renderView->reset();
     m_renderView->setStatus("Detecting...");
@@ -569,41 +602,8 @@ void TrainingGUI::detectISM()
     m_navGeneral->setEnabled(false);
     m_navISM->setEnabled(false);
 
-    /*if (i == 0) {
-        for (int i = 0; i < m_cloud->size(); i++) {
-            pcl::PointXYZRGB& point = m_cloud->at(i);
-            point.x += ((rand() / (float)RAND_MAX) - 0.5f) * 0.005f;
-            point.y += ((rand() / (float)RAND_MAX) - 0.5f) * 0.005f;
-            point.z += ((rand() / (float)RAND_MAX) - 0.5f) * 0.005f;
-        }
-    }*/
-
-    /*if (i > 0) {
-        float angle = (rand() / (float)RAND_MAX) * 2 * M_PI;
-        float x = rand() / (float)RAND_MAX;
-        float y = rand() / (float)RAND_MAX;
-        float z = rand() / (float)RAND_MAX;
-
-        Eigen::Vector3f axis(x, y, z);
-        axis.normalize();
-
-        pcl::PointCloud<PointNormalT>::Ptr newCloud(new pcl::PointCloud<PointNormalT>());
-
-        Eigen::Affine3f objTransform(Eigen::Translation3f(0, 0, 0));
-        //objTransform *= Eigen::AngleAxisf(angle, axis);
-        objTransform *= Eigen::AngleAxisf(0.2, Eigen::Vector3f(0, 1, 0));
-        //objTransform *= Eigen::Translation3f(x, y, z);
-        pcl::transformPointCloud(*m_detectCloud, *newCloud, objTransform);
-
-        m_detectCloud->clear();
-        m_cloud->clear();
-        pcl::copyPointCloud(*newCloud, *m_detectCloud);
-        pcl::copyPointCloud(*newCloud, *m_cloud);
-    }
-
-    i++;*/
-
-    if (m_isLoaded) {
+    if (m_isLoaded)
+    {
         // detect object
         try {
             m_isDetecting = true;
@@ -612,12 +612,7 @@ void TrainingGUI::detectISM()
             QThread* thread = new QThread;
             ISMWorker* worker = new ISMWorker;
             worker->setImplicitShapeModel(m_ism);
-
-//            pcl::PointCloud<PointNormalT>::Ptr newCloud(new pcl::PointCloud<PointNormalT>());
-//            pcl::copyPointCloud(*m_detectCloud, *newCloud);
-//            worker->setDetectionPointCloud(newCloud);
             worker->setDetectionPointCloud(m_detectCloud);
-
             worker->moveToThread(thread);
             connect(thread, SIGNAL(started()), worker, SLOT(detect()));
             connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
@@ -637,8 +632,6 @@ void TrainingGUI::detectISM()
     }
     else
         QMessageBox::warning(this, "Warning", "No detection point cloud loaded.");
-
-    //m_cloud->clear();
 }
 
 void TrainingGUI::detectionFinished(bool successful)
@@ -661,7 +654,8 @@ void TrainingGUI::clearISM()
 void TrainingGUI::signalPointCloud(pcl::PointCloud<ism3d::PointT>::ConstPtr pointCloud)
 {
     // can cause synchronizing issues
-    if (!m_isDetecting) {
+    if (!m_isDetecting)
+    {
         m_cloud->clear();
         pcl::copyPointCloud(*pointCloud, *m_cloud);
     }
@@ -707,8 +701,7 @@ void TrainingGUI::addBoundingBox(const ism3d::Utils::BoundingBox& box)
     vtkSmartPointer<vtkActor> bboxActor = vtkSmartPointer<vtkActor>::New();
     bboxActor->SetMapper(bboxMapper);
     bboxActor->GetProperty()->SetLighting(false);
-    //bboxActor->GetProperty()->SetColor(255, 255, 255);
-    bboxActor->GetProperty()->SetColor(0, 0, 255);    // TEMP
+    bboxActor->GetProperty()->SetColor(0, 0, 255);
     bboxActor->GetProperty()->SetLineWidth(2);
     bboxActor->GetProperty()->SetRepresentationToWireframe();
 
@@ -720,6 +713,23 @@ void TrainingGUI::addBoundingBox(const ism3d::Utils::BoundingBox& box)
     m_renderView->unlock();
 }
 
+void TrainingGUI::updateRenderView(bool state)
+{
+    // TODO VS: if needed handle all checkboxes to update the view without pressing "train" or "detect"
+    // NOTE: this already works for the m_pointsActor and the m_normalsActor
+    // however, the boundig boxes are only stored inside the m_renderView and must be kept in a separate list
+    // same for features etc.
+
+//    m_renderView->reset();
+//    m_renderView->addActorToAll(m_pointsActor);
+
+//    if(m_chkShowNormals->isChecked())
+//    {
+//        m_renderView->getRendererScene(true)->AddActor(m_normalsActor);
+//    }
+}
+
+
 void TrainingGUI::signalNormals(pcl::PointCloud<ism3d::PointT>::ConstPtr pointCloud, pcl::PointCloud<pcl::Normal>::ConstPtr normals)
 {
     vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
@@ -730,11 +740,6 @@ void TrainingGUI::signalNormals(pcl::PointCloud<ism3d::PointT>::ConstPtr pointCl
         const pcl::Normal& normal = normals->at(i);
 
         Eigen::Vector3f nn = normal.getNormalVector3fMap();
-        if(m_chkInvertNormals->isChecked())
-        {
-            nn *= -1;
-        }
-
         Eigen::Vector3f pos = point.getVector3fMap();
         Eigen::Vector3f posNormal = pos + 0.01f * nn;
 
@@ -748,6 +753,8 @@ void TrainingGUI::signalNormals(pcl::PointCloud<ism3d::PointT>::ConstPtr pointCl
 
         cells->InsertNextCell(polyLine);
     }
+    m_normals->clear();
+    pcl::copyPointCloud(*normals, *m_normals);
 
     // Create a polydata to store everything in
     vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
@@ -759,14 +766,13 @@ void TrainingGUI::signalNormals(pcl::PointCloud<ism3d::PointT>::ConstPtr pointCl
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
     mapper->SetInputData(polyData);
 
-    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(0, 0, 255);
-    actor->GetProperty()->SetLineWidth(2);
-    //actor->GetProperty()->SetColor(0, 0, 0);
+    m_normalsActor = vtkSmartPointer<vtkActor>::New();
+    m_normalsActor->SetMapper(mapper);
+    m_normalsActor->GetProperty()->SetColor(0, 0, 255);
+    m_normalsActor->GetProperty()->SetLineWidth(2);
     if(m_chkShowNormals->isChecked())
     {
-        m_renderView->getRendererScene()->AddActor(actor);
+        m_renderView->getRendererScene(true)->AddActor(m_normalsActor);
     }
 }
 
@@ -800,63 +806,36 @@ void TrainingGUI::signalFeatures(pcl::PointCloud<ism3d::ISMFeature>::ConstPtr fe
         vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
         transform->SetMatrix(&mat(0, 0));
 
-        vtkSmartPointer<vtkAxesActor> axes = vtkSmartPointer<vtkAxesActor>::New();
-        axes->SetUserTransform(transform);
-        axes->AxisLabelsOff();
-        axes->SetConeRadius(0);
-        axes->GetXAxisShaftProperty()->SetLineWidth(2);
-        axes->GetYAxisShaftProperty()->SetLineWidth(2);
-        axes->GetZAxisShaftProperty()->SetLineWidth(2);
-        axes->SetTotalLength(0.1, 0.1, 0.1);
+        vtkSmartPointer<vtkAxesActor> featuresActor = vtkSmartPointer<vtkAxesActor>::New();
+        featuresActor->SetUserTransform(transform);
+        featuresActor->AxisLabelsOff();
+        featuresActor->SetConeRadius(0);
+        featuresActor->GetXAxisShaftProperty()->SetLineWidth(2);
+        featuresActor->GetYAxisShaftProperty()->SetLineWidth(2);
+        featuresActor->GetZAxisShaftProperty()->SetLineWidth(2);
+        featuresActor->SetTotalLength(0.1, 0.1, 0.1);
 
         if(m_chkShowFeatures->isChecked())
         {
-            m_renderView->getRendererScene(true)->AddActor(axes);
+            m_renderView->getRendererScene(true)->AddActor(featuresActor);
         }
 
-        // add a sphere
-        /*vtkSmartPointer<vtkSphereSource> sphere = vtkSmartPointer<vtkSphereSource>::New();
+        // add a sphere for each keypoint
+        vtkSmartPointer<vtkSphereSource> sphere = vtkSmartPointer<vtkSphereSource>::New();
         sphere->SetCenter(feature.x, feature.y, feature.z);
-        sphere->SetRadius(0.1);
+        sphere->SetRadius(0.02);
         vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
         mapper->SetInputConnection(sphere->GetOutputPort());
         vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
         actor->SetMapper(mapper);
-        actor->GetProperty()->SetRepresentationToWireframe();
+        //actor->GetProperty()->SetRepresentationToWireframe();
         actor->GetProperty()->SetLighting(false);
-        actor->GetProperty()->SetColor(1, 1, 1);
-        m_renderView->getRendererScene()->AddActor(actor);*/
+        actor->GetProperty()->SetColor(0, 0.75, 0);
 
-        /*Eigen::Vector3f keyPos(keypoint.x, keypoint.y, keypoint.z);
-        Eigen::Vector3f normal(keypoint.normal_x, keypoint.normal_y, keypoint.normal_z);
-        Eigen::Vector3f keyNormal = keyPos + 0.1f * normal;
-
-        vtkSmartPointer<vtkPoints> line = vtkSmartPointer<vtkPoints>::New();
-        vtkSmartPointer<vtkPolyLine> polyLine = vtkSmartPointer<vtkPolyLine>::New();
-        polyLine->GetPointIds()->SetNumberOfIds(2);
-        for(unsigned int i = 0; i < 2; i++)
-            polyLine->GetPointIds()->SetId(i, i);
-        line->InsertNextPoint(keyPos[0], keyPos[1], keyPos[2]);
-        line->InsertNextPoint(keyNormal[0], keyNormal[1], keyNormal[2]);
-
-        // Create a cell array to store the lines in and add the lines to it
-        vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
-        cells->InsertNextCell(polyLine);
-
-        // Create a polydata to store everything in
-        vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
-
-        polyData->SetPoints(line);
-        polyData->SetLines(cells);
-
-        // Setup actor and mapper
-        vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-        mapper->SetInput(polyData);
-
-        vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(0, 0, 255);
-        m_rendererScene->AddActor(actor);*/
+        if(m_chkShowKeypoints->isChecked())
+        {
+            m_renderView->getRendererScene()->AddActor(actor);
+        }
     }
 
     m_renderView->unlock();
@@ -878,14 +857,16 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
     {
         // save vote indices
         std::map<unsigned, std::vector<int> > voteIndices;
-        for (int i = 0; i < (int)maxima.size(); i++) {
+        for (int i = 0; i < (int)maxima.size(); i++)
+        {
             const std::vector<int> indices = maxima[i].voteIndices;
             std::vector<int>& mapEntry = voteIndices[maxima[i].classId];
             mapEntry.insert(mapEntry.end(), indices.begin(), indices.end());
         }
 
         for (std::map<unsigned, std::vector<ism3d::Voting::Vote> >::const_iterator it = votes.begin();
-             it != votes.end(); it++) {
+             it != votes.end(); it++)
+        {
             unsigned classId = it->first;
             const std::vector<ism3d::Voting::Vote>& classVotes = it->second;
 
@@ -983,7 +964,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 
     // clear list of maxima to show
     m_maxima_classes.clear();
-    m_maxima_classes.resize(64, false); // FIXME: actually should be number of possible classes, not a fixed value
+    m_maxima_classes.resize(64, false); // TODO VS: actually should be number of possible classes, not a fixed value
 
     // enable / disable bounding box and center visualization
     if(m_chkShowBbAndCenters->isChecked())
@@ -993,7 +974,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 
         // add bounding boxes to represent object positions
         int min_votes = m_minMaxVotesToShowLine->text().toInt();
-        LOG_WARN("Only maxima with at least " << min_votes << " votes will be displayed!");
+        LOG_INFO("Only maxima with at least " << min_votes << " votes will be displayed!");
 
         // only show maxima of certain classes
         std::string temp_text = m_onlyShowClassLine->text().toStdString();
@@ -1009,11 +990,11 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
         }
         if(temp_text != "")
         {
-            LOG_WARN("Only maxima of class IDs " << temp_text << " will be displayed!");
+            LOG_INFO("Only maxima of class IDs " << temp_text << " will be displayed!");
         }
         else
         {
-            LOG_WARN("All class IDs will be displayed!");
+            LOG_INFO("All class IDs will be displayed!");
         }
 
         for (int i = 0; i <(int)maxima.size(); i++)
@@ -1070,42 +1051,41 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
     }
 
     // TEMP STUFF
+//    // draw trajectories
+//    const std::vector<std::vector<Eigen::Vector3f> >& trajectories = ((ism3d::VotingMeanShift*)m_ism->getVoting())->getTrajectories;
+//    for (int i = 0; i < (int)trajectories.size(); i++) {
+//        vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+//        const std::vector<Eigen::Vector3f>& path = trajectories[i];
+//        for (int j = 0; j < (int)path.size(); j++)
+//            points->InsertNextPoint(&path[j][0]);
 
-    // draw trajectories
-    /*const std::vector<std::vector<Eigen::Vector3f> >& trajectories = ((VotingMeanShiftBase*)m_ism->getVoting())->trajectories;
-    for (int i = 0; i < (int)trajectories.size(); i++) {
-        vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-        const std::vector<Eigen::Vector3f>& path = trajectories[i];
-        for (int j = 0; j < (int)path.size(); j++)
-            points->InsertNextPoint(&path[j][0]);
+//        vtkSmartPointer<vtkPolyLine> polyLine = vtkSmartPointer<vtkPolyLine>::New();
+//        polyLine->GetPointIds()->SetNumberOfIds(path.size());
+//        for(unsigned int i = 0; i < path.size(); i++)
+//            polyLine->GetPointIds()->SetId(i,i);
 
-        vtkSmartPointer<vtkPolyLine> polyLine = vtkSmartPointer<vtkPolyLine>::New();
-        polyLine->GetPointIds()->SetNumberOfIds(path.size());
-        for(unsigned int i = 0; i < path.size(); i++)
-            polyLine->GetPointIds()->SetId(i,i);
+//        // Create a cell array to store the lines in and add the lines to it
+//        vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
+//        cells->InsertNextCell(polyLine);
 
-        // Create a cell array to store the lines in and add the lines to it
-        vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
-        cells->InsertNextCell(polyLine);
+//        // Create a polydata to store everything in
+//        vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
 
-        // Create a polydata to store everything in
-        vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
+//        // Add the points to the dataset
+//        polyData->SetPoints(points);
 
-        // Add the points to the dataset
-        polyData->SetPoints(points);
+//        // Add the lines to the dataset
+//        polyData->SetLines(cells);
 
-        // Add the lines to the dataset
-        polyData->SetLines(cells);
+//        // Setup actor and mapper
+//        vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+//        mapper->SetInputData(polyData);
 
-        // Setup actor and mapper
-        vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-        mapper->SetInput(polyData);
-
-        vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-        actor->SetMapper(mapper);
-        actor->GetProperty()->SetColor(255, 255, 0);
-        m_rendererScene->AddActor(actor);
-    }*/
+//        vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+//        actor->SetMapper(mapper);
+//        actor->GetProperty()->SetColor(255, 255, 0);
+//        m_renderView->getRendererScene(true)->AddActor(actor);
+//    }
 
     m_renderView->unlock();
 }

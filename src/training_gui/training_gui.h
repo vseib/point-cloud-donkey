@@ -14,7 +14,7 @@
 #include <QLineEdit>
 #include <QLabel>
 
-// TODO VS temporarily (?) disabling ROS
+// NOTE temporarily disabling ROS
 //// ROS
 //#include "ros/ros.h"
 //#include "sensor_msgs/PointCloud2.h"
@@ -52,11 +52,12 @@ public:
     ~TrainingGUI();
 
 private slots:
-    void spinOnce();
-    void pauseResume();
+    void spinOnce(); // NOTE ROS is disabled inside this function
+    // void pauseResume(); // NOTE temporarily disabling ROS
     void reset();
     void addModel();
     void loadScene();
+    void loadConfig();
     void load();
     void save();
     void trainModel();
@@ -64,15 +65,16 @@ private slots:
     void detectISM();
     void detectionFinished(bool);
     void clearISM();
+    void updateRenderView(bool state);
 
 protected:
-    // TODO VS temporarily (?) disabling ROS
+    // NOTE temporarily disabling ROS
     //void cbPoints(const sensor_msgs::PointCloud2::ConstPtr& points);
 
 private:
     QGroupBox* createNavigatorApplication();
-    QGroupBox* createNavigatorGeneral();
-    QGroupBox* createNavigatorISM();
+    QGroupBox* createNavigatorTraining();
+    QGroupBox* createNavigatorDetect();
 
     void draw();
     void drawCloud();
@@ -87,13 +89,13 @@ private:
 
     void addBoundingBox(const ism3d::Utils::BoundingBox&);
 
-    // TODO VS temporarily (?) disabling ROS
+    // NOTE temporarily disabling ROS
 //    ros::NodeHandle m_node;
 //    ros::Subscriber m_subPoints;
     ism3d::ImplicitShapeModel* m_ism;
 
     bool m_isLoaded;
-    bool m_updateCloud;
+    bool m_updateSensorCloud;
     bool m_isDetecting;
 
     // Qt items
@@ -104,7 +106,7 @@ private:
     QCheckBox* m_chkShowBbAndCenters;
     QCheckBox* m_chkShowVotes;
     QCheckBox* m_chkShowFeatures;
-    QCheckBox* m_chkInvertNormals;
+    QCheckBox* m_chkShowKeypoints;
     QCheckBox* m_chkShowNormals;
     QCheckBox* m_chkShowOnlyBestMaxPerClass;
 
@@ -120,12 +122,14 @@ private:
 
     RenderView* m_renderView;
 
-    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr m_detectCloud;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_cloud;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_displayCloud;
+    pcl::PointCloud<ism3d::PointNormalT>::Ptr m_detectCloud;
+    pcl::PointCloud<ism3d::PointNormalT>::Ptr m_cloud;
+    pcl::PointCloud<pcl::Normal>::Ptr m_normals;
+    pcl::PointCloud<ism3d::PointNormalT>::Ptr m_displayCloud;
 
     vtkSmartPointer<vtkPolyData> m_points;
     vtkSmartPointer<vtkActor> m_pointsActor;
+    vtkSmartPointer<vtkActor> m_normalsActor;
 
     std::vector<bool> m_maxima_classes; // used to display only the best maximum per class
 
