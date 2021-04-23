@@ -786,7 +786,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     }
 
     pcl::PointCloud<PointT>::Ptr pointCloud(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<PointT>::Ptr eigenValues;
+    pcl::PointCloud<PointT>::Ptr eigenValues(new pcl::PointCloud<PointT>());
     pcl::PointCloud<pcl::Normal>::Ptr normals;
     pcl::PointCloud<PointT>::Ptr pointsWithoutNaN;
     pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan;
