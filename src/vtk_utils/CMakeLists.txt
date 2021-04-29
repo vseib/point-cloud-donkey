@@ -32,4 +32,4 @@ add_library(vtk_utils
 )
 
 # link library with dependencies
-target_link_libraries(vtk_utils ${PCL_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(vtk_utils ${PCL_LIBRARIES} ${QT_LIBRARIES} ${VTK_LIBRARIES} ${Boost_LIBRARIES})
