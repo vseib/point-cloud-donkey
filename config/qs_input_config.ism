@@ -8,7 +8,9 @@
             "Children" : {
                "ActivationStrategy" : {
                   "Parameters" : {
-                     "K" : 1
+                     "K" : 1,
+                     "DistanceRatioThreshold" : 0.8,
+                     "UseDistanceRatio" : false
                   },
                   "Type" : "KNN"
                }
@@ -54,7 +56,15 @@
          },
          "Keypoints" : {
             "Parameters" : {
-               "LeafSize" : 50
+               "LeafSize" : 50,
+               "FilterMethodGeometry" : "None",
+               "FilterTypeGeometry" : "CutOff",
+               "FilterThresholdGeometry" : 0.005,
+               "FilterMethodColor" : "None",
+               "FilterTypeColor" : "CutOff",
+               "FilterThresholdColor" : 0.02,
+               "MaxSimilarColorDistance" : 0.05,
+               "FilterCutoffRatio" : 0.5
             },
             "Type" : "VoxelGrid"
          },
@@ -78,6 +88,7 @@
                "MinThreshold" : 0.0,
                "MinVotesThreshold" : 1,
                "SingleObjectMaxType" : "None",
+               "SingleObjectMode" : true,
                "Threshold" : 0.001000000047497451,
                "UseGlobalFeatures" : false
             },
@@ -92,19 +103,30 @@
          "EnableVotingAnalysis" : false,
          "FLANNExactMatch" : false,
          "FLANNNumKDTrees" : 4,
+         "InstanceLabelsPrimary" : true,
          "NormalRadius" : 10,
          "NumThreads" : 0,
          "SetColorToZero" : true,
-         "SingleObjectMode" : true,
+         "SingleObjectMode" : false,
          "SvmAutoTrain" : true,
          "SvmOneVsAllTraining" : true,
          "SvmParamC" : 7.410,
          "SvmParamGamma" : 2.960,
          "SvmParamKfold" : 10,
          "UseSvmTraining" : false,
+         "UseSmoothing" : false,
+         "SmoothingPolynomialOrder" : 1,
+         "SmoothingRadius" : 0.01,
+         "UseStatisticalOutlierRemoval" : false,
+         "OutlierRemovalMeanK" : 20,
+         "OutlierRemovalStddevMul" : 2.0,
+         "UseRadiusOutlierRemoval" : false,
+         "OutlierRemovalMinNeighbors" : 10,
+         "OutlierRemovalRadius" : 0.005,
          "UseVoxelFiltering" : false,
-         "VotingAnalysisOutputPath" : "/home/vseib/Desktop/",
-         "VoxelLeafSize" : 0.009999999776482582
+         "VotingAnalysisOutputPath" : "/home/user/Desktop/voting_analysis",
+         "VoxelLeafSize" : 0.009999999776482582,
+         "DistanceThresholdDetection" : 0.05
       }
    }
 }

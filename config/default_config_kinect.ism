@@ -8,7 +8,9 @@
             "Children" : {
                "ActivationStrategy" : {
                   "Parameters" : {
-                     "K" : 1
+                     "K" : 1,
+                     "DistanceRatioThreshold" : 0.8,
+                     "UseDistanceRatio" : false
                   },
                   "Type" : "KNN"
                }
@@ -69,7 +71,15 @@
          },
          "Keypoints" : {
             "Parameters" : {
-               "LeafSize" : 0.02
+               "LeafSize" : 0.02,
+               "FilterMethodGeometry" : "None",
+               "FilterTypeGeometry" : "CutOff",
+               "FilterThresholdGeometry" : 0.005,
+               "FilterMethodColor" : "None",
+               "FilterTypeColor" : "CutOff",
+               "FilterThresholdColor" : 0.02,
+               "MaxSimilarColorDistance" : 0.05,
+               "FilterCutoffRatio" : 0.5
             },
             "Type" : "VoxelGrid"
          },
@@ -103,14 +113,16 @@
       "Parameters" : {
          "BoundingBoxType" : "AABB",
          "ConsistentNormalsK" : 10,
-         "ConsistentNormalsMethod" : 1,
+         "ConsistentNormalsMethod" : 0,
          "DistanceType" : "ChiSquared",
          "EnableVotingAnalysis" : false,
          "FLANNExactMatch" : false,
          "FLANNNumKDTrees" : 4,
+         "InstanceLabelsPrimary" : true,
          "NormalRadius" : 0.005000000074505806,
          "NumThreads" : 0,
          "SetColorToZero" : false,
+         "SingleObjectMode" : false,
          "SvmAutoTrain" : true,
          "SvmOneVsAllTraining" : true,
          "SvmParamC" : 7.410,
@@ -128,7 +140,8 @@
          "OutlierRemovalRadius" : 0.005,
          "UseVoxelFiltering" : false,
          "VotingAnalysisOutputPath" : "/home/vseib/Desktop/voting_analysis",
-         "VoxelLeafSize" : 0.0015
+         "VoxelLeafSize" : 0.0015,
+         "DistanceThresholdDetection" : 0.05
       }
    }
 }

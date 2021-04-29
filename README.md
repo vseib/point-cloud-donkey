@@ -1,6 +1,6 @@
 
 
-# PointCloudDonkey
+# Point-cloud-donkey
 A Hough-Space-based Nearest Neighbor Object Recognition Pipeline for Point Clouds
 
 ![alt text](images/complete_pipeline.png "Visualization of the Pipeline")
@@ -11,7 +11,7 @@ The maneki-neko (lucky cat) mesh model is intellectual property of user bs3 (tak
 
 ## Description
 
-PointCloudDonkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. There are still many references to ISM in the code. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
+Point-cloud-donkey is a customizable pipeline based on the <a href="http://pointclouds.org" target="_blank">Point Cloud Library (PCL)</a> for point cloud classification. The development started as an adaptation of the Implicit Shape Model (ISM) [1] algorithm to point cloud data. There are still many references to ISM in the code. Over time, the framework was extended and became a general, local feature, Hough-Space voting approach for point cloud classification. It allows to classify point cloud objects and localize them amongst clutter (the latter part still being in development).
 
 The following table summarizes classification results on some datasets. For more information please refer to the publications linked in the [Citing](#Citing) section.
 
@@ -25,9 +25,9 @@ The following table summarizes classification results on some datasets. For more
 | [ModelNet 40](http://modelnet.cs.princeton.edu/) | - |71.9 | 75.4 |
 
 <a name="fnaim">1</a>: Dataset no longer online <br>
-<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf) and [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf)<br>
-<a name="fnbasep">3</a>: Optimized parameters in training [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf) <br> 
-<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
+<a name="fnbasep">2</a>: Pipeline **excluding** steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/point-cloud-donkey/wiki/List_of_Related_Papers#Implicit-Shape-Models-For-3D-Shape-Classification-With-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015ISM.pdf) and [\[bibtex\]](https://github.com/vseib/point-cloud-donkey/wiki/List_of_Related_Papers#Pose-Estimation-and-Shape-Retrieval-with-Hough-Voting-in-a-Continuous-Voting-Space) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2015PEA.pdf)<br>
+<a name="fnbasep">3</a>: Optimized parameters in training [\[bibtex\]](https://github.com/vseib/point-cloud-donkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf) <br> 
+<a name="fnbasep">4</a>: Pipeline **including** orange and green steps marked with a red star in the image above [\[bibtex\]](https://github.com/vseib/point-cloud-donkey/wiki/List_of_Related_Papers#Boosting-3D-Shape-Classification-with-Global-Verification-and-Redundancy-Free-Codebooks) [\[PDF\]](http://www.uni-koblenz.de/~agas/Documents/Seib2019B3S.pdf)<br>
 
 | RGB-D Data Set | Base Pipeline<sup>[3](#fnbasep2)</sup> | Base Pipeline with Short CSHOT<sup>[5](#fnbasescsh)</sup> |
 | ---  | ---    | --- | 
@@ -37,7 +37,7 @@ The following table summarizes classification results on some datasets. For more
 | [YCB](https://www.ycbbenchmarks.com/) | 87.9 / 73.2 | 81.4 / 68.6 |
 
 <a name="fnbasescsh">5</a>: Shortened Color SHOT Descriptors [in press] <br>
-<a name="icarsc21supp">6</a>: Self-assigned instances to classes, see [\[ICARSC21 supplements\]](https://github.com/vseib/PointCloudDonkey/blob/master/supplements/icarsc2021/rgbd-dataset-classes-instances.txt) <br>
+<a name="icarsc21supp">6</a>: Self-assigned instances to classes, see [\[ICARSC21 supplements\]](https://github.com/vseib/point-cloud-donkey/blob/master/supplements/icarsc2021/rgbd-dataset-classes-instances.txt) <br>
 
 ## Acknowledgments
 
@@ -54,25 +54,26 @@ Further, I would like to thank the developers of third party libraries used in t
 
 ## Installation
 
-This framework was tested with Ubuntu 14.04 LTS, Ubuntu 16.04 LTS and Ubuntu 18.04 LTS.
+This framework was tested with various versions of Ubuntu LTS.
 The installation instructions can be found on the Wiki pages.
 
-[Ubuntu 14.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_14.04_LTS)
+[Ubuntu 20.04 LTS](https://github.com/vseib/point-cloud-donkey/wiki/Installation_Ubuntu_20.04_LTS)
 
-[Ubuntu 16.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_16.04_LTS)
-
-[Ubuntu 18.04 LTS](https://github.com/vseib/PointCloudDonkey/wiki/Installation_Ubuntu_18.04_LTS)
-
+For older versions, please consult the [Wiki pages.](https://github.com/vseib/point-cloud-donkey/wiki/Home)
 
 ## Quick Start
 
 To quickly start training a classifier to classify isolated point clouds, refer to the instructions on the following Wiki pages.
 
-[Quick Start Using the Command Line](https://github.com/vseib/PointCloudDonkey/wiki/Quick_Start_Using_Command_Line)
+[Quick Start Using the Command Line](https://github.com/vseib/point-cloud-donkey/wiki/Quick_Start_Using_Command_Line)
 
-TODO: [Quick Start Using the GUI]
+[Quick Start Using the GUI](https://github.com/vseib/point-cloud-donkey/wiki/Quick_Start_Using_GUI)
 
 ## Documentation
+
+### GUI Tools
+
+TODO
 
 ### Preparing Point Clouds
 
@@ -95,7 +96,7 @@ TODO
 If you are using this repository for academic work, please consider citing the publication listed below.
 If you consider citing a specific contribution contained in this repository, please refer to the following Wiki page:
 
-[Citing This Repository](https://github.com/vseib/PointCloudDonkey/wiki/List_of_Related_Papers)
+[Citing This Repository](https://github.com/vseib/point-cloud-donkey/wiki/List_of_Related_Papers)
 
 ### Boosting 3D Shape Classification with Global Verification and Redundancy-Free Codebooks
 * Paper introducing codebook cleaning and global verification
@@ -120,8 +121,8 @@ If you consider citing a specific contribution contained in this repository, ple
 
 ## License
 
-PointCloudDonkey is released under the BSD-3-Clause license. See [LICENSE](LICENSE) for details.
-PointCloudDonkey also includes some 3rd party code which might be subject to other licenses.
+Point-cloud-donkey is released under the BSD-3-Clause license. See [LICENSE](LICENSE) for details.
+Point-cloud-donkey also includes some 3rd party code which might be subject to other licenses.
 
 ## References
 
