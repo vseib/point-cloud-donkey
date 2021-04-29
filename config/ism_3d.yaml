@@ -1,7 +1,0 @@
-# define files to load
-# NOTE: param model file with leading /
-#/ism_3d/model_file: /object_models/lisa_new_cshot.ism
-/ism_3d/model_file: /object_models/lisa_new_1_shot.ism
-#/ism_3d/model_file: /object_models/lisa_kinect_downsampled_filtered_smoothed.ism    # loads the given files with extensions .ism (params), .ismd (object data) and .txt (assignments of IDs to class and instance names)
-
-# if needed define default param file for training (e.g. the file in config/default.ism) and introduce train/detect flag
