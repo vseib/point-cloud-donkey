@@ -39,19 +39,6 @@ The following table summarizes classification results on some datasets. For more
 <a name="fnbasescsh">5</a>: Shortened Color SHOT Descriptors [in press] <br>
 <a name="icarsc21supp">6</a>: Self-assigned instances to classes, see [\[ICARSC21 supplements\]](https://github.com/vseib/point-cloud-donkey/blob/master/supplements/icarsc2021/rgbd-dataset-classes-instances.txt) <br>
 
-## Acknowledgments
-
-The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub:
-* [Norman's repository](https://github.com/Norman0406).
-
-Further, I would like to thank the developers of third party libraries used in this project: 
-* [Point Cloud Library](https://github.com/PointCloudLibrary/pcl)
-* [Compact Geometric Features](https://marckhoury.github.io/CGF/)
-* [cnpy Library](https://github.com/rogersce/cnpy)
-* [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
-* [lzf Library](http://oldhome.schmorp.de/marc/liblzf.html)
-* [B-SHOT Descriptor](https://github.com/saimanoj18/iros_bshot)
-
 ## Installation
 
 This framework was tested with various versions of Ubuntu LTS.
@@ -90,6 +77,19 @@ TODO
 ### Detailed Config File Documentation
 
 TODO
+
+## Acknowledgments
+
+The development of this framework started during the Master's thesis of Norman Link, that I supervised. I am very thankful to Norman for his contributions. Please check out other projects of Norman on GitHub:
+* [Norman's repository](https://github.com/Norman0406).
+
+Further, I would like to thank the developers of third party libraries used in this project: 
+* [Point Cloud Library](https://github.com/PointCloudLibrary/pcl)
+* [Compact Geometric Features](https://marckhoury.github.io/CGF/)
+* [cnpy Library](https://github.com/rogersce/cnpy)
+* [gdiam Library](https://sarielhp.org/research/papers/00/diameter/diam_prog.html)
+* [lzf Library](http://oldhome.schmorp.de/marc/liblzf.html)
+* [B-SHOT Descriptor](https://github.com/saimanoj18/iros_bshot)
 
 ## Citing
 
