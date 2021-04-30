@@ -22,7 +22,6 @@ namespace ism3d
     {
         addParameter(m_leafSize, "LeafSize", 0.1f);
 
-        // TODO VS include all of these params into config files
         addParameter(m_filter_method_geometry, "FilterMethodGeometry", std::string("None"));
         addParameter(m_filter_type_geometry, "FilterTypeGeometry", std::string("CutOff"));
         addParameter(m_filter_threshold_geometry, "FilterThresholdGeometry", 0.005f);
@@ -48,15 +47,6 @@ namespace ism3d
                                                                             pcl::search::Search<PointT>::Ptr search)
     {      
         int knn_kpq = 100;
-        // TODO VS document these values in default config
-//        m_filter_threshold_geometry = 0.005f; // e.g. 0.005 good for method "curvature"
-//        m_filter_cutoff_ratio = 0.5f; // value between 0 and 1
-//        m_filter_method_geometry = "none"; // one of: "curvature", "gaussian", "kpq", "none"
-//        m_filter_type_geometry = "cutoff"; // one of: "cutoff", "threshold", "auto"
-//        m_filter_method_color = "none"; // one of: "color_distance", "none"
-//        m_filter_type_color = "threshold";  // one of: "cutoff", "threshold"
-//        m_filter_threshold_color = 0.02f; // e.g. 0.02 good for color
-
         // TODO VS disable filtering in training
 
         boost::algorithm::to_lower(m_filter_method_geometry);
@@ -95,7 +85,7 @@ namespace ism3d
                 exit(1);
             }
 
-            if(m_filter_method_color != "none" && m_filter_method_color != "color_distance")
+            if(m_filter_method_color != "none" && m_filter_method_color != "colordistance")
             {
                 LOG_ERROR("Unsupported keypoint color filter method: " << m_filter_method_color);
                 exit(1);
@@ -176,7 +166,7 @@ namespace ism3d
                 }
 
                 // group these methods as they need nearest neighbor search
-                if(m_filter_method_geometry == "kpq" || m_filter_method_color == "color_distance")
+                if(m_filter_method_geometry == "kpq" || m_filter_method_color == "colordistance")
                 {
                     pts_with_normals_tree.nearestKSearch(reference_point, knn_kpq, point_idxs, point_dists); // TODO VS: switch to radius search?
                     if(m_filter_method_geometry == "kpq")
@@ -187,7 +177,7 @@ namespace ism3d
                         // overwrite curvature with current method's value
                         reference_point.curvature = kpqval;
                     }
-                    if(m_filter_method_color == "color_distance")
+                    if(m_filter_method_color == "colordistance")
                     {
                         float color_score = computeColorScore(point_idxs, points_with_normals, reference_point, cc);
                         color_scores.push_back(color_score);
