@@ -19,13 +19,12 @@
 namespace ism3d
 {
 FeatureRanking::FeatureRanking()
-    : m_numThreads(1)
+    : m_numThreads(0)
 {
     addParameter(m_k_search, "KSearch", 10);
     addParameter(m_dist_thresh, "DistanceThreshold", 0.1f);
     addParameter(m_factor, "Factor", 0.75f);
     addParameter(m_extractList, "ExtractFromList", std::string("front"));
-    addParameter(m_score_threshold, "ScoreThreshold", 0.0f);
 }
 
 FeatureRanking::~FeatureRanking()

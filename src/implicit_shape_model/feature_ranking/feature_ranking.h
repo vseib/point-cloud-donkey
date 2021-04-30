@@ -96,7 +96,6 @@ namespace ism3d
         int m_k_search;
         float m_dist_thresh;
         float m_factor;
-        float m_score_threshold;
         int m_num_kd_trees;
         bool m_flann_exact_match;
 
