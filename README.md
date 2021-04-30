@@ -58,25 +58,10 @@ To quickly start training a classifier to classify isolated point clouds, refer 
 
 ## Documentation
 
-### GUI Tools
+Documentation for different tools, config files and other required artifacts can be found on the following Wiki page.
 
-TODO
+[Documentation Pages](https://github.com/vseib/point-cloud-donkey/wiki/Documentation_Home)
 
-### Preparing Point Clouds
-
-TODO
-
-### Preparing a File List
-
-TODO
-
-### Preparing a Config File
-
-TODO
-
-### Detailed Config File Documentation
-
-TODO
 
 ## Acknowledgments
 
