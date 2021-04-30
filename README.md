@@ -46,7 +46,7 @@ The installation instructions can be found on the Wiki pages.
 
 [Ubuntu 20.04 LTS](https://github.com/vseib/point-cloud-donkey/wiki/Installation_Ubuntu_20.04_LTS)
 
-For older versions, please consult the [Wiki pages.](https://github.com/vseib/point-cloud-donkey/wiki/Home)
+For older versions, please consult the [Wiki pages for older Ubuntu versions.](https://github.com/vseib/point-cloud-donkey/wiki/Installation_Ubuntu_Older)
 
 ## Quick Start
 
