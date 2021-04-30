@@ -27,7 +27,7 @@
 namespace ism3d
 {
 Features::Features()
-    : m_numThreads(1)
+    : m_numThreads(0)
 {
     addParameter(m_referenceFrameRadius, "ReferenceFrameRadius", 0.2f);
     addParameter(m_referenceFrameType, "ReferenceFrameType", std::string("SHOT"));

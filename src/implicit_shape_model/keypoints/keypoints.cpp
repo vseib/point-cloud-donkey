@@ -15,7 +15,7 @@
 namespace ism3d
 {
     Keypoints::Keypoints()
-        : m_numThreads(1)
+        : m_numThreads(0)
     {
     }
 
