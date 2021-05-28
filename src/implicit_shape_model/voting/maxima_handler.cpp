@@ -218,6 +218,10 @@ namespace ism3d
         {
             return mergeAndFilterMaxima(maxima, true);
         }
+        else if(filter_type == "None")  // do nothing
+        {
+            return maxima;
+        }
         else
         {
             LOG_ERROR("Invalid maxima filter type specified: " << filter_type << "! No filtering is performed!");
