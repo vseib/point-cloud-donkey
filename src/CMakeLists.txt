@@ -98,11 +98,11 @@ target_link_libraries(ground_truth_gui implicit_shape_model vtk_utils ${QT_LIBRA
 #)
 #target_link_libraries(eval_pcl_ism ${PCL_LIBRARIES})
 
-#add_executable(eval_lnbnn
-#    eval_comparison/lnbnn/eval_lnbnn.cpp
-#    eval_comparison/lnbnn/lnbnn.cpp
-#)
-#target_link_libraries(eval_lnbnn ${PCL_LIBRARIES} implicit_shape_model ${Boost_LIBRARIES})
+add_executable(eval_pipeline_mccann
+    eval_pipelines/eval_pipeline_mccann/eval_lnbnn.cpp
+    eval_pipelines/eval_pipeline_mccann/lnbnn.cpp
+)
+target_link_libraries(eval_pipeline_mccann implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
 #add_executable(eval_pcl_orcg
 #    eval_comparison/pcl_orcg/eval_pcl_orcg.cpp
