@@ -53,6 +53,8 @@ namespace ism3d
         float m_leafSize;
         float m_max_similar_color_distance;
 
+        bool m_disable_filter_in_training;
+
         float m_filter_threshold_geometry;
         float m_filter_cutoff_ratio;
         std::string m_filter_method_geometry;

@@ -701,7 +701,7 @@ std::tuple<pcl::PointCloud<ISMFeature>::ConstPtr, pcl::PointCloud<ISMFeature>::C
 pcl::PointCloud<PointT>::ConstPtr, pcl::PointCloud<pcl::Normal>::ConstPtr >
 ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr points,
                                     bool hasNormals, boost::timer::cpu_timer& timer_normals, boost::timer::cpu_timer& timer_keypoints,
-                                    bool compute_global)
+                                    bool is_training)
 {
     if(m_use_statistical_outlier_removal)
     {
@@ -840,6 +840,10 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     LOG_INFO("computing keypoints");
     timer_keypoints.start();
     m_keypoints_detector->setNumThreads(m_num_threads);
+    if(is_training)
+    {
+        m_keypoints_detector->setIsTraining();
+    }
     pcl::PointCloud<PointT>::ConstPtr keypoints = (*m_keypoints_detector)(pointCloud, eigenValues, normals,
                                                                           pointsWithoutNaN, eigenValuesWithoutNan,
                                                                           normalsWithoutNaN, searchTree);
@@ -857,8 +861,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
     LOG_ASSERT(features->size() <= keypoints->size());
 
     // in training: always compute global features
-    // in testing: only in single object mode
-    if(compute_global)
+    if(is_training)
     {
         // compute global descriptors for objects
         LOG_INFO("computing global features");
@@ -870,7 +873,7 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
                                                                                              searchTree);
         return std::make_tuple(features, global_features, pointsWithoutNaN, normalsWithoutNaN);
     }
-    else // for recognition global features need to be computed later
+    else // for recognition/testing global features need to be computed later
     {
         // create descriptor point cloud
         pcl::PointCloud<ISMFeature>::Ptr global_features(new pcl::PointCloud<ISMFeature>());

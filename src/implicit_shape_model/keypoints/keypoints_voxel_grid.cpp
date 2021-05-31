@@ -32,6 +32,11 @@ namespace ism3d
 
         addParameter(m_max_similar_color_distance, "MaxSimilarColorDistance", 0.05f);
         addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
+
+        addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
+
+        // init false, will be set to true in case training phase is running
+        m_is_training = false;
     }
 
     KeypointsVoxelGrid::~KeypointsVoxelGrid()
@@ -54,7 +59,10 @@ namespace ism3d
         boost::algorithm::to_lower(m_filter_type_geometry);
         boost::algorithm::to_lower(m_filter_type_color);
 
-        if(m_filter_method_geometry == "none" && m_filter_method_color == "none")
+        // disable in training if desired
+        // otherwise: disable only when no filtering is chosen
+        if((m_is_training && m_disable_filter_in_training)
+            || (m_filter_method_geometry == "none" && m_filter_method_color == "none"))
         {
             pcl::VoxelGrid<PointT> voxelGrid;
             voxelGrid.setInputCloud(points);

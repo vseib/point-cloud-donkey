@@ -61,6 +61,12 @@ namespace ism3d
          */
         void setNumThreads(int numThreads);
 
+        /** allows to indicate that the training phase is running, only relevant for voxel_grid so far **/
+        void setIsTraining()
+        {
+            m_is_training = true;
+        }
+
     protected:
         Keypoints();
 
@@ -76,6 +82,7 @@ namespace ism3d
 
     private:
         int m_numThreads;
+        bool m_is_training;
     };
 }
 
