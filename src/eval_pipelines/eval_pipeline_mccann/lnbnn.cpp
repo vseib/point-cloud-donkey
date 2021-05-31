@@ -14,22 +14,22 @@
 Lnbnn::Lnbnn() : m_features(new pcl::PointCloud<ISMFeature>()), m_flann_index(flann::KDTreeIndexParams(4))
 {
     // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
-//    m_normal_radius = 0.05;
-//    m_reference_frame_radius = 0.3;
-//    m_feature_radius = 0.4;
-//    m_keypoint_sampling_radius = 0.2;
-//    m_k_search = 11;
-//    m_normal_method = 1;
-//    m_feature_type = "SHOT";
+    m_normal_radius = 0.05;
+    m_reference_frame_radius = 0.3;
+    m_feature_radius = 0.4;
+    m_keypoint_sampling_radius = 0.2;
+    m_k_search = 11;
+    m_normal_method = 1;
+    m_feature_type = "SHOT";
 
     // use this for datasets: washington, bigbird, ycb
-    m_normal_radius = 0.005;
-    m_reference_frame_radius = 0.05;
-    m_feature_radius = 0.05;
-    m_keypoint_sampling_radius = 0.02;
-    m_k_search = 11;
-    m_normal_method = 0;
-    m_feature_type = "CSHOT";
+//    m_normal_radius = 0.005;
+//    m_reference_frame_radius = 0.05;
+//    m_feature_radius = 0.05;
+//    m_keypoint_sampling_radius = 0.02;
+//    m_k_search = 11;
+//    m_normal_method = 0;
+//    m_feature_type = "CSHOT";
 }
 
 

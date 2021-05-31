@@ -91,12 +91,12 @@ target_link_libraries(ground_truth_gui implicit_shape_model vtk_utils ${QT_LIBRA
 
 
 #Tools to compare with other approaches
-#add_executable(eval_pcl_ism
-#    eval_comparison/pcl_ism/eval_pcl_ism.cpp
-#    eval_comparison/pcl_ism/pcl_ism.cpp
-#    eval_comparison/pcl_ism/implicit_shape_model.hpp
-#)
-#target_link_libraries(eval_pcl_ism ${PCL_LIBRARIES})
+add_executable(eval_pipeline_knopp
+    eval_pipelines/eval_pipeline_knopp/eval_pcl_ism.cpp
+    eval_pipelines/eval_pipeline_knopp/pcl_ism.cpp
+    eval_pipelines/eval_pipeline_knopp/implicit_shape_model.hpp
+)
+target_link_libraries(eval_pipeline_knopp ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(eval_pipeline_mccann
     eval_pipelines/eval_pipeline_mccann/eval_lnbnn.cpp
