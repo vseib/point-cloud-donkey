@@ -88,10 +88,15 @@ int main (int argc, char** argv)
             // instance ids must be filled even if training with class labels only
             instance_labels = class_labels;
         }
+        else if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+        {
+            // use instance labels for classes
+            class_labels = instance_labels;
+        }
 
         std::cout << "Started training!" << std::endl;
-        lnbnn->train(filenames, class_labels, instance_labels, model);
         lnbnn->setLabels(class_labels_rmap, instance_labels_rmap, instance_to_class_map);
+        lnbnn->train(filenames, class_labels, instance_labels, model);
     }
     else if(mode == "test")
     {
@@ -136,9 +141,9 @@ int main (int argc, char** argv)
                 {
                     for(int i = 0; i < results.size(); i++)
                     {
-                        std::pair<unsigned, float> &res = results.at(i);
+                        std::pair<unsigned, float> res = results.at(i);
                         result_instance_labels.push_back(res.first);
-                        res.first = instance_to_class_map[res.first];
+                        results.at(i).first = instance_to_class_map[res.first];
                     }
                 }
                 else // need to fill it in, but it won't be displayed
@@ -183,16 +188,16 @@ int main (int argc, char** argv)
             }
 
             std::cout << "Classified " << num_correct_classes << " of " << num_total << " (" << (num_correct_classes/((float)num_total))*100 << " %) files correctly." << std::endl;
-            outfile << std::endl << std::endl << "Classified " << num_correct_classes << " of " << num_total
-                       << " (" << (num_correct_classes/((float)num_total))*100 << " %) files correctly." << std::endl;
+            outfile << std::endl << std::endl << "  Classes: " << num_correct_classes << " of " << num_total
+                       << " (" << (num_correct_classes/((float)num_total))*100 << " %) files classified correctly." << std::endl;
 
             if(label_usage == LabelUsage::INSTANCE_PRIMARY)
             {
-                outfile << std::endl << std::endl << "Classified " << num_correct_instances << " of " << num_total
-                           << " (" << (num_correct_instances/((float)num_total))*100 << " %) files correctly." << std::endl;
+                outfile << "Instances: " << num_correct_instances << " of " << num_total
+                           << " (" << (num_correct_instances/((float)num_total))*100 << " %) files classified correctly." << std::endl;
             }
 
-            outfile << "Total processing time: " << timer.format(4, "%w") << " seconds \n";
+            outfile << std::endl << "Total processing time: " << timer.format(4, "%w") << " seconds \n";
             outfile.close();
         }
         else
