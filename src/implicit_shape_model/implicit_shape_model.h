@@ -232,7 +232,7 @@ namespace ism3d
         std::tuple<pcl::PointCloud<ISMFeature>::ConstPtr, pcl::PointCloud<ISMFeature>::ConstPtr,
                     pcl::PointCloud<PointT>::ConstPtr, pcl::PointCloud<pcl::Normal>::ConstPtr >
             computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr, bool, boost::timer::cpu_timer&, boost::timer::cpu_timer &timer_keypoints,
-                            bool compute_global);
+                            bool is_training);
 
         void computeNormals(pcl::PointCloud<PointT>::ConstPtr points,
                             pcl::PointCloud<PointT>::Ptr &eigen_values,

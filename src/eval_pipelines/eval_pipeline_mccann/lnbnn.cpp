@@ -6,22 +6,39 @@
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/features/integral_image_normal.h>
 #include <pcl/filters/voxel_grid.h>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/serialization/vector.hpp>
 
 
 Lnbnn::Lnbnn() : m_features(new pcl::PointCloud<ISMFeature>()), m_flann_index(flann::KDTreeIndexParams(4))
 {
-    m_normal_radius = 0.05;
-    m_reference_frame_radius = 0.3;
-    m_feature_radius = 0.4;
-    m_keypoint_sampling_radius = 0.2;
+    // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
+//    m_normal_radius = 0.05;
+//    m_reference_frame_radius = 0.3;
+//    m_feature_radius = 0.4;
+//    m_keypoint_sampling_radius = 0.2;
+//    m_k_search = 11;
+//    m_normal_method = 1;
+//    m_feature_type = "SHOT";
+
+    // use this for datasets: washington, bigbird, ycb
+    m_normal_radius = 0.005;
+    m_reference_frame_radius = 0.05;
+    m_feature_radius = 0.05;
+    m_keypoint_sampling_radius = 0.02;
     m_k_search = 11;
-    m_rgbd_camera_data = true;
+    m_normal_method = 0;
+    m_feature_type = "CSHOT";
 }
 
 
-void Lnbnn::train(const std::vector<std::string> &filenames, const std::vector<std::string> &labels, const std::string &output_file) const
+void Lnbnn::train(const std::vector<std::string> &filenames,
+                  const std::vector<unsigned> &class_labels,
+                  const std::vector<unsigned> &instance_labels,
+                  const std::string &output_file) const
 {
-    if(filenames.size() != labels.size())
+    if(filenames.size() != class_labels.size())
     {
         std::cerr << "ERROR: number of clouds does not match number of labels!" << std::endl;
         return;
@@ -29,9 +46,9 @@ void Lnbnn::train(const std::vector<std::string> &filenames, const std::vector<s
 
     // contains the whole list of features for each class id
     std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> all_features;
-    for(unsigned i = 0; i < labels.size(); i++)
+    for(unsigned i = 0; i < class_labels.size(); i++)
     {
-        unsigned int tr_class = atoi(labels.at(i).c_str());
+        unsigned int tr_class = class_labels.at(i);
         pcl::PointCloud<ISMFeature>::Ptr cloud(new pcl::PointCloud<ISMFeature>());
         all_features.insert({tr_class, cloud});
     }
@@ -43,7 +60,8 @@ void Lnbnn::train(const std::vector<std::string> &filenames, const std::vector<s
     {
         std::cout << "Processing file " << (i+1) << " of " << filenames.size() << std::endl;
         std::string file = filenames.at(i);
-        unsigned int tr_class = atoi(labels.at(i).c_str());
+        unsigned int tr_class = class_labels.at(i);
+        unsigned int tr_instance = instance_labels.at(i);
 
         // load cloud
         pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
@@ -53,6 +71,11 @@ void Lnbnn::train(const std::vector<std::string> &filenames, const std::vector<s
         }
 
         pcl::PointCloud<ISMFeature>::Ptr features_cleaned = processPointCloud(cloud);
+        for(ISMFeature& ismf : features_cleaned->points)
+        {
+            ismf.classId = tr_class;
+            ismf.instanceId = tr_instance;
+        }
 
         // add computed features to map
         (*all_features.at(tr_class)) += (*features_cleaned);
@@ -111,18 +134,11 @@ bool Lnbnn::loadModel(std::string &filename)
 }
 
 
-pcl::PointCloud<ISMFeature>::Ptr Lnbnn::processPointCloud(pcl::PointCloud<PointT>::Ptr &cloud) const
+pcl::PointCloud<ISMFeature>::Ptr Lnbnn::processPointCloud(pcl::PointCloud<PointT>::Ptr cloud) const
 {
     // create search tree
     pcl::search::Search<PointT>::Ptr searchTree;
-    if (cloud->isOrganized())
-    {
-        searchTree = pcl::search::OrganizedNeighbor<PointT>::Ptr(new pcl::search::OrganizedNeighbor<PointT>());
-    }
-    else
-    {
-        searchTree = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
-    }
+    searchTree = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
 
     // compute normals
     pcl::PointCloud<pcl::Normal>::Ptr normals;
@@ -153,21 +169,33 @@ pcl::PointCloud<ISMFeature>::Ptr Lnbnn::processPointCloud(pcl::PointCloud<PointT
 }
 
 
-void Lnbnn::computeNormals(pcl::PointCloud<PointT>::Ptr &cloud,
+void Lnbnn::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
                            pcl::PointCloud<pcl::Normal>::Ptr& normals,
-                           pcl::search::Search<PointT>::Ptr &searchTree) const
+                           pcl::search::Search<PointT>::Ptr searchTree) const
 {
     normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
 
-    // always use if-clause if data from kinect is used - no matter if organized or not
-    if (cloud->isOrganized() || m_rgbd_camera_data)
+//    if(m_normal_method == 0 && cloud->isOrganized())
+//    {
+//        std::cout << " --- 1 --- " << std::endl;
+//        pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
+//        normalEst.setInputCloud(cloud);
+//        normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
+//        normalEst.setMaxDepthChangeFactor(0.02f);
+//        normalEst.setNormalSmoothingSize(10.0f);
+//        normalEst.useSensorOriginAsViewPoint();
+//        normalEst.compute(*normals);
+//    }
+//    else if(m_normal_method == 0 && !cloud->isOrganized())
+    if(m_normal_method == 0)
     {
-        pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
+         // prepare PCL normal estimation object
+        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
         normalEst.setInputCloud(cloud);
-        normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
-        normalEst.setMaxDepthChangeFactor(0.02f);
-        normalEst.setNormalSmoothingSize(10.0f);
-        normalEst.useSensorOriginAsViewPoint();
+        normalEst.setNumberOfThreads(0);
+        normalEst.setSearchMethod(searchTree);
+        normalEst.setRadiusSearch(m_normal_radius);
+        normalEst.setViewPoint(0,0,0);
         normalEst.compute(*normals);
     }
     else
@@ -175,6 +203,7 @@ void Lnbnn::computeNormals(pcl::PointCloud<PointT>::Ptr &cloud,
         // prepare PCL normal estimation object
         pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
         normalEst.setInputCloud(cloud);
+        normalEst.setNumberOfThreads(0);
         normalEst.setSearchMethod(searchTree);
         normalEst.setRadiusSearch(m_normal_radius);
 
@@ -206,9 +235,9 @@ void Lnbnn::computeNormals(pcl::PointCloud<PointT>::Ptr &cloud,
     }
 }
 
-void Lnbnn::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
+void Lnbnn::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr normals,
                           pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
-                          pcl::PointCloud<PointT>::Ptr &cloud,
+                          pcl::PointCloud<PointT>::Ptr cloud,
                           pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const
 {
     std::vector<int> mapping;
@@ -224,7 +253,7 @@ void Lnbnn::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
 }
 
 
-void Lnbnn::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr &cloud) const
+void Lnbnn::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr cloud) const
 {
     pcl::VoxelGrid<PointT> voxelGrid;
     voxelGrid.setInputCloud(cloud);
@@ -235,9 +264,9 @@ void Lnbnn::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::Point
 
 
 void Lnbnn::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                   pcl::PointCloud<PointT>::Ptr &keypoints,
-                                   pcl::PointCloud<PointT>::Ptr &cloud,
-                                   pcl::search::Search<PointT>::Ptr &searchTree) const
+                                   pcl::PointCloud<PointT>::Ptr keypoints,
+                                   pcl::PointCloud<PointT>::Ptr cloud,
+                                   pcl::search::Search<PointT>::Ptr searchTree) const
 {
     reference_frames = pcl::PointCloud<pcl::ReferenceFrame>::Ptr(new pcl::PointCloud<pcl::ReferenceFrame>());
     pcl::SHOTLocalReferenceFrameEstimationOMP<PointT, pcl::ReferenceFrame> refEst;
@@ -264,41 +293,94 @@ void Lnbnn::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &re
 }
 
 
-void Lnbnn::computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
-                               pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                               pcl::PointCloud<PointT>::Ptr &keypoints,
-                               pcl::search::Search<PointT>::Ptr &searchTree,
-                               pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
+void Lnbnn::computeDescriptors(pcl::PointCloud<PointT>::Ptr cloud,
+                               pcl::PointCloud<pcl::Normal>::Ptr normals,
+                               pcl::PointCloud<PointT>::Ptr keypoints,
+                               pcl::search::Search<PointT>::Ptr searchTree,
+                               pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames,
                                pcl::PointCloud<ISMFeature>::Ptr &features) const
 {
-    pcl::SHOTEstimationOMP<PointT, pcl::Normal, pcl::SHOT352> shotEst;
-    shotEst.setSearchSurface(cloud);
-    shotEst.setInputNormals(normals);
-    shotEst.setInputCloud(keypoints);
-    shotEst.setInputReferenceFrames(reference_frames);
-    shotEst.setSearchMethod(searchTree);
-    shotEst.setRadiusSearch(m_feature_radius);
-    pcl::PointCloud<pcl::SHOT352>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT352>());
-    shotEst.compute(*shot_features);
-
-    // create descriptor point cloud
-    features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-    features->resize(shot_features->size());
-
-    for (int i = 0; i < (int)shot_features->size(); i++)
+    if(m_feature_type == "SHOT")
     {
-        ISMFeature& feature = features->at(i);
-        const pcl::SHOT352& shot = shot_features->at(i);
+        pcl::SHOTEstimationOMP<PointT, pcl::Normal, pcl::SHOT352> shotEst;
+        shotEst.setSearchSurface(cloud);
+        shotEst.setInputNormals(normals);
+        shotEst.setInputCloud(keypoints);
+        shotEst.setInputReferenceFrames(reference_frames);
+        shotEst.setSearchMethod(searchTree);
+        shotEst.setRadiusSearch(m_feature_radius);
+        pcl::PointCloud<pcl::SHOT352>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT352>());
+        shotEst.compute(*shot_features);
 
-        // store the descriptor
-        feature.descriptor.resize(352);
-        for (int j = 0; j < feature.descriptor.size(); j++)
-            feature.descriptor[j] = shot.descriptor[j];
+        // create descriptor point cloud
+        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
+        features->resize(shot_features->size());
+
+        for (int i = 0; i < (int)shot_features->size(); i++)
+        {
+            ISMFeature& feature = features->at(i);
+            const pcl::SHOT352& shot = shot_features->at(i);
+
+            // store the descriptor
+            feature.descriptor.resize(352);
+            for (int j = 0; j < feature.descriptor.size(); j++)
+                feature.descriptor[j] = shot.descriptor[j];
+        }
+    }
+    else if(m_feature_type == "CSHOT")
+    {
+        pcl::SHOTColorEstimationOMP<PointT, pcl::Normal, pcl::SHOT1344> shotEst;
+
+        // temporary workaround to fix race conditions in OMP version of CSHOT in PCL
+        if (shotEst.sRGB_LUT[0] < 0)
+        {
+          for (int i = 0; i < 256; i++)
+          {
+            float f = static_cast<float> (i) / 255.0f;
+            if (f > 0.04045)
+              shotEst.sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
+            else
+              shotEst.sRGB_LUT[i] = f / 12.92f;
+          }
+
+          for (int i = 0; i < 4000; i++)
+          {
+            float f = static_cast<float> (i) / 4000.0f;
+            if (f > 0.008856)
+              shotEst.sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
+            else
+              shotEst.sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
+          }
+        }
+
+        shotEst.setSearchSurface(cloud);
+        shotEst.setInputNormals(normals);
+        shotEst.setInputCloud(keypoints);
+        shotEst.setInputReferenceFrames(reference_frames);
+        shotEst.setSearchMethod(searchTree);
+        shotEst.setRadiusSearch(m_feature_radius);
+        pcl::PointCloud<pcl::SHOT1344>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT1344>());
+        shotEst.compute(*shot_features);
+
+        // create descriptor point cloud
+        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
+        features->resize(shot_features->size());
+
+        for (int i = 0; i < (int)shot_features->size(); i++)
+        {
+            ISMFeature& feature = features->at(i);
+            const pcl::SHOT1344& shot = shot_features->at(i);
+
+            // store the descriptor
+            feature.descriptor.resize(1344);
+            for (int j = 0; j < feature.descriptor.size(); j++)
+                feature.descriptor[j] = shot.descriptor[j];
+        }
     }
 }
 
 
-void Lnbnn::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &features,
+void Lnbnn::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr features,
                                  pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const
 {
     features_cleaned = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
@@ -349,7 +431,8 @@ flann::Matrix<float> Lnbnn::createFlannDataset()
 }
 
 
-std::vector<std::pair<unsigned, float>> Lnbnn::accumulateClassDistances(const pcl::PointCloud<ISMFeature>::Ptr& features) const
+std::vector<std::pair<unsigned, float>> Lnbnn::accumulateClassDistances(
+        const pcl::PointCloud<ISMFeature>::Ptr& features) const
 {
     std::vector<std::pair<unsigned, float>> class_distances;
     for(int i = 0; i < m_number_of_classes; i++)
@@ -407,31 +490,58 @@ std::vector<std::pair<unsigned, float>> Lnbnn::accumulateClassDistances(const pc
 }
 
 
-bool Lnbnn::saveModelToFile(std::string &filename, std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features) const
+bool Lnbnn::saveModelToFile(std::string &filename,
+                            std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features) const
 {
-    std::ofstream output_file (filename.c_str (), std::ios::trunc);
-    if (!output_file)
+    // create boost data object
+    std::ofstream ofs(filename);
+    boost::archive::binary_oarchive oa(ofs);
+
+    // store label maps
+    unsigned size = m_instance_to_class_map.size();
+    oa << size;
+    for(auto const &it : m_instance_to_class_map)
     {
-      output_file.close ();
-      return false;
+        unsigned label_inst = it.first;
+        unsigned label_class = it.second;
+        oa << label_inst;
+        oa << label_class;
     }
 
+    size = m_class_labels.size();
+    oa << size;
+    for(auto it : m_class_labels)
+    {
+        std::string label = it.second;
+        oa << label;
+    }
+    size = m_instance_labels.size();
+    oa << size;
+    for(auto it : m_instance_labels)
+    {
+        std::string label = it.second;
+        oa << label;
+    }
+
+    // write extracted features
     int num_features = 0;
     for(auto elem : all_features)
         num_features += elem.second->size();
 
     int descriptor_dim = all_features[0]->at(0).descriptor.size();
 
-    output_file << all_features.size() << " ";
-    output_file << num_features << " ";
-    output_file << descriptor_dim << " ";
+    size = all_features.size();
+    oa << size;
+    oa << num_features;
+    oa << descriptor_dim;
 
     //write classes
     for(auto elem : all_features)
     {
         for(unsigned int feat = 0; feat < elem.second->size(); feat++)
         {
-            output_file << elem.first << " ";
+            unsigned class_id = elem.first;
+            oa << class_id;
         }
     }
 
@@ -442,58 +552,89 @@ bool Lnbnn::saveModelToFile(std::string &filename, std::map<unsigned, pcl::Point
         {
             for(unsigned int i_dim = 0; i_dim < descriptor_dim; i_dim++)
             {
-                output_file << elem.second->at(feat).descriptor.at(i_dim) << " ";
+                float temp = elem.second->at(feat).descriptor.at(i_dim);
+                oa << temp;
             }
         }
     }
 
-    output_file.close ();
-
+    ofs.close();
     return true;
 }
 
 bool Lnbnn::loadModelFromFile(std::string& filename)
 {
-    std::ifstream input_file (filename.c_str ());
-    if (!input_file)
+    std::ifstream ifs(filename);
+    if(ifs)
     {
-        input_file.close ();
-        return (false);
-    }
+        boost::archive::binary_iarchive ia(ifs);
 
-    int number_of_features;
-    int descriptor_dim;
-
-    char line[256];
-
-    input_file.getline (line, 256, ' ');
-    m_number_of_classes = static_cast<unsigned int> (strtol (line, 0, 10));
-    input_file.getline (line, 256, ' '); number_of_features = atoi (line);
-    input_file.getline (line, 256, ' '); descriptor_dim = atoi (line);
-
-    // read classes
-    m_class_lookup.clear();
-    m_class_lookup.resize (number_of_features, 0);
-    for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
-    {
-        input_file >> m_class_lookup[feat_i];
-    }
-
-    // read features
-    m_features->clear();
-    for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
-    {
-        ISMFeature feature;
-        feature.descriptor.resize(descriptor_dim);
-
-        for (unsigned int dim_i = 0; dim_i < descriptor_dim; dim_i++)
+        // load original labels
+        unsigned size;
+        ia >> size;
+        m_instance_to_class_map.clear();
+        for(unsigned i = 0; i < size; i++)
         {
-            input_file >> feature.descriptor[dim_i];
+            unsigned label_inst, label_class;
+            ia >> label_inst;
+            ia >> label_class;
+            m_instance_to_class_map.insert({label_inst, label_class});
         }
-        feature.classId = m_class_lookup.at(feat_i);
-        m_features->push_back(feature);
+        ia >> size;
+        m_class_labels.clear();
+        for(unsigned i = 0; i < size; i++)
+        {
+            std::string label;
+            ia >> label;
+            m_class_labels.insert({i, label});
+        }
+        ia >> size;
+        m_instance_labels.clear();
+        for(unsigned i = 0; i < size; i++)
+        {
+            std::string label;
+            ia >> label;
+            m_instance_labels.insert({i, label});
+        }
+
+        int number_of_features;
+        int descriptor_dim;
+
+        ia >> size;
+        m_number_of_classes = size;
+        ia >> number_of_features;
+        ia >> descriptor_dim;
+
+        // read classes
+        m_class_lookup.clear();
+        m_class_lookup.resize (number_of_features, 0);
+        for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
+        {
+            ia >> m_class_lookup[feat_i];
+        }
+
+        // read features
+        m_features->clear();
+        for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
+        {
+            ISMFeature feature;
+            feature.descriptor.resize(descriptor_dim);
+
+            for (unsigned int dim_i = 0; dim_i < descriptor_dim; dim_i++)
+            {
+                ia >> feature.descriptor[dim_i];
+            }
+            feature.classId = m_class_lookup.at(feat_i);
+            m_features->push_back(feature);
+        }
+
+        ifs.close();
+    }
+    else
+    {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return false;
     }
 
-  input_file.close ();
-  return (true);
+    return true;
 }

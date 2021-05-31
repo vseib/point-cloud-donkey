@@ -79,10 +79,10 @@ namespace ism3d
                                                                     pcl::search::Search<PointT>::Ptr search) = 0;
 
         int getNumThreads() const;
+        bool m_is_training;
 
     private:
         int m_numThreads;
-        bool m_is_training;
     };
 }
 
