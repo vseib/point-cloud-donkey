@@ -104,6 +104,13 @@ add_executable(eval_pipeline_mccann
 )
 target_link_libraries(eval_pipeline_mccann implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable(eval_pipeline_tombari
+    eval_pipelines/eval_pipeline_tombari/eval_hough3d.cpp
+    eval_pipelines/eval_pipeline_tombari/hough3d.cpp
+)
+target_link_libraries(eval_pipeline_tombari implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
+
+
 #add_executable(eval_pcl_orcg
 #    eval_comparison/pcl_orcg/eval_pcl_orcg.cpp
 #    eval_comparison/pcl_orcg/pcl_orcg.cpp
