@@ -157,7 +157,7 @@ int main (int argc, char** argv)
                     }
                     else
                     {
-                        result_instance_labels.push_back(0);
+                        result_instance_labels.push_back(-1);
                     }
                 }
 
