@@ -45,20 +45,20 @@ struct DetectionObject
     std::string instance_label;
     std::string global_class_label; // only for detection, not in ground truth
     Eigen::Vector3f position;
-    float visibility_ratio;     // only in ground truth, used to filter detections
+    float occlusion_ratio;     // only in ground truth, used to filter detections
     float confidence;           // only for detection, not in ground truth
     // using path because some datasets use repeating names in subfolders
     std::string filepath;       // filename of gt annotations, not the point cloud
 
     DetectionObject(std::string class_label, std::string instance_label, std::string global_class_label, Eigen::Vector3f position,
-                    float visibility_ratio, float confidence, std::string filepath)
+                    float occlusion_ratio, float confidence, std::string filepath)
         : class_label(class_label), instance_label(instance_label), global_class_label(global_class_label), position(position),
-          visibility_ratio(visibility_ratio), confidence(confidence), filepath(filepath) {}
+          occlusion_ratio(occlusion_ratio), confidence(confidence), filepath(filepath) {}
 
     void print()
     {
         LOG_INFO("Object from " << filepath);
-        LOG_INFO("    class: " << class_label << ", instance: " << instance_label << ", visible: " << visibility_ratio << " at position: (" <<
+        LOG_INFO("    class: " << class_label << ", instance: " << instance_label << ", visible: " << occlusion_ratio << " at position: (" <<
                  position.x() << ", " << position.y() << ", " << position.z() << "), confidence: " << confidence);
     }
 };
@@ -251,33 +251,32 @@ std::vector<DetectionObject> parseGtFile(std::string &filename)
             tokens.push_back(item);
         }
 
-        if(tokens.size() == 4 || tokens.size() == 5 || tokens.size() == 6)
+        if(tokens.size() == 5 || tokens.size() == 12)
         {
             std::string class_name = tokens[0];
             std::string instance_name = class_name; // overwrite later if available
-            int offset = 0;
 
-            if(tokens.size() == 6) // gt annotation with visibility ratio and class and instance labels
+
+            float occlusion = 0.0f;
+            std::string occlusion_str = tokens[1];
+            occlusion_str = occlusion_str.substr(1, occlusion_str.find_first_of(')')-1);
+            occlusion = std::stof(occlusion_str);
+
+            Eigen::Vector3f position(std::stof(tokens[2]), std::stof(tokens[3]), std::stof(tokens[4]));
+
+            if(tokens.size() == 12)
             {
-                instance_name = tokens[1];
-                offset += 1;
+                // TODO VS add these to eval
+                Eigen::Vector3f box(std::stof(tokens[5]), std::stof(tokens[6]), std::stof(tokens[7]));
+                Eigen::Quaternionf quat(std::stof(tokens[8]), std::stof(tokens[9]), std::stof(tokens[10]), std::stof(tokens[11]));
             }
-            float visibility = 1.0f;
-            if(tokens.size() == 5) // visibility ratio given, no instance labels
-            {
-                std::string visibility_str = tokens[1+offset];
-                visibility_str = visibility_str.substr(1, visibility_str.find_first_of(')')-1);
-                visibility = std::stof(visibility_str);
-                offset += 1;
-            }
-            Eigen::Vector3f position(std::stof(tokens[1+offset]), std::stof(tokens[2+offset]), std::stof(tokens[3+offset]));
 
             // create object
-            objects.emplace_back(class_name, instance_name, class_name, position, visibility, 1.0f, filename);
+            objects.emplace_back(class_name, instance_name, class_name, position, occlusion, 1.0f, filename);
         }
         else
         {
-            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 4, 5 or 6!");
+            LOG_ERROR("Something is wrong, tokens has size: " << tokens.size() << ", expected: 5 or 12!");
             exit(1);
         }
     }

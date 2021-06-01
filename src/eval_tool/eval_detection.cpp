@@ -72,12 +72,6 @@ int main(int argc, char **argv)
         std::cerr << e.what() << std::endl;
     }
 
-    // init logging
-    log4cxx::LayoutPtr layout(new log4cxx::PatternLayout("[\%d{HH:mm:ss}] \%p: \%m\%n"));
-    log4cxx::ConsoleAppender* consoleAppender = new log4cxx::ConsoleAppender(layout);
-    log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
-    log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
-
     // show help
     if (variables.count("help") || variables.size() == 0) {
         std::cout << desc << std::endl;
@@ -244,7 +238,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    LOG_ERROR("No input file provided! You need to provide an input file with -f");
+                    std::cerr << "No input file provided! You need to provide an input file with -f" << std::endl;
                     return 1;
                 }
 
@@ -319,8 +313,8 @@ int main(int argc, char **argv)
                         }
                         else
                         {
-                            LOG_ERROR("Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!");
-                            LOG_ERROR("Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel());
+                            std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
+                            std::cerr << "Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel() << std::endl;
                             return 1;
                         }
                     }
@@ -616,7 +610,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    std::cerr << "number of point clouds does not match the number of groundtruth files" << std::endl;
+                    std::cerr << "number of point clouds does not match the number of groundtruth files or is zero" << std::endl;
                     return 1;
                 }
             }
