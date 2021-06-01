@@ -155,6 +155,8 @@ LabelUsage parseFileList(std::string &input_file_name,
             filenames.push_back(file);
             unsigned converted_class_label = convertLabel(class_label, class_labels_map, class_labels_rmap);
             class_labels.push_back(converted_class_label);
+            // initialize with identity mapping, just in case ... (e.g. pipeline_knopp is using it)
+            updateInstanceClassMapping(converted_class_label, converted_class_label);
         }
     }
 
