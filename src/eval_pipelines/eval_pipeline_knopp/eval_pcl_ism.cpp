@@ -83,14 +83,12 @@ int main (int argc, char** argv)
 
     if(mode == "train")
     {
-        // not necessary here, since only one label type is supported
-//        if(label_usage == LabelUsage::CLASS_ONLY)
-//        {
-//            // instance ids must be filled even if training with class labels only
-//            instance_labels = class_labels;
-//        }
-//        else
-        if(label_usage == LabelUsage::INSTANCE_PRIMARY)
+        if(label_usage == LabelUsage::CLASS_ONLY)
+        {
+            // instance ids must be filled even if training with class labels only
+            instance_labels = class_labels;
+        }
+        else if(label_usage == LabelUsage::INSTANCE_PRIMARY)
         {
             // use instance labels for classes
             class_labels = instance_labels;
@@ -111,6 +109,11 @@ int main (int argc, char** argv)
             {
                 label_usage = LabelUsage::INSTANCE_PRIMARY;
             }
+            if(label_usage == LabelUsage::CLASS_ONLY)
+            {
+                // instance ids must be filled even if training with class labels only
+                instance_labels = class_labels;
+            }
 
             int num_correct_classes = 0;
             int num_correct_instances = 0;
@@ -124,6 +127,7 @@ int main (int argc, char** argv)
             {
                 unique_labels.push_back(it.first);
             }
+
             ism->setClassLabels(unique_labels);
             for(std::string filename : filenames)
             {
@@ -151,7 +155,7 @@ int main (int argc, char** argv)
                     }
                     else
                     {
-                        result_instance_labels.push_back(0);
+                        result_instance_labels.push_back(-1);
                     }
                 }
 
