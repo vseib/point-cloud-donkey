@@ -128,8 +128,8 @@ std::vector<std::pair<unsigned, float>> PclIsm::classify(const std::string &file
         // ignore class if there are 0 votes
         if(vote_list->getNumberOfVotes() != 0)
         {
-            double radius = m_model->sigmas_[class_label] * 15.0;
-            double sigma = m_model->sigmas_[class_label] * 8;
+            double radius = m_model->sigmas_[class_label] * 10.0;
+            double sigma = m_model->sigmas_[class_label] * 8.0;
             std::vector<pcl::ISMPeak, Eigen::aligned_allocator<pcl::ISMPeak>> strongest_peaks;
             vote_list->findStrongestPeaks(strongest_peaks, class_label, radius, sigma);
 

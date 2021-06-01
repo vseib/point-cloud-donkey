@@ -118,6 +118,8 @@ int main (int argc, char** argv)
             int num_correct_classes = 0;
             int num_correct_instances = 0;
             int num_total = 0;
+            // used to compute average per class accuracy
+            std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
 
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
             std::ofstream outfile("output_pcl_ism_"+outputname);
@@ -176,9 +178,37 @@ int main (int argc, char** argv)
                 // evaluate results
                 if(results.size() > 0)
                 {
-                    if(class_labels.at(num_total) == results.at(0).first)
+                    unsigned trueID = class_labels.at(num_total);
+                    if(trueID == results.at(0).first)
                     {
+                        // for overall accuracy
                         num_correct_classes++;
+                        // for average per class accuracy
+                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
+                        {
+                            // pair <correct, total>
+                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
+                            res.first++;
+                            res.second++;
+                        }
+                        else
+                        {
+                            averageAccuracyHelper.insert({trueID, {1,1}});
+                        }
+                    }
+                    else
+                    {
+                        // wrong classification
+                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
+                        {
+                            // pair <correct, total>
+                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
+                            res.second++;
+                        }
+                        else
+                        {
+                            averageAccuracyHelper.insert({trueID, {0,1}});
+                        }
                     }
                     if(instance_labels.at(num_total) == result_instance_labels.at(0))
                     {
@@ -188,8 +218,17 @@ int main (int argc, char** argv)
                 num_total++;
             }
 
+            float avg_pc_acc = 0;
+            for(const auto &elem : averageAccuracyHelper)
+            {
+                const std::pair<unsigned, unsigned> &p = elem.second;
+                avg_pc_acc += (float)p.first/p.second;
+            }
+            avg_pc_acc /= averageAccuracyHelper.size();
+
             std::cout << "Classified " << num_correct_classes << " of " << num_total << " (" << (num_correct_classes/((float)num_total))*100 << " %) files correctly." << std::endl;
-            outfile << std::endl << std::endl << "  Classes: " << num_correct_classes << " of " << num_total
+            outfile << std::endl << std::endl << "Average per Class accuracy: " << (avg_pc_acc*100) << " %" << std::endl;
+            outfile << "  Classes: " << num_correct_classes << " of " << num_total
                        << " (" << (num_correct_classes/((float)num_total))*100 << " %) files classified correctly." << std::endl;
 
             if(label_usage == LabelUsage::INSTANCE_PRIMARY)
