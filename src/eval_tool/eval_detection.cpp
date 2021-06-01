@@ -234,7 +234,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    LOG_ERROR("No input file provided! You need to provide an input file with -f");
+                    std::cerr << "No input file provided! You need to provide an input file with -f" << std::endl;
                     return 1;
                 }
 
@@ -309,8 +309,8 @@ int main(int argc, char **argv)
                         }
                         else
                         {
-                            LOG_ERROR("Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!");
-                            LOG_ERROR("Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel());
+                            std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
+                            std::cerr << "Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel()) << std::endl;
                             return 1;
                         }
                     }
