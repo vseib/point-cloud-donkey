@@ -130,10 +130,3 @@ target_link_libraries(eval_tool_detection implicit_shape_model ${Boost_LIBRARIES
 #    add_normals_tool/main.cpp
 #)
 #target_link_libraries(add_normals_tool implicit_shape_model ${Boost_LIBRARIES})
-
-
-#ISM stanford tool
-#add_executable(stanford_tool
-#    stanford_tool/main.cpp
-#)
-#target_link_libraries(stanford_tool implicit_shape_model ${PCL_LIBRARIES} ${Boost_LIBRARIES})
