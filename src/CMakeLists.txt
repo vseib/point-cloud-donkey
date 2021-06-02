@@ -110,13 +110,12 @@ add_executable(eval_pipeline_tombari
 )
 target_link_libraries(eval_pipeline_tombari implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
-
-#add_executable(eval_pcl_orcg
-#    eval_comparison/pcl_orcg/eval_pcl_orcg.cpp
-#    eval_comparison/pcl_orcg/pcl_orcg.cpp
-#)
-#target_link_libraries(eval_pcl_orcg ${PCL_LIBRARIES} implicit_shape_model ${Boost_LIBRARIES})
-#set_property(TARGET eval_pcl_orcg PROPERTY CXX_STANDARD 14)
+add_executable(eval_pipeline_aldoma
+    eval_pipelines/eval_pipeline_aldoma/eval_pcl_orcg.cpp
+    eval_pipelines/eval_pipeline_aldoma/pcl_orcg.cpp
+)
+target_link_libraries(eval_pipeline_aldoma implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
+set_property(TARGET eval_pipeline_aldoma PROPERTY CXX_STANDARD 14)
 
 
 
