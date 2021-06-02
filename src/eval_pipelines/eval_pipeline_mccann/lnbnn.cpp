@@ -10,6 +10,15 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
 
+/**
+ * Implementation of the approach described in
+ *
+ * S. McCann, D.G. Lowe:
+ *     Local naive bayes nearest neighbor for image classification.
+ *     2012, Conference on Computer Vision and Pattern Recognition (CVPR)
+ *
+ */
+
 
 Lnbnn::Lnbnn() : m_features(new pcl::PointCloud<ISMFeature>()), m_flann_index(flann::KDTreeIndexParams(4))
 {

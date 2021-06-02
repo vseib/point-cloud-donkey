@@ -38,6 +38,16 @@
 #include "pcl_ism.h"
 #include "../../eval_tool/eval_helpers.h"
 
+/**
+ * Evaluation pipeline for the approach described in
+ *
+ * Jan Knopp, Mukta Prasad, Geert Willems, Radu Timofte, and Luc Van Gool:
+ *     Hough Transforms and 3D SURF for robust three dimensional classication.
+ *     2010, European Conference on Computer Vision (ECCV)
+ *
+ */
+
+
 int main (int argc, char** argv)
 {
     if(argc != 3)

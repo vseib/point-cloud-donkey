@@ -38,6 +38,15 @@
 #include "hough3d.h"
 #include "../../eval_tool/eval_helpers.h"
 
+/**
+ * Evaluation pipeline for the approach described in
+ *
+ * F. Tombari, L. Di Stefano:
+ *     Object recognition in 3D scenes with occlusions and clutter by Hough voting.
+ *     2010, Fourth Pacific-Rim Symposium on Image and Video Technology
+ *
+ */
+
 int main (int argc, char** argv)
 {
     if(argc != 3)

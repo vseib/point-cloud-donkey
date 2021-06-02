@@ -1472,6 +1472,7 @@ pcl::ism::ImplicitShapeModelEstimation<FeatureSize, PointT, NormalT>::computeKMe
         }
       }
       compactness = 0.0f;
+
       for (unsigned int i_point = 0; i_point < number_of_points; i_point++)
       {
         Eigen::VectorXf sample (feature_dimension);

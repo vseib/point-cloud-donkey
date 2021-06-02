@@ -12,6 +12,16 @@
 #include "../../implicit_shape_model/utils/utils.h"
 
 
+/**
+ * Implementation of the approach described in
+ *
+ * F. Tombari, L. Di Stefano:
+ *     Object recognition in 3D scenes with occlusions and clutter by Hough voting.
+ *     2010, Fourth Pacific-Rim Symposium on Image and Video Technology
+ *
+ */
+
+
 Hough3d::Hough3d() : m_features(new pcl::PointCloud<ISMFeature>()),
     m_min_coord(-5.0, -5.0, -5.0), m_max_coord(5.0, 5.0, 5.0), m_bin_size(0.2, 0.2, 0.2),
     m_flann_index(flann::KDTreeIndexParams(4))
@@ -487,7 +497,6 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
 
     // loop over all features extracted from the input model
     std::map<unsigned, std::vector<Eigen::Vector3f>> all_votes;
-    // TODO VS check if this works: #pragma omp parallel for
     for(int fe = 0; fe < features->size(); fe++)
     {
         // insert the query point
@@ -505,9 +514,8 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
 
         delete[] query.ptr();
 
-        // TODO VS: tombari uses some kind of distance threshold
-        // TODO VS: check flann distance type: is euclidean correct?
-        float threshold = 999999999.0f;
+        // tombari uses some kind of distance threshold but doesn't report it
+        float threshold = std::numeric_limits<float>::max();
         if(distances[0][0] < threshold)
         {
             unsigned class_id = m_features->at(indices[0][0]).classId;
@@ -529,7 +537,9 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
         }
     }
 
-    // cast votes of each class separately // TODO VS check paper if this is correct
+
+    // cast votes of each class separately
+    // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
     std::vector<std::pair<unsigned, float>> results;
     for(auto elem : all_votes)
     {
@@ -539,16 +549,20 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
         m_hough_space->reset();
         for(int vid = 0; vid < votelist.size(); vid++)
         {
-            // TODO VS: check paper: maybe use   voteInt   instead
             // TODO VS maybe use hough3dcorrespondence grouping???
             Eigen::Vector3d vote(votelist[vid].x(), votelist[vid].y(), votelist[vid].z());
-            m_hough_space->vote(vote, 1.0, vid);
+            // voting with interpolation
+            // tombari does not use interpolation, but later checks neighboring bins
+            // interpolated voting should be the same or even better
+            m_hough_space->voteInt(vote, 1.0, vid);
         }
         // find maxima for this class id
         std::vector<double> maxima;
         float m_relThreshold = 0.8f; // TODO VS check this param
         std::vector<std::vector<int>> voteIndices;
         m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
+        // TODO generate 6DOF hypotheses with absolute orientation based on voteIndices
+        // TODO HV with RMSE between transformed correspondences (tombari mentions it, but does not use it)
 
         std::sort(maxima.begin(), maxima.end());
         // sorts ascendingly - get last element as the one with highest value in voting space

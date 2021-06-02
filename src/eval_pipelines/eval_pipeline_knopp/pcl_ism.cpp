@@ -10,6 +10,15 @@
 #include <pcl/features/impl/fpfh.hpp>
 #include <pcl/features/shot.h>
 
+/**
+ * PCL implementation of the approach described in
+ *
+ * Jan Knopp, Mukta Prasad, Geert Willems, Radu Timofte, and Luc Van Gool:
+ *     Hough Transforms and 3D SURF for robust three dimensional classication.
+ *     2010, European Conference on Computer Vision (ECCV)
+ *
+ */
+
 
 PclIsm::PclIsm()
 {

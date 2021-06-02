@@ -38,6 +38,15 @@
 #include "lnbnn.h"
 #include "../../eval_tool/eval_helpers.h"
 
+/**
+ * Evaluation pipeline for the approach described in
+ *
+ * S. McCann, D.G. Lowe:
+ *     Local naive bayes nearest neighbor for image classification.
+ *     2012, Conference on Computer Vision and Pattern Recognition (CVPR)
+ *
+ */
+
 int main (int argc, char** argv)
 {
     if(argc != 3)
