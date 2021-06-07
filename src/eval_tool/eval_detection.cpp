@@ -492,7 +492,7 @@ int main(int argc, char **argv)
                         if(report_global_metrics)
                         {
                             // if there are no detections for this class in global detector
-                            if(det_class_map.find(class_label) == det_class_map.end())
+                            if(det_class_map_global.find(class_label) == det_class_map_global.end())
                             {
                                 global_ap_per_class[class_id] = 0;
                                 global_precision_per_class[class_id] = 0;
