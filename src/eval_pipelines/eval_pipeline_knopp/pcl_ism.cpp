@@ -19,6 +19,10 @@
  *
  */
 
+/**
+ * also see:
+ *      https://pcl.readthedocs.io/en/latest/implicit_shape_model.html#implicit-shape-model
+ */
 
 PclIsm::PclIsm()
 {
