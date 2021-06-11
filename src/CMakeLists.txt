@@ -121,7 +121,6 @@ add_executable(eval_pipeline_aldoma_detection
     eval_pipelines/eval_pipeline_aldoma/global_hv.cpp
 )
 target_link_libraries(eval_pipeline_aldoma_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
-set_property(TARGET eval_pipeline_aldoma_detection PROPERTY CXX_STANDARD 14)
 
 
 #ISM evaluation tools
