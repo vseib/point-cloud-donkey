@@ -116,12 +116,12 @@ add_executable(eval_pipeline_tombari_detection
 )
 target_link_libraries(eval_pipeline_tombari_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable(eval_pipeline_aldoma
-    eval_pipelines/eval_pipeline_aldoma/eval_pcl_orcg.cpp
-    eval_pipelines/eval_pipeline_aldoma/pcl_orcg.cpp
+add_executable(eval_pipeline_aldoma_detection
+    eval_pipelines/eval_pipeline_aldoma/eval_global_hv_detection.cpp
+    eval_pipelines/eval_pipeline_aldoma/global_hv.cpp
 )
-target_link_libraries(eval_pipeline_aldoma implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
-set_property(TARGET eval_pipeline_aldoma PROPERTY CXX_STANDARD 14)
+target_link_libraries(eval_pipeline_aldoma_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
+set_property(TARGET eval_pipeline_aldoma_detection PROPERTY CXX_STANDARD 14)
 
 
 #ISM evaluation tools
