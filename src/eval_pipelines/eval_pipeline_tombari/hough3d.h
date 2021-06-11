@@ -18,7 +18,7 @@ class Hough3d
 {
 
 public:
-    Hough3d(std::string dataset);
+    Hough3d(std::string dataset, float bin=-1, float th=-1);
 
     virtual ~Hough3d()
     {
@@ -106,16 +106,6 @@ private:
 
     bool loadModelFromFile(std::string& filename);
 
-
-    template<typename T>
-    static bool containsValue(const std::vector<T> &vec, const T &val)
-    {
-        for(T elem : vec)
-            if (elem == val) return true;
-
-        return false;
-    }
-
     std::map<unsigned, std::string> m_class_labels;
     std::map<unsigned, std::string> m_instance_labels;
     std::map<unsigned, unsigned> m_instance_to_class_map;
@@ -132,6 +122,7 @@ private:
     int m_k_search;
     int m_normal_method;
     std::string m_feature_type;
+    float m_th;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;

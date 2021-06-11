@@ -28,10 +28,9 @@ public:
                const std::vector<unsigned> &instance_labels,
                const std::string &output_file);
 
-    // TODO VS do this later
-    std::vector<std::pair<unsigned, float>> classify(const std::string &filename_model) const;
+    std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool use_hough);
 
-    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool use_tombari_variant);
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool use_hough, bool use_global_hv);
 
     bool loadModel(std::string &filename);
 
@@ -92,11 +91,14 @@ private:
 
     flann::Matrix<float> createFlannDataset() const;
 
+    std::vector<std::pair<unsigned, float>> classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+                                                           const bool use_hough) const;
+
     std::vector<std::pair<unsigned, float>>
 //    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
                                             findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                                                         const pcl::PointCloud<PointT>::Ptr cloud,
-                                                        const bool use_hv) const;
+                                                        const bool use_hv, const bool use_global_hv) const;
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
@@ -129,7 +131,7 @@ private:
     pcl::PointCloud<ISMFeature>::Ptr m_features;
     pcl::PointCloud<PointT>::Ptr m_scene_keypoints;
     pcl::PointCloud<pcl::ReferenceFrame>::Ptr m_scene_lrf;
-    std::vector<Eigen::Vector3f> m_center_vectors; // TODO VS add allocator and aligned macro
+    std::vector<Eigen::Vector3f> m_center_vectors;
 
     flann::Index<flann::L2<float>> m_flann_index;
 };

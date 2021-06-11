@@ -29,7 +29,7 @@
 // TODO VS: find good params for eval, in detection try additionally to sample 1000 key points per model in training and 3000 per
 // scene in testing as described by tombari in the paper
 
-Hough3d::Hough3d(std::string dataset) : m_features(new pcl::PointCloud<ISMFeature>()),
+Hough3d::Hough3d(std::string dataset, float bin, float th) : m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
     std::cout << "-------- loading parameters for " << dataset << " dataset --------" << std::endl;
@@ -68,9 +68,10 @@ Hough3d::Hough3d(std::string dataset) : m_features(new pcl::PointCloud<ISMFeatur
     else if(dataset == "dataset1" || dataset == "dataset5")
     {
         /// detection
+        m_th = th;
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
-        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02); // TODO VS find good params
+        m_bin_size = Eigen::Vector3d(bin, bin, bin); // TODO VS find good params
         m_normal_radius = 0.005;
         m_reference_frame_radius = 0.05;
         m_feature_radius = 0.05;
@@ -613,8 +614,8 @@ Hough3d::classifyObjectsWithSeparateVotingSpaces(
         delete[] query.ptr();
 
         // tombari uses some kind of distance threshold but doesn't report it
-        // PCL implementation has a threshold of 0.25
-        float threshold = 0.25; //std::numeric_limits<float>::max();
+        // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
+        float threshold = std::numeric_limits<float>::max();
         if(distances[0][0] < threshold)
         {
             const ISMFeature &object_feat = m_features->at(indices[0][0]);
@@ -700,8 +701,8 @@ Hough3d::classifyObjectsWithUnifiedVotingSpaces(
         delete[] query.ptr();
 
         // tombari uses some kind of distance threshold but doesn't report it
-        // PCL implementation has a threshold of 0.25
-        float threshold = 0.25f; //std::numeric_limits<float>::max();
+        // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
+        float threshold = std::numeric_limits<float>::max();
         if(distances[0][0] < threshold)
         {
             // create current correspondence
@@ -845,8 +846,8 @@ Hough3d::findObjects(
         delete[] query.ptr();
 
         // tombari uses some kind of distance threshold but doesn't report it
-        // PCL implementation has a threshold of 0.25
-        float threshold = 0.25; //std::numeric_limits<float>::max();
+        // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
+        float threshold = std::numeric_limits<float>::max();
         if(distances[0][0] < threshold)
         {
             // create current correspondence
@@ -910,7 +911,7 @@ Hough3d::findObjects(
     }
     // find maxima for this class id
     std::vector<double> maxima;
-    float m_relThreshold = 0.01f; // TODO VS check this param
+    float m_relThreshold = m_th; // TODO VS check this param
     std::vector<std::vector<int>> voteIndices;
     m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
 
@@ -930,8 +931,7 @@ Hough3d::findObjects(
     corr_rejector.setInlierThreshold(m_bin_size(0));
     corr_rejector.setInputSource(temp_scene_cloud);
     corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
-
-    std::cout << " --- num maxima: " << maxima.size() << std::endl;
+    //corr_rejector.setRefineModel(true); // slightly worse results
 
     for (size_t j = 0; j < maxima.size (); ++j)
     {

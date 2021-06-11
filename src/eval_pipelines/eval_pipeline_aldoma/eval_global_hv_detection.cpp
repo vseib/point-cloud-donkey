@@ -215,8 +215,9 @@ int main (int argc, char** argv)
 
                 std::cout << "Processing file " << pointCloud << std::endl;
 
-                bool useHypothesisVerification = true;
-                maxima = global_hv->detect(pointCloud, useHypothesisVerification);
+                bool use_global_hv = true; // true --> aldoma global hv (default), false --> no global hv
+                bool use_hough = true; // false --> use chen (default), true --> use tombare to generate hypotheses
+                maxima = global_hv->detect(pointCloud, use_hough, use_global_hv);
 
                 // collect all gt objects
                 std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);

@@ -34,8 +34,8 @@
 
 #include <iostream>
 #include <fstream>
-#include <boost/timer/timer.hpp>
 #include "hough3d.h"
+#include <boost/timer/timer.hpp>
 #include "../../eval_tool/eval_helpers_detection.h"
 
 /**
@@ -49,7 +49,7 @@
 
 int main (int argc, char** argv)
 {
-    if(argc != 3)
+    if(argc != 5)
     {
         std::cout << std::endl << "Usage:" << std::endl << std::endl;
         std::cout << argv[0] << " [dataset file] [model name]" << std::endl << std::endl;
@@ -71,6 +71,8 @@ int main (int argc, char** argv)
     // input data
     std::string dataset = argv[1];
     std::string model = argv[2];
+    float bin = atof(argv[3]);
+    float th = atof(argv[4]);
 
     // parse input
     std::vector<std::string> filenames;
@@ -94,7 +96,7 @@ int main (int argc, char** argv)
         datasetname = str1;
     }
 
-    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname));
+    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname, bin, th));
 
     // workaround to set "mode"
     {
@@ -196,7 +198,7 @@ int main (int argc, char** argv)
             std::vector<DetectionObject> detected_objects;
 
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
-            std::ofstream summaryFile("output_tombari_"+outputname);
+            std::ofstream summaryFile("output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_"+outputname);
 
             for(unsigned i = 0; i < filenames.size(); i++)
             {
