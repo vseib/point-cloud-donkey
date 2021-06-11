@@ -929,7 +929,7 @@ Hough3d::findObjects(
     pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
     corr_rejector.setMaximumIterations(10000);
     corr_rejector.setInlierThreshold(m_bin_size(0));
-    corr_rejector.setInputSource(temp_scene_cloud);
+    corr_rejector.setInputSource(scene_keypoints);
     corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
     //corr_rejector.setRefineModel(true); // slightly worse results
 
@@ -953,50 +953,13 @@ Hough3d::findObjects(
             filtered_corrs = temp_corrs;
         }
 
-
-        // determine position based on filtered correspondences for each remaining class
-        // (ideally, only one class remains after filtering)
-        std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
-        std::vector<int> num_votes(m_number_of_classes);
-        // init
-        for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-        {
-            all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
-            num_votes[temp_idx] = 0;
-        }
-        // compute
-        for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
-        {
-            unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-            const ISMFeature &cur_feat = m_features->at(match_idx);
-            unsigned class_id = cur_feat.classId;
-
-            unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
-            const ISMFeature &scene_feat = scene_features->at(scene_idx);
-            pcl::ReferenceFrame ref = scene_feat.referenceFrame;
-            Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
-            Eigen::Vector3f vote = m_center_vectors.at(match_idx);
-            Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
-            all_centers[class_id] += pos;
-            num_votes[class_id] += 1;
-        }
-        for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-        {
-            all_centers[temp_idx] /= num_votes[temp_idx];
-        }
-        // find class with max votes
-        unsigned cur_class = 0;
-        int cur_best_num = 0;
-        for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
-        {
-            if(num_votes[class_idx] > cur_best_num)
-            {
-                cur_best_num = num_votes[class_idx];
-                cur_class = class_idx;
-            }
-        }
-        results.push_back({cur_class, cur_best_num});
-        positions.push_back(all_centers[cur_class]);
+        unsigned res_class;
+        int res_num_votes;
+        Eigen::Vector3f res_position;
+        findClassAndPositionFromCluster(filtered_corrs, m_features, scene_features,
+                                        res_class, res_num_votes, res_position);
+        results.push_back({res_class, res_num_votes});
+        positions.push_back(res_position);
 
 //        // count class occurences in filtered corrs
 //        std::map<unsigned, int> class_occurences;
@@ -1040,6 +1003,65 @@ Hough3d::findObjects(
 
     return std::make_tuple(results, positions);
 }
+
+
+void Hough3d::findClassAndPositionFromCluster(
+        const pcl::Correspondences &filtered_corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        unsigned &resulting_class,
+        int &resulting_num_votes,
+        Eigen::Vector3f &resulting_position) const
+{
+    // determine position based on filtered correspondences for each remaining class
+    // (ideally, only one class remains after filtering)
+    std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
+    std::vector<int> num_votes(m_number_of_classes);
+    // init
+    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
+    {
+        all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
+        num_votes[temp_idx] = 0;
+    }
+    // compute
+    for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
+    {
+        // match_idx refers to the complete codebook !!!
+        unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
+        const ISMFeature &cur_feat = m_features->at(match_idx);
+        unsigned class_id = cur_feat.classId;
+
+        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
+        const ISMFeature &scene_feat = scene_features->at(scene_idx);
+        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+        Eigen::Vector3f vote = m_center_vectors.at(match_idx);
+        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
+        all_centers[class_id] += pos;
+        num_votes[class_id] += 1;
+    }
+    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
+    {
+        all_centers[temp_idx] /= num_votes[temp_idx];
+    }
+    // find class with max votes
+    unsigned cur_class = 0;
+    int cur_best_num = 0;
+    for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
+    {
+        if(num_votes[class_idx] > cur_best_num)
+        {
+            cur_best_num = num_votes[class_idx];
+            cur_class = class_idx;
+        }
+    }
+
+    // fill in results
+    resulting_class = cur_class;
+    resulting_num_votes = cur_best_num;
+    resulting_position = all_centers[cur_class];
+}
+
 
 
 bool Hough3d::saveModelToFile(std::string &filename,
