@@ -94,11 +94,17 @@ private:
     std::vector<std::pair<unsigned, float>> classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                                                            const bool use_hough) const;
 
-    std::vector<std::pair<unsigned, float>>
-//    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
+    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
                                             findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                                                         const pcl::PointCloud<PointT>::Ptr cloud,
                                                         const bool use_hv, const bool use_global_hv) const;
+    void findClassAndPositionFromCluster(
+            const pcl::Correspondences &filtered_corrs,
+            const pcl::PointCloud<ISMFeature>::Ptr object_features,
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            unsigned &resulting_class,
+            int &resulting_num_votes,
+            Eigen::Vector3f &resulting_position) const;
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
