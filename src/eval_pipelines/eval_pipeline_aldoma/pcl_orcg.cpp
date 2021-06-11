@@ -14,8 +14,8 @@
 #include <pcl/recognition/hv/hv_go.h>
 
 // NOTE: inspired by the tutorials
-// http://pointclouds.org/documentation/tutorials/correspondence_grouping.php#correspondence-grouping
-// http://pointclouds.org/documentation/tutorials/global_hypothesis_verification.php
+// https://pcl.readthedocs.io/en/latest/correspondence_grouping.html
+// https://pcl.readthedocs.io/en/latest/global_hypothesis_verification.html
 // and the paper:
 // Aldoma et al. 2012, Point Cloud Library - Three-Dimensional Object Recognition and 6 DoF Pose Estimation, IEEE ROBOTICS & AUTOMATION MAGAZINE
 
