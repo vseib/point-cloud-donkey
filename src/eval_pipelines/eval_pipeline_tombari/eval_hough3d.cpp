@@ -87,8 +87,22 @@ int main (int argc, char** argv)
         label_usage = LabelUsage::INSTANCE_PRIMARY;
     }
 
-    // process training or testing
-    std::shared_ptr<Hough3d> hough3d(new Hough3d());
+    // find dataset name from input file
+    std::string datasetname;
+    int pos1 = dataset.find_first_of('_');
+    int pos2 = dataset.find_last_of('_');
+    std::string str1 = dataset.substr(0, pos1);
+    std::string str2 = dataset.substr(pos1+1, pos2);
+    if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
+    {
+        datasetname = str2;
+    }
+    else
+    {
+        datasetname = str1;
+    }
+
+    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname));
 
     if(mode == "train")
     {
@@ -136,7 +150,6 @@ int main (int argc, char** argv)
             // used to compute average per class accuracy
             std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
 
-
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
             std::ofstream outfile("output_tombari_"+outputname);
 
@@ -145,7 +158,8 @@ int main (int argc, char** argv)
                 std::cout << "Processing file " << filename << std::endl;
 
                 std::vector<std::pair<unsigned, float>> results;
-                results = hough3d->classify(filename);
+                bool useSingleVotingSpace = true;
+                results = hough3d->classify(filename, useSingleVotingSpace);
 
                 // lookup real class ids if instances were used as primary labels
                 std::vector<unsigned> result_instance_labels;

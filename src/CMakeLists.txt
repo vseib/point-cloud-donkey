@@ -6,7 +6,7 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD 17)
 
 # find pcl
-find_package(PCL REQUIRED)
+find_package(PCL 1.10 REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -110,13 +110,18 @@ add_executable(eval_pipeline_tombari
 )
 target_link_libraries(eval_pipeline_tombari implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable(eval_pipeline_tombari_detection
+    eval_pipelines/eval_pipeline_tombari/eval_hough3d_detection.cpp
+    eval_pipelines/eval_pipeline_tombari/hough3d.cpp
+)
+target_link_libraries(eval_pipeline_tombari_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
+
 add_executable(eval_pipeline_aldoma
     eval_pipelines/eval_pipeline_aldoma/eval_pcl_orcg.cpp
     eval_pipelines/eval_pipeline_aldoma/pcl_orcg.cpp
 )
 target_link_libraries(eval_pipeline_aldoma implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 set_property(TARGET eval_pipeline_aldoma PROPERTY CXX_STANDARD 14)
-
 
 
 #ISM evaluation tools

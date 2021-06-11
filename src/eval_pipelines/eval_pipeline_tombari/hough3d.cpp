@@ -6,6 +6,10 @@
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/features/integral_image_normal.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/common/centroid.h>
+#include <pcl/correspondence.h>
+#include <pcl/registration/correspondence_rejection_sample_consensus.h>
+#include <pcl/registration/transformation_estimation.h>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
@@ -22,29 +26,69 @@
  */
 
 
-Hough3d::Hough3d() : m_features(new pcl::PointCloud<ISMFeature>()),
-    m_min_coord(-5.0, -5.0, -5.0), m_max_coord(5.0, 5.0, 5.0), m_bin_size(0.2, 0.2, 0.2),
+// TODO VS: find good params for eval, in detection try additionally to sample 1000 key points per model in training and 3000 per
+// scene in testing as described by tombari in the paper
+
+Hough3d::Hough3d(std::string dataset) : m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
-    m_hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(m_min_coord, m_max_coord, m_bin_size);
+    std::cout << "-------- loading parameters for " << dataset << " dataset --------" << std::endl;
 
-    // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
-    m_normal_radius = 0.05;
-    m_reference_frame_radius = 0.3;
-    m_feature_radius = 0.4;
-    m_keypoint_sampling_radius = 0.2;
-    m_k_search = 1;
-    m_normal_method = 1;
-    m_feature_type = "SHOT";
+    if(dataset == "aim" || dataset == "mcgill" || dataset == "mcg" || dataset == "psb" ||
+            dataset == "sh12" || dataset == "mn10" || dataset == "mn40")
+    {
+        /// classification
+        m_min_coord = Eigen::Vector3d(-2.0, -2.0, -2.0);
+        m_max_coord = Eigen::Vector3d(2.0, 2.0, 2.0);
+        m_bin_size = Eigen::Vector3d(0.5, 0.5, 0.5);
 
-    // use this for datasets: washington, bigbird, ycb
-//    m_normal_radius = 0.005;
-//    m_reference_frame_radius = 0.05;
-//    m_feature_radius = 0.05;
-//    m_keypoint_sampling_radius = 0.02;
-//    m_k_search = 1;
-//    m_normal_method = 0;
-//    m_feature_type = "CSHOT";
+        // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
+        m_normal_radius = 0.05;
+        m_reference_frame_radius = 0.3;
+        m_feature_radius = 0.4;
+        m_keypoint_sampling_radius = 0.2;
+        m_k_search = 1;
+        m_normal_method = 1;
+        m_feature_type = "SHOT";
+    }
+    else if(dataset == "wash" || dataset == "bigbird" || dataset == "ycb")
+    {
+        /// classification
+        m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
+        m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
+        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02); // TODO VS find good params
+        m_normal_radius = 0.005;
+        m_reference_frame_radius = 0.05;
+        m_feature_radius = 0.05;
+        m_keypoint_sampling_radius = 0.02;
+        m_k_search = 1;
+        m_normal_method = 0;
+        m_feature_type = "CSHOT";
+    }
+    else if(dataset == "dataset1" || dataset == "dataset5")
+    {
+        /// detection
+        m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
+        m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
+        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02); // TODO VS find good params
+        m_normal_radius = 0.005;
+        m_reference_frame_radius = 0.05;
+        m_feature_radius = 0.05;
+        m_keypoint_sampling_radius = 0.02;
+        m_k_search = 1;
+        m_normal_method = 0;
+
+        if(dataset == "dataset1")
+            m_feature_type = "SHOT";
+        if(dataset == "dataset5")
+            m_feature_type = "CSHOT";
+    }
+    else
+    {
+        std::cerr << "ERROR: dataset with name " << dataset << " not supported!" << std::endl;
+    }
+
+    m_hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(m_min_coord, m_bin_size, m_max_coord);
 }
 
 
@@ -127,7 +171,8 @@ void Hough3d::train(const std::vector<std::string> &filenames,
 }
 
 
-std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &filename) const
+std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &filename,
+                                                          bool useSingleVotingSpace) const
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
@@ -140,7 +185,15 @@ std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &fil
     pcl::PointCloud<ISMFeature>::Ptr features = processPointCloud(cloud);
 
     // get results
-    std::vector<std::pair<unsigned, float>> results = findObjects(features);
+    std::vector<std::pair<unsigned, float>> results;
+    if(useSingleVotingSpace)
+    {
+        results = classifyObjectsWithUnifiedVotingSpaces(features);
+    }
+    else
+    {
+        results = classifyObjectsWithSeparateVotingSpaces(features);
+    }
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -150,6 +203,50 @@ std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &fil
 
     return results;
 }
+
+
+std::vector<VotingMaximum> Hough3d::detect(const std::string &filename,
+                                           bool useHypothesisVerification) const
+{
+    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
+    if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
+    {
+      std::cerr << "ERROR: loading file " << filename << std::endl;
+      return std::vector<VotingMaximum>();
+    }
+
+    // extract features
+    pcl::PointCloud<ISMFeature>::Ptr features = processPointCloud(cloud);
+
+    std::vector<VotingMaximum> result_maxima;
+
+    // get results
+    std::vector<std::pair<unsigned, float>> results;
+    std::vector<Eigen::Vector3f> positions;
+    bool use_hv = useHypothesisVerification;
+    std::tie(results, positions) = findObjects(features, cloud, use_hv);
+
+    // here higher values are better
+    std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
+    {
+        return a.second > b.second;
+    });
+
+    // convert result to maxima
+    for(unsigned i = 0; i < results.size(); i++)
+    {
+        auto res = results.at(i);
+        VotingMaximum max;
+        max.classId = res.first;
+        max.globalHypothesis.classId = res.first;
+        max.weight = res.second;
+        max.position = positions.at(i);
+        result_maxima.emplace_back(std::move(max));
+    }
+
+    return result_maxima;
+}
+
 
 
 bool Hough3d::loadModel(std::string &filename)
@@ -490,21 +587,22 @@ flann::Matrix<float> Hough3d::createFlannDataset()
 }
 
 
-std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
-        const pcl::PointCloud<ISMFeature>::Ptr& features) const
+std::vector<std::pair<unsigned, float>>
+Hough3d::classifyObjectsWithSeparateVotingSpaces(
+        const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const
 {
     int k_search = m_k_search;
 
     // loop over all features extracted from the input model
     std::map<unsigned, std::vector<Eigen::Vector3f>> all_votes;
-    for(int fe = 0; fe < features->size(); fe++)
+    for(int fe = 0; fe < scene_features->size(); fe++)
     {
         // insert the query point
-        ISMFeature feature = features->at(fe);
-        flann::Matrix<float> query(new float[feature.descriptor.size()], 1, feature.descriptor.size());
-        for(int i = 0; i < feature.descriptor.size(); i++)
+        ISMFeature scene_feat = scene_features->at(fe);
+        flann::Matrix<float> query(new float[scene_feat.descriptor.size()], 1, scene_feat.descriptor.size());
+        for(int i = 0; i < scene_feat.descriptor.size(); i++)
         {
-            query[0][i] = feature.descriptor.at(i);
+            query[0][i] = scene_feat.descriptor.at(i);
         }
 
         // prepare results
@@ -515,12 +613,15 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
         delete[] query.ptr();
 
         // tombari uses some kind of distance threshold but doesn't report it
-        float threshold = std::numeric_limits<float>::max();
+        // PCL implementation has a threshold of 0.25
+        float threshold = 0.25; //std::numeric_limits<float>::max();
         if(distances[0][0] < threshold)
         {
-            unsigned class_id = m_features->at(indices[0][0]).classId;
-            pcl::ReferenceFrame ref = feature.referenceFrame;
-            Eigen::Vector3f keyPos(feature.x, feature.y, feature.z);
+            const ISMFeature &object_feat = m_features->at(indices[0][0]);
+            unsigned class_id = object_feat.classId;
+
+            pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+            Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
             Eigen::Vector3f vote = m_center_vectors.at(indices[0][0]);
             Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
             // collect vote
@@ -537,7 +638,6 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
         }
     }
 
-
     // cast votes of each class separately
     // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
     std::vector<std::pair<unsigned, float>> results;
@@ -549,23 +649,19 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
         m_hough_space->reset();
         for(int vid = 0; vid < votelist.size(); vid++)
         {
-            // TODO VS maybe use hough3dcorrespondence grouping???
             Eigen::Vector3d vote(votelist[vid].x(), votelist[vid].y(), votelist[vid].z());
-            // voting with interpolation
-            // tombari does not use interpolation, but later checks neighboring bins
+            // voting with interpolation: tombari does not use interpolation, but later checks neighboring bins
             // interpolated voting should be the same or even better
-            m_hough_space->voteInt(vote, 1.0, vid);
+            m_hough_space->voteInt(vote, 1.0, vid); // NOTE: voteIndices not used here, therefore just using some (meaningless) id
         }
         // find maxima for this class id
         std::vector<double> maxima;
-        float m_relThreshold = 0.8f; // TODO VS check this param
+        float m_relThreshold = 0.1f;
         std::vector<std::vector<int>> voteIndices;
         m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
-        // TODO generate 6DOF hypotheses with absolute orientation based on voteIndices
-        // TODO HV with RMSE between transformed correspondences (tombari mentions it, but does not use it)
-
-        std::sort(maxima.begin(), maxima.end());
+        // this creates the results for classification
         // sorts ascendingly - get last element as the one with highest value in voting space
+        std::sort(maxima.begin(), maxima.end());
         if(maxima.size() > 0)
         {
             results.push_back({class_id, maxima.back()});
@@ -575,10 +671,380 @@ std::vector<std::pair<unsigned, float>> Hough3d::findObjects(
     return results;
 }
 
+std::vector<std::pair<unsigned, float>>
+Hough3d::classifyObjectsWithUnifiedVotingSpaces(
+        const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const
+{
+    int k_search = m_k_search;
+
+    // loop over all features extracted from the input model
+    std::map<unsigned, std::vector<Eigen::Vector3f>> all_votes;
+    std::map<unsigned, std::vector<int>> all_match_idxs;
+    pcl::Correspondences object_scene_corrs;
+
+    for(int fe = 0; fe < scene_features->size(); fe++)
+    {
+        // insert the query point
+        ISMFeature scene_feat = scene_features->at(fe);
+        flann::Matrix<float> query(new float[scene_feat.descriptor.size()], 1, scene_feat.descriptor.size());
+        for(int i = 0; i < scene_feat.descriptor.size(); i++)
+        {
+            query[0][i] = scene_feat.descriptor.at(i);
+        }
+
+        // prepare results
+        std::vector<std::vector<int>> indices;
+        std::vector<std::vector<float>> distances;
+        m_flann_index.knnSearch(query, indices, distances, k_search, flann::SearchParams(128));
+
+        delete[] query.ptr();
+
+        // tombari uses some kind of distance threshold but doesn't report it
+        // PCL implementation has a threshold of 0.25
+        float threshold = 0.25f; //std::numeric_limits<float>::max();
+        if(distances[0][0] < threshold)
+        {
+            // create current correspondence
+            pcl::Correspondence corr;
+            corr.index_query = fe; // query is from the list of scene features
+            corr.index_match = indices[0][0];
+            corr.distance = distances[0][0];
+            int corr_id = object_scene_corrs.size();
+            object_scene_corrs.push_back(corr);
+
+            const ISMFeature &object_feat = m_features->at(indices[0][0]);
+            unsigned class_id = object_feat.classId;
+
+            pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+            Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+
+            Eigen::Vector3f vote = m_center_vectors.at(indices[0][0]);
+            Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
+            // collect vote
+            if(all_votes.find(class_id) != all_votes.end())
+            {
+                // known class - append vote
+                all_votes.at(class_id).push_back(center);
+                all_match_idxs.at(class_id).push_back(corr_id);
+            }
+            else
+            {
+                // class not seen yet - insert first vote
+                all_votes.insert({class_id, {center}});
+                all_match_idxs.insert({class_id, {corr_id}});
+            }
+        }
+    }
+
+    // cast votes of each class separately
+    // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
+    std::vector<std::pair<unsigned, float>> results;
+    // use all votes at once
+    std::vector<Eigen::Vector3f> votelist;
+    for(auto elem : all_votes)
+        votelist.insert(votelist.end(), elem.second.begin(), elem.second.end());
+    std::vector<int> idlist;
+    for(auto elem : all_match_idxs)
+        idlist.insert(idlist.end(), elem.second.begin(), elem.second.end());
+
+    // vote all votes into empty hough space
+    m_hough_space->reset();
+    for(int vid = 0; vid < votelist.size(); vid++)
+    {
+        Eigen::Vector3d vote(votelist[vid].x(), votelist[vid].y(), votelist[vid].z());
+        int vote_id = idlist.at(vid);
+        // voting with interpolation
+        // tombari does not use interpolation, but later checks neighboring bins
+        // interpolated voting should be the same or even better
+        m_hough_space->voteInt(vote, 1.0, vote_id);
+    }
+    // find maxima for this class id
+    std::vector<double> maxima;
+    float m_relThreshold = 0.1f;
+    std::vector<std::vector<int>> voteIndices;
+    m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
+
+    // check all maxima since highest valued maximum might still be composed of different class votes
+    // therefore we need to count votes per class per maximum
+    for (size_t j = 0; j < maxima.size (); ++j)
+    {
+        std::map<unsigned, int> class_occurences;
+        pcl::Correspondences max_corrs;
+        for (size_t i = 0; i < voteIndices[j].size(); ++i)
+        {
+            max_corrs.push_back(object_scene_corrs.at(voteIndices[j][i]));
+        }
+
+        // count class occurences in filtered corrs
+        for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++)
+        {
+            unsigned match_idx = max_corrs.at(fcorr_idx).index_match;
+            const ISMFeature &cur_feat = m_features->at(match_idx);
+            unsigned class_id = cur_feat.classId;
+            // add occurence of this class_id
+            if(class_occurences.find(class_id) != class_occurences.end())
+            {
+                class_occurences.at(class_id) += 1;
+            }
+            else
+            {
+                class_occurences.insert({class_id, 1});
+            }
+        }
+
+        // determine most frequent label
+        unsigned cur_class = 0;
+        int cur_best_num = 0;
+        for(auto occ_elem : class_occurences)
+        {
+            if(occ_elem.second > cur_best_num)
+            {
+                cur_best_num = occ_elem.second;
+                cur_class = occ_elem.first;
+            }
+        }
+        results.push_back({cur_class, cur_best_num});
+    }
+
+    return results;
+}
+
+
+std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
+Hough3d::findObjects(
+        const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+        const bool use_hv) const
+{
+    int k_search = m_k_search;
+
+    // collect matched scene and object (i.e. dictionary) keypoints
+    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<PointT>::Ptr scene_keypoints(new pcl::PointCloud<PointT>());
+
+    // loop over all features extracted from the input model
+    std::map<unsigned, std::vector<Eigen::Vector3f>> all_votes;
+    std::map<unsigned, std::vector<int>> all_match_idxs;
+    pcl::Correspondences object_scene_corrs;
+
+    for(int fe = 0; fe < scene_features->size(); fe++)
+    {
+        // insert the query point
+        ISMFeature scene_feat = scene_features->at(fe);
+        flann::Matrix<float> query(new float[scene_feat.descriptor.size()], 1, scene_feat.descriptor.size());
+        for(int i = 0; i < scene_feat.descriptor.size(); i++)
+        {
+            query[0][i] = scene_feat.descriptor.at(i);
+        }
+
+        // prepare results
+        std::vector<std::vector<int>> indices;
+        std::vector<std::vector<float>> distances;
+        m_flann_index.knnSearch(query, indices, distances, k_search, flann::SearchParams(128));
+
+        delete[] query.ptr();
+
+        // tombari uses some kind of distance threshold but doesn't report it
+        // PCL implementation has a threshold of 0.25
+        float threshold = 0.25; //std::numeric_limits<float>::max();
+        if(distances[0][0] < threshold)
+        {
+            // create current correspondence
+            pcl::Correspondence corr;
+            corr.index_query = fe; // query is from the list of scene features
+            corr.index_match = indices[0][0];
+            corr.distance = distances[0][0];
+            int corr_id = object_scene_corrs.size();
+            object_scene_corrs.push_back(corr);
+
+            const ISMFeature &object_feat = m_features->at(indices[0][0]);
+            unsigned class_id = object_feat.classId;
+            object_keypoints->push_back(PointT(object_feat.x, object_feat.y, object_feat.z));
+
+            pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+            Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+            scene_keypoints->push_back(PointT(scene_feat.x, scene_feat.y, scene_feat.z));
+
+            Eigen::Vector3f vote = m_center_vectors.at(indices[0][0]);
+            Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
+            // collect vote
+            if(all_votes.find(class_id) != all_votes.end())
+            {
+                // known class - append vote
+                all_votes.at(class_id).push_back(center);
+                all_match_idxs.at(class_id).push_back(corr_id);
+            }
+            else
+            {
+                // class not seen yet - insert first vote
+                all_votes.insert({class_id, {center}});
+                all_match_idxs.insert({class_id, {corr_id}});
+            }
+        }
+    }
+
+    pcl::PointCloud<PointT>::Ptr temp_scene_cloud(new pcl::PointCloud<PointT>());
+    pcl::copyPointCloud<PointT, PointT>(*scene_cloud, *temp_scene_cloud);
+
+    // cast votes of each class separately
+    // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
+    std::vector<std::pair<unsigned, float>> results;
+    // use all votes at once
+    std::vector<Eigen::Vector3f> votelist;
+    for(auto elem : all_votes)
+        votelist.insert(votelist.end(), elem.second.begin(), elem.second.end());
+    std::vector<int> idlist;
+    for(auto elem : all_match_idxs)
+        idlist.insert(idlist.end(), elem.second.begin(), elem.second.end());
+
+    // vote all votes into empty hough space
+    m_hough_space->reset();
+    for(int vid = 0; vid < votelist.size(); vid++)
+    {
+        Eigen::Vector3d vote(votelist[vid].x(), votelist[vid].y(), votelist[vid].z());
+        int vote_id = idlist.at(vid);
+        // voting with interpolation
+        // tombari does not use interpolation, but later checks neighboring bins
+        // interpolated voting should be the same or even better
+        m_hough_space->voteInt(vote, 1.0, vote_id);
+    }
+    // find maxima for this class id
+    std::vector<double> maxima;
+    float m_relThreshold = 0.01f; // TODO VS check this param
+    std::vector<std::vector<int>> voteIndices;
+    m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
+
+    // TODO VS: selber experimentieren mit
+    // #include <pcl/registration/transformation_estimation.h>
+    // oder
+    // #include <pcl/registration/transformation_estimation_svd.h>
+    // oder
+    // #include <pcl/sample_consensus/msac.h>
+
+    // generate 6DOF hypotheses with absolute orientation
+    std::vector<Eigen::Matrix4f> transformations;
+    std::vector<Eigen::Vector3f> positions;
+    std::vector<pcl::Correspondences> model_instances;
+    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
+    corr_rejector.setMaximumIterations(10000);
+    corr_rejector.setInlierThreshold(m_bin_size(0));
+    corr_rejector.setInputSource(temp_scene_cloud);
+    corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
+
+    std::cout << " --- num maxima: " << maxima.size() << std::endl;
+
+    for (size_t j = 0; j < maxima.size (); ++j)
+    {
+        pcl::Correspondences temp_corrs, filtered_corrs;
+        for (size_t i = 0; i < voteIndices[j].size(); ++i)
+        {
+            temp_corrs.push_back(object_scene_corrs.at(voteIndices[j][i]));
+        }
+
+        if(use_hv)
+        {
+            corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
+            // save transformations for recognition
+            transformations.push_back(corr_rejector.getBestTransformation());
+            model_instances.push_back(filtered_corrs);
+        }
+        else
+        {
+            filtered_corrs = temp_corrs;
+        }
+
+
+        // determine position based on filtered correspondences for each remaining class
+        // (ideally, only one class remains after filtering)
+        std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
+        std::vector<int> num_votes(m_number_of_classes);
+        // init
+        for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
+        {
+            all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
+            num_votes[temp_idx] = 0;
+        }
+        // compute
+        for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
+        {
+            unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
+            const ISMFeature &cur_feat = m_features->at(match_idx);
+            unsigned class_id = cur_feat.classId;
+
+            unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
+            const ISMFeature &scene_feat = scene_features->at(scene_idx);
+            pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+            Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+            Eigen::Vector3f vote = m_center_vectors.at(match_idx);
+            Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
+            all_centers[class_id] += pos;
+            num_votes[class_id] += 1;
+        }
+        for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
+        {
+            all_centers[temp_idx] /= num_votes[temp_idx];
+        }
+        // find class with max votes
+        unsigned cur_class = 0;
+        int cur_best_num = 0;
+        for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
+        {
+            if(num_votes[class_idx] > cur_best_num)
+            {
+                cur_best_num = num_votes[class_idx];
+                cur_class = class_idx;
+            }
+        }
+        results.push_back({cur_class, cur_best_num});
+        positions.push_back(all_centers[cur_class]);
+
+//        // count class occurences in filtered corrs
+//        std::map<unsigned, int> class_occurences;
+//        pcl::PointCloud<PointT>::Ptr corresponences_cloud(new pcl::PointCloud<PointT>());
+//        for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
+//        {
+//            unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
+//            const ISMFeature &cur_feat = m_features->at(match_idx);
+//            unsigned class_id = cur_feat.classId;
+//            corresponences_cloud->push_back(PointT(cur_feat.x, cur_feat.y, cur_feat.z));
+//            // add occurence of this class_id
+//            if(class_occurences.find(class_id) != class_occurences.end())
+//            {
+//                class_occurences.at(class_id) += 1;
+//            }
+//            else
+//            {
+//                class_occurences.insert({class_id, 1});
+//            }
+//        }
+
+//        // find centroid and determine position // TODO VS do this based on clusterVotes like in else branch of use_hv
+//        Eigen::Vector4f centroid4f;
+//        pcl::compute3DCentroid(*corresponences_cloud, centroid4f);
+//        Eigen::Vector4f pos = transformations.back() * centroid4f;
+//        positions.emplace_back(pos);
+
+//        // determine most frequent label
+//        unsigned cur_class = 0;
+//        int cur_best_num = 0;
+//        for(auto occ_elem : class_occurences)
+//        {
+//            if(occ_elem.second > cur_best_num)
+//            {
+//                cur_best_num = occ_elem.second;
+//                cur_class = occ_elem.first;
+//            }
+//        }
+//        results.push_back({cur_class, cur_best_num});
+    }
+
+    return std::make_tuple(results, positions);
+}
+
 
 bool Hough3d::saveModelToFile(std::string &filename,
-                            std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
-                            std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const
+                              std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
+                              std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const
 {
     // create boost data object
     std::ofstream ofs(filename);

@@ -3,10 +3,12 @@
 
 #include <vector>
 #include <string>
+#include <functional>
 #include <flann/flann.hpp>
 #include <pcl/features/feature.h>
 #include <pcl/recognition/cg/hough_3d.h>
 #include "../../implicit_shape_model/utils/ism_feature.h"
+#include "../../implicit_shape_model/voting/voting_maximum.h"
 
 using namespace ism3d;
 
@@ -16,8 +18,7 @@ class Hough3d
 {
 
 public:
-
-    Hough3d();
+    Hough3d(std::string dataset);
 
     virtual ~Hough3d()
     {
@@ -28,7 +29,9 @@ public:
                const std::vector<unsigned> &instance_labels,
                const std::string &output_file) const;
 
-    std::vector<std::pair<unsigned, float>> classify(const std::string &filename) const;
+    std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool useSingleVotingSpace) const;
+
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification) const;
 
     bool loadModel(std::string &filename);
 
@@ -89,10 +92,16 @@ private:
 
     flann::Matrix<float> createFlannDataset();
 
-    std::vector<std::pair<unsigned, float>> findObjects(const pcl::PointCloud<ISMFeature>::Ptr& features) const;
+    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
+                                            findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+                                                        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+                                                        const bool use_hv) const;
 
-    bool saveModelToFile(std::string &filename, std::map<unsigned,
-                         pcl::PointCloud<ISMFeature>::Ptr> &all_features,
+    std::vector<std::pair<unsigned, float>> classifyObjectsWithSeparateVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
+    std::vector<std::pair<unsigned, float>> classifyObjectsWithUnifiedVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
+
+    bool saveModelToFile(std::string &filename,
+                         std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
                          std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const;
 
     bool loadModelFromFile(std::string& filename);
