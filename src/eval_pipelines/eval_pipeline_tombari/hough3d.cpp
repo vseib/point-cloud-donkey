@@ -757,7 +757,7 @@ Hough3d::classifyObjectsWithUnifiedVotingSpaces(
         // interpolated voting should be the same or even better
         m_hough_space->voteInt(vote, 1.0, vote_id);
     }
-    // find maxima for this class id
+    // find maxima
     std::vector<double> maxima;
     float m_relThreshold = 0.1f;
     std::vector<std::vector<int>> voteIndices;
@@ -949,6 +949,7 @@ Hough3d::findObjects(
             // save transformations for recognition
             transformations.push_back(corr_rejector.getBestTransformation());
             model_instances.push_back(filtered_corrs);
+            // TODO VS: reject if no filtering possible? see self adapt hghv cpp, lines ~ 660-670
         }
         else
         {
@@ -962,45 +963,6 @@ Hough3d::findObjects(
                                         res_class, res_num_votes, res_position);
         results.push_back({res_class, res_num_votes});
         positions.push_back(res_position);
-
-//        // count class occurences in filtered corrs
-//        std::map<unsigned, int> class_occurences;
-//        pcl::PointCloud<PointT>::Ptr corresponences_cloud(new pcl::PointCloud<PointT>());
-//        for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
-//        {
-//            unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-//            const ISMFeature &cur_feat = m_features->at(match_idx);
-//            unsigned class_id = cur_feat.classId;
-//            corresponences_cloud->push_back(PointT(cur_feat.x, cur_feat.y, cur_feat.z));
-//            // add occurence of this class_id
-//            if(class_occurences.find(class_id) != class_occurences.end())
-//            {
-//                class_occurences.at(class_id) += 1;
-//            }
-//            else
-//            {
-//                class_occurences.insert({class_id, 1});
-//            }
-//        }
-
-//        // find centroid and determine position // TODO VS do this based on clusterVotes like in else branch of use_hv
-//        Eigen::Vector4f centroid4f;
-//        pcl::compute3DCentroid(*corresponences_cloud, centroid4f);
-//        Eigen::Vector4f pos = transformations.back() * centroid4f;
-//        positions.emplace_back(pos);
-
-//        // determine most frequent label
-//        unsigned cur_class = 0;
-//        int cur_best_num = 0;
-//        for(auto occ_elem : class_occurences)
-//        {
-//            if(occ_elem.second > cur_best_num)
-//            {
-//                cur_best_num = occ_elem.second;
-//                cur_class = occ_elem.first;
-//            }
-//        }
-//        results.push_back({cur_class, cur_best_num});
     }
 
     return std::make_tuple(results, positions);
