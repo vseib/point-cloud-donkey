@@ -168,7 +168,7 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
 }
 
 
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::string &filename, bool use_hough)
+std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::string &filename)
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
@@ -182,7 +182,7 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::strin
 
     // get results
     std::vector<std::pair<unsigned, float>> results;
-    results = classifyObject(features, use_hough);
+    results = classifyObject(features);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -194,9 +194,7 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::strin
 }
 
 
-// TODO VS implement this method
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                                 const bool use_hough)
+std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features)
 {
     // get model-scene correspondences
     // query index is scene, match index is codebook ("object")
@@ -216,6 +214,16 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl:
     // * only keep inliers
     // --> this requires to have separate codebooks for matching, otherwise transformations won't make sense
     // alternative with a common codebook: matching threshold
+
+    // TODO VS: own idea for filtering:
+    // match knn with k = 3
+    // if all are same class -> accept
+    // if k1 and k2 are same class
+    //       -> accept if valid distance ratio between k1 and k3
+    // otherwise: distance ratio between k1 and k2 -> accept or discard
+    // if k2 and k3 are same, but different from k1, accept k2 if distance ratio k1-k2 invalid?
+    // if all are different
+    //      -> accept if valid distance ratio between k1 and k2
 
     // object keypoints are simply the matched keypoints from the codebook
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
@@ -301,9 +309,9 @@ void SelfAdaptHGHV::performSelfAdaptedHoughVoting(std::vector<double> &maxima,
             float b_l = (rmse_E_min_max.second - rmse_E_min_max.first) / h_n;
             float b_w = (rmse_T_min_max.second - rmse_T_min_max.first) / h_n;
 
-            Eigen::Vector3d m_min_coord = Eigen::Vector3d(0, 0, 0);
-            Eigen::Vector3d m_max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
-            Eigen::Vector3d m_bin_size = Eigen::Vector3d(b_l,b_w,1);
+            m_min_coord = Eigen::Vector3d(0, 0, 0);
+            m_max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
+            m_bin_size = Eigen::Vector3d(b_l,b_w,1);
             m_hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(m_min_coord, m_bin_size, m_max_coord);
 
             // vote all votes into empty hough space
@@ -318,7 +326,7 @@ void SelfAdaptHGHV::performSelfAdaptedHoughVoting(std::vector<double> &maxima,
                 m_hough_space->voteInt(vote, 1.0, vid);
             }
             // find maxima
-            float m_relThreshold = 0.01f; // TODO VS tune threshold
+            float m_relThreshold = 0.01f; // TODO VS tune threshold: must be member and set differently for classification / detection
             m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
 
             // only keep maxima with at least 3 votes
@@ -467,6 +475,25 @@ void SelfAdaptHGHV::prepare_voting(
 }
 
 
+std::vector<pcl::Correspondences> SelfAdaptHGHV::getCorrespondeceClustersFromMaxima(
+        const std::vector<double> &maxima,
+        const std::vector<std::vector<int>> &voteIndices,
+        const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const
+{
+    std::vector<pcl::Correspondences> clustered_corrs;
+    for (size_t j = 0; j < maxima.size (); ++j) // loop over all maxima
+    {
+        pcl::Correspondences max_corrs;
+        for (size_t i = 0; i < voteIndices[j].size(); ++i)
+        {
+            max_corrs.push_back(model_scene_corrs_filtered->at(voteIndices[j][i]));
+        }
+        clustered_corrs.push_back(max_corrs);
+    }
+    return clustered_corrs;
+}
+
+
 std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::getResultsFromMaxima(
         const std::vector<double> &maxima,
         const std::vector<std::vector<int>> &voteIndices,
@@ -518,10 +545,7 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::getResultsFromMaxima(
 }
 
 
-
-// TODO VS implement this method
-std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename,
-                                           bool use_hough, bool use_global_hv)
+std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename)
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
@@ -538,9 +562,7 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename,
     // get results
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
-    bool use_tombari_variant = use_hough;
-    bool use_aldoma_hv = use_global_hv;
-    std::tie(results, positions) = findObjects(features, cloud, use_tombari_variant, use_aldoma_hv);
+    std::tie(results, positions) = findObjects(features, cloud);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -563,19 +585,35 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename,
     return result_maxima;
 }
 
-// TODO VS implement this method
+
 std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
 SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                              const pcl::PointCloud<PointT>::Ptr scene_cloud,
-                                                              const bool use_hough, const bool use_global_hv) const
+                           const pcl::PointCloud<PointT>::Ptr scene_cloud)
 {
     // get model-scene correspondences
     // query index is scene, match index is codebook ("object")
     pcl::CorrespondencesPtr model_scene_corrs = findNnCorrespondences(scene_features);
     std::cout << "Found " << model_scene_corrs->size() << " correspondences" << std::endl;
 
+    // TODO VS
+    // run first RANSAC here to eliminate false correspondences - how exactly?
+    // NOTE:
+    // * find transformation while eliminating fp with ransac
+    // * only keep inliers
+    // --> this requires to have separate codebooks for matching, otherwise transformations won't make sense
+    // alternative with a common codebook: matching threshold
+
+    // TODO VS: own idea for filtering:
+    // match knn with k = 3
+    // if all are same class -> accept
+    // if k1 and k2 are same class
+    //       -> accept if valid distance ratio between k1 and k3
+    // otherwise: distance ratio between k1 and k2 -> accept or discard
+    // if k2 and k3 are same, but different from k1, accept k2 if distance ratio k1-k2 invalid?
+    // if all are different
+    //      -> accept if valid distance ratio between k1 and k2
+
     // object keypoints are simply the matched keypoints from the codebook
-    // NOTE: in a detection task they may represent multiple different objects
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
     pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
     pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
@@ -596,164 +634,183 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
         object_lrf->push_back(lrf);
     }
 
-    // Actual Clustering
-    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
+    std::vector<double> maxima;
+    std::vector<std::vector<int>> voteIndices;
+    pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
+    performSelfAdaptedHoughVoting(maxima, voteIndices, model_scene_corrs_filtered,
+                                  model_scene_corrs, object_keypoints, object_features, object_lrf);
+
+    // get clusters from each maximum, note that correspondences might still be of different classes
     std::vector<pcl::Correspondences> clustered_corrs;
+    clustered_corrs = std::move(getCorrespondeceClustersFromMaxima(maxima, voteIndices, model_scene_corrs_filtered));
 
-    //  Using Hough3D - i.e. hypothesis generation of tombari
-    if(use_hough)
-    {
-        //  Clustering
-        pcl::Hough3DGrouping<PointT, PointT, pcl::ReferenceFrame, pcl::ReferenceFrame> clusterer;
-        clusterer.setHoughBinSize(m_bin_size);
-        clusterer.setHoughThreshold(m_corr_threshold);
-        clusterer.setUseInterpolation(true);
-        clusterer.setUseDistanceWeight(false);
-        clusterer.setInputRf(object_lrf);
-        clusterer.setSceneRf(m_scene_lrf);
-        clusterer.setLocalRfSearchRadius(m_reference_frame_radius);
-        clusterer.setInputCloud(object_keypoints);
-        clusterer.setSceneCloud(m_scene_keypoints);
-        clusterer.setModelSceneCorrespondences(model_scene_corrs);
-        //clusterer.cluster(clustered_corrs);
-        clusterer.recognize(rototranslations, clustered_corrs);
-    }
-    else // Using GeometricConsistency - i.e. hypothesis generation of chen (default in the aldoma pipeline)
-    {
-        pcl::GeometricConsistencyGrouping<PointT, PointT> gc_clusterer;
-        gc_clusterer.setGCSize(m_bin_size);
-        gc_clusterer.setGCThreshold(m_corr_threshold);
-        gc_clusterer.setInputCloud(object_keypoints);
-        gc_clusterer.setSceneCloud(m_scene_keypoints);
-        gc_clusterer.setModelSceneCorrespondences(model_scene_corrs);
-        //gc_clusterer.cluster(clustered_corrs);
-        gc_clusterer.recognize(rototranslations, clustered_corrs);
-    }
-
-
-    // ------ this is where the aldoma contibution starts -------
+    // generate 6DOF hypotheses from clusters
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
+    std::vector<Eigen::Matrix4f> transformations;
+    std::vector<pcl::Correspondences> filtered_clustered_corrs;
+    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
+    corr_rejector.setMaximumIterations(10000);
+    corr_rejector.setInlierThreshold(m_bin_size(0));
+    corr_rejector.setInputSource(m_scene_keypoints);
+    corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
+    //corr_rejector.setRefineModel(true); // TODO VS verify: slightly worse results
 
-    // Stop if no instances
-    if (rototranslations.size () <= 0)
+    // second RANSAC: filter correspondence groups by position
+    for(const pcl::Correspondences &temp_corrs : clustered_corrs)
     {
-        std::cout << "No instances found!" << std::endl;
-        return std::make_tuple(results, positions);
-    }
-    else
-    {
-        std::cout << "Resulting clusters: " << rototranslations.size() << std::endl;
-    }
+        pcl::Correspondences filtered_corrs;
+        corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
+        Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
 
-    if(use_global_hv) // aldoma global hypotheses verification
-    {
-        // Generates clouds for each instances found
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
-        for(size_t i = 0; i < rototranslations.size (); ++i)
+        // TODO VS check if best_transform is computed with "absolute orientation"
+        // check code of corr_rejector --> confirmed it is using absolute orientation!!!
+
+        // TODO VS check for background knowledge:
+        // https://www.ais.uni-bonn.de/papers/RAM_2015_Holz_PCL_Registration_Tutorial.pdf
+        // https://www.programmersought.com/article/93804217152/
+
+        // TODO VS check if this if clause works and makes sense
+        if(!best_transform.isIdentity(0.01))
         {
-            pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
-            // NOTE: object_keypoints might contain multiple objects, so use only keypoints of a single cluster
-            //pcl::transformPointCloud(*object_keypoints, *rotated_model, rototranslations[i]);
-            pcl::PointCloud<PointT>::Ptr cluster_keypoints(new pcl::PointCloud<PointT>());
-            pcl::Correspondences this_cluster = clustered_corrs[i];
-            for(const pcl::Correspondence &corr : this_cluster)
-            {
-                const ISMFeature &feat = object_features->at(corr.index_match);
-                PointT keypoint = PointT(feat.x, feat.y, feat.z);
-                cluster_keypoints->push_back(keypoint);
-            }
-            pcl::transformPointCloud(*cluster_keypoints, *rotated_model, rototranslations[i]);
-            instances.push_back(rotated_model);
-        }
+            // keep transformation and correspondences if RANSAC was run successfully
+            transformations.push_back(best_transform);
+            filtered_clustered_corrs.push_back(filtered_corrs);
 
-        // ICP
-        std::cout << "--- ICP ---------" << std::endl;
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
-        for (size_t i = 0; i < rototranslations.size (); ++i)
-        {
-            pcl::IterativeClosestPoint<PointT, PointT> icp;
-            icp.setMaximumIterations(m_icp_max_iter);
-            icp.setMaxCorrespondenceDistance(m_icp_corr_distance);
-            icp.setInputTarget(m_scene_keypoints); // TODO VS scene keypoints or scene cloud?? --> keypoints slightly better in first test
-            icp.setInputSource(instances[i]);
-            pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
-            icp.align(*registered);
-            registered_instances.push_back(registered);
-//            std::cout << "Instance " << i << " ";
-//            if (icp.hasConverged ())
-//            {
-//                std::cout << "Aligned!" << std::endl;
-//            }
-//            else
-//            {
-//                std::cout << "Not Aligned!" << std::endl;
-//            }
-        }
-
-        // Hypothesis Verification
-        std::cout << "--- Hypotheses Verification ---" << std::endl;
-        // TODO VS: tune thresholds
-        std::vector<bool> hypotheses_mask;  // Mask Vector to identify positive hypotheses
-        pcl::GlobalHypothesesVerification<PointT, PointT> GoHv;
-        GoHv.setSceneCloud(scene_cloud);  // Scene Cloud
-        GoHv.addModels(registered_instances, true);  //Models to verify
-        GoHv.setInlierThreshold(0.01);
-        GoHv.setOcclusionThreshold(0.02);
-        GoHv.setRegularizer(3.0);
-        GoHv.setClutterRegularizer(5.0);
-        GoHv.setRadiusClutter(0.25);
-        GoHv.setDetectClutter(true);
-        GoHv.setRadiusNormals(m_normal_radius);
-        GoHv.verify();
-        GoHv.getMask(hypotheses_mask);  // i-element TRUE if hvModels[i] verifies hypotheses
-
-        for (int i = 0; i < hypotheses_mask.size (); i++)
-        {
-            if(hypotheses_mask[i])
-            {
-                std::cout << "Instance " << i << " is GOOD!" << std::endl;
-                pcl::Correspondences filtered_corrs = clustered_corrs[i];
-                unsigned res_class;
-                int res_num_votes;
-                Eigen::Vector3f res_position;
-                findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-                                                res_class, res_num_votes, res_position);
-
-                // find aligned position
-                pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
-                Eigen::Vector4f centroid4f;
-                pcl::compute3DCentroid(*reg_inst, centroid4f);
-
-                // store results
-                results.push_back({res_class, res_num_votes});
-                // TODO VS: which position? transformed centroid or position from cluster (the latter was better in first test)
-                //positions.emplace_back(Eigen::Vector3f(centroid4f.x(), centroid4f.y(), centroid4f.z()));
-                positions.push_back(res_position);
-            }
-            else
-            {
-                //std::cout << "Instance " << i << " is bad, discarding!" << std::endl;
-            }
-        }
-    }
-    // NOTE: else branch is just for verification and should not be used normally
-    // NOTE: if above use_hough == true, this else branch should correspond to the
-    //       tombari pipeline (i.e. executable "eval_pipeline_tombari_detection")
-    else
-    {
-        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima
-        {
-            pcl::Correspondences filtered_corrs = clustered_corrs[j];
+            // TODO VS: the following is probably not needed at this point
             unsigned res_class;
             int res_num_votes;
             Eigen::Vector3f res_position;
-            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+            findClassAndPositionFromCluster(filtered_corrs, m_features, scene_features,
                                             res_class, res_num_votes, res_position);
             results.push_back({res_class, res_num_votes});
             positions.push_back(res_position);
         }
     }
+
+//    // ------ this is where the aldoma contibution starts -------
+//    std::vector<std::pair<unsigned, float>> results;
+//    std::vector<Eigen::Vector3f> positions;
+
+//    // Stop if no instances
+//    if (rototranslations.size () <= 0)
+//    {
+//        std::cout << "No instances found!" << std::endl;
+//        return std::make_tuple(results, positions);
+//    }
+//    else
+//    {
+//        std::cout << "Resulting clusters: " << rototranslations.size() << std::endl;
+//    }
+
+//    if(use_global_hv) // aldoma global hypotheses verification
+//    {
+//        // Generates clouds for each instances found
+//        std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
+//        for(size_t i = 0; i < rototranslations.size (); ++i)
+//        {
+//            pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
+//            // NOTE: object_keypoints might contain multiple objects, so use only keypoints of a single cluster
+//            //pcl::transformPointCloud(*object_keypoints, *rotated_model, rototranslations[i]);
+//            pcl::PointCloud<PointT>::Ptr cluster_keypoints(new pcl::PointCloud<PointT>());
+//            pcl::Correspondences this_cluster = clustered_corrs[i];
+//            for(const pcl::Correspondence &corr : this_cluster)
+//            {
+//                const ISMFeature &feat = object_features->at(corr.index_match);
+//                PointT keypoint = PointT(feat.x, feat.y, feat.z);
+//                cluster_keypoints->push_back(keypoint);
+//            }
+//            pcl::transformPointCloud(*cluster_keypoints, *rotated_model, rototranslations[i]);
+//            instances.push_back(rotated_model);
+//        }
+
+//        // ICP
+//        std::cout << "--- ICP ---------" << std::endl;
+//        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
+//        for (size_t i = 0; i < rototranslations.size (); ++i)
+//        {
+//            pcl::IterativeClosestPoint<PointT, PointT> icp;
+//            icp.setMaximumIterations(m_icp_max_iter);
+//            icp.setMaxCorrespondenceDistance(m_icp_corr_distance);
+//            icp.setInputTarget(m_scene_keypoints); // TODO VS scene keypoints or scene cloud?? --> keypoints slightly better in first test
+//            icp.setInputSource(instances[i]);
+//            pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
+//            icp.align(*registered);
+//            registered_instances.push_back(registered);
+////            std::cout << "Instance " << i << " ";
+////            if (icp.hasConverged ())
+////            {
+////                std::cout << "Aligned!" << std::endl;
+////            }
+////            else
+////            {
+////                std::cout << "Not Aligned!" << std::endl;
+////            }
+//        }
+
+//        // Hypothesis Verification
+//        std::cout << "--- Hypotheses Verification ---" << std::endl;
+//        // TODO VS: tune thresholds
+//        std::vector<bool> hypotheses_mask;  // Mask Vector to identify positive hypotheses
+//        pcl::GlobalHypothesesVerification<PointT, PointT> GoHv;
+//        GoHv.setSceneCloud(scene_cloud);  // Scene Cloud
+//        GoHv.addModels(registered_instances, true);  //Models to verify
+//        GoHv.setInlierThreshold(0.01);
+//        GoHv.setOcclusionThreshold(0.02);
+//        GoHv.setRegularizer(3.0);
+//        GoHv.setClutterRegularizer(5.0);
+//        GoHv.setRadiusClutter(0.25);
+//        GoHv.setDetectClutter(true);
+//        GoHv.setRadiusNormals(m_normal_radius);
+//        GoHv.verify();
+//        GoHv.getMask(hypotheses_mask);  // i-element TRUE if hvModels[i] verifies hypotheses
+
+//        for (int i = 0; i < hypotheses_mask.size (); i++)
+//        {
+//            if(hypotheses_mask[i])
+//            {
+//                std::cout << "Instance " << i << " is GOOD!" << std::endl;
+//                pcl::Correspondences filtered_corrs = clustered_corrs[i];
+//                unsigned res_class;
+//                int res_num_votes;
+//                Eigen::Vector3f res_position;
+//                findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+//                                                res_class, res_num_votes, res_position);
+
+//                // find aligned position
+//                pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
+//                Eigen::Vector4f centroid4f;
+//                pcl::compute3DCentroid(*reg_inst, centroid4f);
+
+//                // store results
+//                results.push_back({res_class, res_num_votes});
+//                // TODO VS: which position? transformed centroid or position from cluster (the latter was better in first test)
+//                //positions.emplace_back(Eigen::Vector3f(centroid4f.x(), centroid4f.y(), centroid4f.z()));
+//                positions.push_back(res_position);
+//            }
+//            else
+//            {
+//                //std::cout << "Instance " << i << " is bad, discarding!" << std::endl;
+//            }
+//        }
+//    }
+//    // NOTE: else branch is just for verification and should not be used normally
+//    // NOTE: if above use_hough == true, this else branch should correspond to the
+//    //       tombari pipeline (i.e. executable "eval_pipeline_tombari_detection")
+//    else
+//    {
+//        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima
+//        {
+//            pcl::Correspondences filtered_corrs = clustered_corrs[j];
+//            unsigned res_class;
+//            int res_num_votes;
+//            Eigen::Vector3f res_position;
+//            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+//                                            res_class, res_num_votes, res_position);
+//            results.push_back({res_class, res_num_votes});
+//            positions.push_back(res_position);
+//        }
+//    }
 
     return std::make_tuple(results, positions);
 }

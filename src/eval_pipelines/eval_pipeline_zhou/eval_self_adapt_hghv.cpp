@@ -159,8 +159,7 @@ int main (int argc, char** argv)
                 std::cout << "Processing file " << filename << std::endl;
 
                 std::vector<std::pair<unsigned, float>> results;
-                bool use_hough = false; // false --> use chen (default), true --> use tombare to generate hypotheses
-                results = sa_hghv->classify(filename, use_hough);
+                results = sa_hghv->classify(filename);
 
                 // lookup real class ids if instances were used as primary labels
                 std::vector<unsigned> result_instance_labels;

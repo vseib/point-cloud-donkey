@@ -29,9 +29,9 @@ public:
                const std::vector<unsigned> &instance_labels,
                const std::string &output_file);
 
-    std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool use_hough);
+    std::vector<std::pair<unsigned, float>> classify(const std::string &filename);
 
-    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool use_hough, bool use_global_hv);
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename);
 
     bool loadModel(std::string &filename);
 
@@ -92,13 +92,11 @@ private:
 
     flann::Matrix<float> createFlannDataset() const;
 
-    std::vector<std::pair<unsigned, float>> classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                           const bool use_hough);
+    std::vector<std::pair<unsigned, float>> classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features);
 
     std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
                                             findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                        const pcl::PointCloud<PointT>::Ptr cloud,
-                                                        const bool use_hv, const bool use_global_hv) const;
+                                                        const pcl::PointCloud<PointT>::Ptr cloud);
     void prepare_voting(
             std::vector<std::pair<float,float>> &votes,
             std::pair<float,float> &rmse_E_min_max,
@@ -107,6 +105,11 @@ private:
             const pcl::PointCloud<PointT>::Ptr object_keypoints,
             const pcl::PointCloud<ISMFeature>::Ptr object_features,
             const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf) const;
+
+    std::vector<pcl::Correspondences> getCorrespondeceClustersFromMaxima(
+            const std::vector<double> &maxima,
+            const std::vector<std::vector<int>> &voteIndices,
+            const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const;
 
     std::vector<std::pair<unsigned, float>> getResultsFromMaxima(
                 const std::vector<double> &maxima,
@@ -152,7 +155,9 @@ private:
     int m_normal_method;
     std::string m_feature_type;
     float m_corr_threshold;
-    float m_bin_size;
+    Eigen::Vector3d m_min_coord;
+    Eigen::Vector3d m_max_coord;
+    Eigen::Vector3d m_bin_size;
 
     // TODO VS check these params
     int m_icp_max_iter;

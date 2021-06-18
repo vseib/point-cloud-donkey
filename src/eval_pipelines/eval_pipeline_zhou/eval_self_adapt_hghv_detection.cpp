@@ -206,10 +206,7 @@ int main (int argc, char** argv)
                 std::vector<ism3d::VotingMaximum> maxima;
 
                 std::cout << "Processing file " << pointCloud << std::endl;
-
-                bool use_global_hv = true; // true --> aldoma global hv (default), false --> no global hv
-                bool use_hough = false; // false --> use chen (default), true --> use tombari to generate hypotheses
-                maxima = sa_hghv->detect(pointCloud, use_hough, use_global_hv);
+                maxima = sa_hghv->detect(pointCloud);
 
                 // collect all gt objects
                 std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
