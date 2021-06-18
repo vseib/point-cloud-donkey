@@ -36,7 +36,7 @@
  */
 
 
-SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
+GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_scene_keypoints(new pcl::PointCloud<PointT>()),
     m_scene_lrf(new pcl::PointCloud<pcl::ReferenceFrame>()),
@@ -99,7 +99,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
 }
 
 
-void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
+void GlobalHV::train(const std::vector<std::string> &filenames,
                      const std::vector<unsigned> &class_labels,
                      const std::vector<unsigned> &instance_labels,
                      const std::string &output_file)
@@ -178,7 +178,7 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
 }
 
 
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::string &filename, bool use_hough)
+std::vector<std::pair<unsigned, float>> GlobalHV::classify(const std::string &filename, bool use_hough)
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
@@ -204,7 +204,7 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::strin
 }
 
 
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+std::vector<std::pair<unsigned, float>> GlobalHV::classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                                                                  const bool use_hough) const
 {
     // get model-scene correspondences
@@ -313,7 +313,7 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl:
 }
 
 
-std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename,
+std::vector<VotingMaximum> GlobalHV::detect(const std::string &filename,
                                            bool use_hough, bool use_global_hv)
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
@@ -357,7 +357,7 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename,
 }
 
 std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
-SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+GlobalHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                                                               const pcl::PointCloud<PointT>::Ptr scene_cloud,
                                                               const bool use_hough, const bool use_global_hv) const
 {
@@ -551,7 +551,7 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
 }
 
 
-void SelfAdaptHGHV::findClassAndPositionFromCluster(
+void GlobalHV::findClassAndPositionFromCluster(
         const pcl::Correspondences &filtered_corrs,
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
@@ -610,7 +610,7 @@ void SelfAdaptHGHV::findClassAndPositionFromCluster(
 }
 
 
-bool SelfAdaptHGHV::loadModel(std::string &filename)
+bool GlobalHV::loadModel(std::string &filename)
 {
     if(!loadModelFromFile(filename)) return false;
 
@@ -623,7 +623,7 @@ bool SelfAdaptHGHV::loadModel(std::string &filename)
 }
 
 
-pcl::PointCloud<ISMFeature>::Ptr SelfAdaptHGHV::processPointCloud(pcl::PointCloud<PointT>::Ptr cloud)
+pcl::PointCloud<ISMFeature>::Ptr GlobalHV::processPointCloud(pcl::PointCloud<PointT>::Ptr cloud)
 {
     // create search tree
     pcl::search::Search<PointT>::Ptr searchTree;
@@ -688,7 +688,7 @@ pcl::PointCloud<ISMFeature>::Ptr SelfAdaptHGHV::processPointCloud(pcl::PointClou
 }
 
 
-void SelfAdaptHGHV::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
+void GlobalHV::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
                            pcl::PointCloud<pcl::Normal>::Ptr& normals,
                            pcl::search::Search<PointT>::Ptr searchTree) const
 {
@@ -741,7 +741,7 @@ void SelfAdaptHGHV::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
     }
 }
 
-void SelfAdaptHGHV::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
+void GlobalHV::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
                           pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
                           pcl::PointCloud<PointT>::Ptr &cloud,
                           pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const
@@ -759,7 +759,7 @@ void SelfAdaptHGHV::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
 }
 
 
-void SelfAdaptHGHV::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr &cloud) const
+void GlobalHV::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr &cloud) const
 {
     pcl::VoxelGrid<PointT> voxelGrid;
     voxelGrid.setInputCloud(cloud);
@@ -769,7 +769,7 @@ void SelfAdaptHGHV::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pc
 }
 
 
-void SelfAdaptHGHV::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
+void GlobalHV::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
                                    pcl::PointCloud<PointT>::Ptr &keypoints,
                                    pcl::PointCloud<PointT>::Ptr &cloud,
                                    pcl::search::Search<PointT>::Ptr &searchTree) const
@@ -799,7 +799,7 @@ void SelfAdaptHGHV::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>:
 }
 
 
-void SelfAdaptHGHV::computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
+void GlobalHV::computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
                                pcl::PointCloud<pcl::Normal>::Ptr &normals,
                                pcl::PointCloud<PointT>::Ptr &keypoints,
                                pcl::search::Search<PointT>::Ptr &searchTree,
@@ -886,7 +886,7 @@ void SelfAdaptHGHV::computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
 }
 
 
-void SelfAdaptHGHV::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &features,
+void GlobalHV::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &features,
                                  pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const
 {
     features_cleaned = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
@@ -915,7 +915,7 @@ void SelfAdaptHGHV::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &featu
 }
 
 
-flann::Matrix<float> SelfAdaptHGHV::createFlannDataset() const
+flann::Matrix<float> GlobalHV::createFlannDataset() const
 {
     // create a dataset with all features for matching / activation
     int descriptor_size = m_features->at(0).descriptor.size();
@@ -937,7 +937,7 @@ flann::Matrix<float> SelfAdaptHGHV::createFlannDataset() const
 }
 
 
-pcl::CorrespondencesPtr SelfAdaptHGHV::findNnCorrespondences(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const
+pcl::CorrespondencesPtr GlobalHV::findNnCorrespondences(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const
 {
     pcl::CorrespondencesPtr model_scene_corrs(new pcl::Correspondences());
 
@@ -982,7 +982,7 @@ pcl::CorrespondencesPtr SelfAdaptHGHV::findNnCorrespondences(const pcl::PointClo
     return model_scene_corrs;
 }
 
-bool SelfAdaptHGHV::saveModelToFile(std::string &filename,
+bool GlobalHV::saveModelToFile(std::string &filename,
                               std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
                               std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const
 {
@@ -1091,7 +1091,7 @@ bool SelfAdaptHGHV::saveModelToFile(std::string &filename,
     return true;
 }
 
-bool SelfAdaptHGHV::loadModelFromFile(std::string& filename)
+bool GlobalHV::loadModelFromFile(std::string& filename)
 {
     std::ifstream ifs(filename);
     if(ifs)

@@ -102,7 +102,7 @@ int main (int argc, char** argv)
         datasetname = str1;
     }
 
-    std::shared_ptr<SelfAdaptHGHV> global_hv(new SelfAdaptHGHV(datasetname, bin, th));
+    std::shared_ptr<GlobalHV> global_hv(new GlobalHV(datasetname, bin, th));
 
     // workaround to set "mode"
     {
