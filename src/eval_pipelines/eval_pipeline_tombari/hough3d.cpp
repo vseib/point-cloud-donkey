@@ -737,8 +737,6 @@ Hough3d::classifyObjectsWithUnifiedVotingSpaces(
         }
     }
 
-    // cast votes of each class separately
-    // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
     std::vector<std::pair<unsigned, float>> results;
     // use all votes at once
     std::vector<Eigen::Vector3f> votelist;
@@ -887,14 +885,13 @@ Hough3d::findObjects(
     pcl::PointCloud<PointT>::Ptr temp_scene_cloud(new pcl::PointCloud<PointT>());
     pcl::copyPointCloud<PointT, PointT>(*scene_cloud, *temp_scene_cloud);
 
-    // cast votes of each class separately
-    // (tombari speaks of only one single hough space, but this makes implementation easier without drawbacks)
+    // cast votes
     std::vector<std::pair<unsigned, float>> results;
     // use all votes at once
     std::vector<Eigen::Vector3f> votelist;
     for(auto elem : all_votes)
         votelist.insert(votelist.end(), elem.second.begin(), elem.second.end());
-    std::vector<int> idlist;
+    std::vector<int> idlist; // contains indices of the correspondence list
     for(auto elem : all_match_idxs)
         idlist.insert(idlist.end(), elem.second.begin(), elem.second.end());
 
@@ -919,8 +916,13 @@ Hough3d::findObjects(
     // #include <pcl/registration/transformation_estimation.h>
     // oder
     // #include <pcl/registration/transformation_estimation_svd.h>
-    // oder
+    // in Verbindung mit
+    // transformation_validation.h
+    // siehe auch:
     // #include <pcl/sample_consensus/msac.h>
+    //
+    // siehe auch in OpenCV (es nutzt Ransac) und gibt eine Konfidenz: cv::estimateAffine3D
+    // (also eine Kombination aus pcl transformation estimation und transformation validation)
 
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;

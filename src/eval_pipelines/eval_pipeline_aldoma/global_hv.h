@@ -12,14 +12,14 @@ using namespace ism3d;
 
 typedef pcl::PointXYZRGB PointT;
 
-class GlobalHV
+class SelfAdaptHGHV
 {
 
 public:
 
-    GlobalHV(std::string dataset, float bin=-1, float th=-1);
+    SelfAdaptHGHV(std::string dataset, float bin=-1, float th=-1);
 
-    virtual ~GlobalHV()
+    virtual ~SelfAdaptHGHV()
     {
     }
 
