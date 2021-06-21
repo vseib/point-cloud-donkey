@@ -128,6 +128,57 @@ void castVotesAndFindMaxima(
 }
 
 
+void generateClassificationHypotheses(
+        const pcl::CorrespondencesPtr object_scene_corrs,
+        const std::vector<std::vector<int>> &vote_indices,
+        const pcl::PointCloud<ISMFeature>::Ptr codebook_features,
+        std::vector<std::pair<unsigned, float>> &results)
+{
+    // check all maxima since highest valued maximum might still be composed of different class votes
+    // therefore we need to count votes per class per maximum
+    results.clear();
+    for (size_t j = 0; j < vote_indices.size (); ++j)
+    {
+        std::map<unsigned, int> class_occurences;
+        pcl::Correspondences max_corrs;
+        for (size_t i = 0; i < vote_indices[j].size(); ++i)
+        {
+            max_corrs.push_back(object_scene_corrs->at(vote_indices[j][i]));
+        }
+
+        // count class occurences in filtered corrs
+        for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++)
+        {
+            unsigned match_idx = max_corrs.at(fcorr_idx).index_match;
+            const ISMFeature &cur_feat = codebook_features->at(match_idx);
+            unsigned class_id = cur_feat.classId;
+            // add occurence of this class_id
+            if(class_occurences.find(class_id) != class_occurences.end())
+            {
+                class_occurences.at(class_id) += 1;
+            }
+            else
+            {
+                class_occurences.insert({class_id, 1});
+            }
+        }
+
+        // determine most frequent label
+        unsigned cur_class = 0;
+        int cur_best_num = 0;
+        for(auto occ_elem : class_occurences)
+        {
+            if(occ_elem.second > cur_best_num)
+            {
+                cur_best_num = occ_elem.second;
+                cur_class = occ_elem.first;
+            }
+        }
+        results.push_back({cur_class, cur_best_num});
+    }
+}
+
+
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,

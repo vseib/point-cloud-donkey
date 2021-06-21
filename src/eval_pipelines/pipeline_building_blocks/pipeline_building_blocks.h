@@ -37,6 +37,12 @@ void castVotesAndFindMaxima(
         std::vector<std::vector<int>> &vote_indices,
         std::shared_ptr<pcl::recognition::HoughSpace3D> &hough_space);
 
+void generateClassificationHypotheses(
+        const pcl::CorrespondencesPtr object_scene_corrs,
+        const std::vector<std::vector<int>> &vote_indices,
+        const pcl::PointCloud<ISMFeature>::Ptr codebook_features,
+        std::vector<std::pair<unsigned, float>> &results);
+
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,

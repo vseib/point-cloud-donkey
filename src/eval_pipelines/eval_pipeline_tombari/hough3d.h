@@ -98,8 +98,13 @@ private:
             std::vector<std::pair<unsigned, float>> &results,
             std::vector<Eigen::Vector3f> &positions);
 
-    std::vector<std::pair<unsigned, float>> classifyObjectsWithSeparateVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
-    std::vector<std::pair<unsigned, float>> classifyObjectsWithUnifiedVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
+    void classifyObjectsWithSeparateVotingSpaces(
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            std::vector<std::pair<unsigned, float>> &results);
+
+    void classifyObjectsWithUnifiedVotingSpaces(
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            std::vector<std::pair<unsigned, float>> &results);
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
