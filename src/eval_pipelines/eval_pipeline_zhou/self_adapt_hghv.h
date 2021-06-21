@@ -151,7 +151,7 @@ private:
     float m_reference_frame_radius;
     float m_feature_radius;
     float m_keypoint_sampling_radius;
-    int m_k_search;
+    int m_k_search; // TODO remove
     int m_normal_method;
     std::string m_feature_type;
     float m_corr_threshold;

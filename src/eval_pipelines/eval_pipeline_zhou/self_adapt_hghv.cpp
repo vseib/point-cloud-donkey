@@ -47,7 +47,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
         m_reference_frame_radius = 0.3;
         m_feature_radius = 0.4;
         m_keypoint_sampling_radius = 0.2;
-        m_k_search = 1;
+        m_k_search = 1; // TODO remove
         m_normal_method = 1;
         m_feature_type = "SHOT";
     }
@@ -592,8 +592,8 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
 {
     // get model-scene correspondences
     // query index is scene, match index is codebook ("object")
-    pcl::CorrespondencesPtr model_scene_corrs = findNnCorrespondences(scene_features);
-    std::cout << "Found " << model_scene_corrs->size() << " correspondences" << std::endl;
+    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features);
+    std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
     // TODO VS
     // run first RANSAC here to eliminate false correspondences - how exactly?
@@ -617,11 +617,11 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
     pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
     pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    // however in order not to pass the whole codebook, we need to ajust the index mapping
-    for(unsigned i = 0; i < model_scene_corrs->size(); i++)
+    // however in order not to pass the whole codebook, we need to adjust the index mapping
+    for(unsigned i = 0; i < object_scene_corrs->size(); i++)
     {
         // create new list of keypoints and reassign the object (i.e. match) index
-        pcl::Correspondence &corr = model_scene_corrs->at(i);
+        pcl::Correspondence &corr = object_scene_corrs->at(i);
         int &index = corr.index_match;
         const ISMFeature &feat = m_features->at(index);
         object_features->push_back(feat);
@@ -638,7 +638,7 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
     std::vector<std::vector<int>> voteIndices;
     pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
     performSelfAdaptedHoughVoting(maxima, voteIndices, model_scene_corrs_filtered,
-                                  model_scene_corrs, object_keypoints, object_features, object_lrf);
+                                  object_scene_corrs, object_keypoints, object_features, object_lrf);
 
     // get clusters from each maximum, note that correspondences might still be of different classes
     std::vector<pcl::Correspondences> clustered_corrs;
