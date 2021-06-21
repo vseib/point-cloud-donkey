@@ -27,11 +27,11 @@ public:
     void train(const std::vector<std::string> &filenames,
                const std::vector<unsigned> &class_labels,
                const std::vector<unsigned> &instance_labels,
-               const std::string &output_file) const;
+               const std::string &output_file);
 
-    std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool useSingleVotingSpace) const;
+    std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool useSingleVotingSpace);
 
-    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification) const;
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification);
 
     bool loadModel(std::string &filename);
 
@@ -61,7 +61,7 @@ public:
 
 private:
 
-    pcl::PointCloud<ISMFeature>::Ptr processPointCloud(pcl::PointCloud<PointT>::Ptr cloud) const;
+    pcl::PointCloud<ISMFeature>::Ptr processPointCloud(pcl::PointCloud<PointT>::Ptr cloud);
 
     void computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
                         pcl::PointCloud<pcl::Normal>::Ptr& normals,
@@ -94,13 +94,13 @@ private:
 
     std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
                                             findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                        const pcl::PointCloud<PointT>::Ptr scene_cloud,
-                                                        const bool use_hv) const;
+                                                        const bool use_hv);
 
     void findClassAndPositionFromCluster(
             const pcl::Correspondences &filtered_corrs,
             const pcl::PointCloud<ISMFeature>::Ptr object_features,
             const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            const std::vector<Eigen::Vector3f> &object_center_vectors,
             unsigned &resulting_class,
             int &resulting_num_votes,
             Eigen::Vector3f &resulting_position) const;
@@ -113,6 +113,10 @@ private:
                          std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const;
 
     bool loadModelFromFile(std::string& filename);
+
+    pcl::CorrespondencesPtr findNnCorrespondences(
+            const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+            const float matching_threshold) const;
 
     std::map<unsigned, std::string> m_class_labels;
     std::map<unsigned, std::string> m_instance_labels;
@@ -127,14 +131,14 @@ private:
     float m_reference_frame_radius;
     float m_feature_radius;
     float m_keypoint_sampling_radius;
-    int m_k_search;
     int m_normal_method;
     std::string m_feature_type;
     float m_th;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
-    pcl::PointCloud<ISMFeature>::Ptr m_features;
+    pcl::PointCloud<PointT>::Ptr m_scene_keypoints;
+    pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
     std::vector<Eigen::Vector3f> m_center_vectors;
 
     flann::Index<flann::L2<float>> m_flann_index;
