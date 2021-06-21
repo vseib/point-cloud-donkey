@@ -8,13 +8,12 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/common/centroid.h>
 #include <pcl/correspondence.h>
-#include <pcl/registration/correspondence_rejection_sample_consensus.h>
 #include <pcl/registration/transformation_estimation.h>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
 #include "../../implicit_shape_model/utils/utils.h"
-
+#include "../pipeline_building_blocks/pipeline_building_blocks.h"
 
 /**
  * Implementation of the approach described in
@@ -224,7 +223,7 @@ std::vector<VotingMaximum> Hough3d::detect(const std::string &filename,
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
     bool use_hv = useHypothesisVerification;
-    std::tie(results, positions) = findObjects(features, use_hv);
+    findObjects(features, use_hv, results, positions);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -809,71 +808,41 @@ Hough3d::classifyObjectsWithUnifiedVotingSpaces(
 }
 
 
-std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
-Hough3d::findObjects(
+void Hough3d::findObjects(
         const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-        const bool use_hv)
+        const bool use_hv,
+        std::vector<std::pair<unsigned, float>> &results,
+        std::vector<Eigen::Vector3f> &positions)
 {
     // get model-scene correspondences
     // query index is scene, match index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
-    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold);
+    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
+
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
     // object keypoints are simply the matched keypoints from the codebook
+    // however in order not to pass the whole codebook, we need to adjust the index mapping
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
     pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
     std::vector<Eigen::Vector3f> object_center_vectors;
     pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    // however in order not to pass the whole codebook, we need to adjust the index mapping
-    for(unsigned i = 0; i < object_scene_corrs->size(); i++)
-    {
-        // create new list of keypoints and reassign the object (i.e. match) index
-        pcl::Correspondence &corr = object_scene_corrs->at(i);
-        int &index = corr.index_match;
-        const ISMFeature &feat = m_features->at(index);
-        object_features->push_back(feat);
-        object_center_vectors.push_back(m_center_vectors.at(index));
-
-        PointT keypoint = PointT(feat.x, feat.y, feat.z);
-        object_keypoints->push_back(keypoint);
-
-        pcl::ReferenceFrame lrf = feat.referenceFrame;
-        object_lrf->push_back(lrf);
-        // remap index to new position in the created point clouds
-        // no longer referring to m_features, but now to object_features
-        index = i;
-    }
+    remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
+            object_keypoints, object_features, object_center_vectors, object_lrf);
 
     // prepare voting
-    std::vector<Eigen::Vector3f> votelist;
-    for(const pcl::Correspondence &corr : *object_scene_corrs)
-    {
-        const ISMFeature &scene_feat = scene_features->at(corr.index_query);
-        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
-        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+    std::vector<Eigen::Vector3f> votelist = prepareCenterVotes(object_scene_corrs, scene_features, object_center_vectors);
 
-        Eigen::Vector3f vote = object_center_vectors.at(corr.index_match);
-        Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
-        votelist.push_back(center);
-    }
-
-    // cast votes
-    std::vector<std::pair<unsigned, float>> results;
-    m_hough_space->reset();
-    for(int vid = 0; vid < votelist.size(); vid++)
-    {
-        Eigen::Vector3d vote(votelist[vid].x(), votelist[vid].y(), votelist[vid].z());
-        // voting with interpolation
-        // votes are in the same order as correspondences, vid is therefore the index in the correspondence list
-        m_hough_space->voteInt(vote, 1.0, vid);
-    }
-    // find maxima for this class id
-    float m_relThreshold = m_th; // TODO VS check this param
+    // cast votes and retrieve maxima
     std::vector<double> maxima;
-    std::vector<std::vector<int>> voteIndices;
-    m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
+    std::vector<std::vector<int>> vote_indices;
+    float relative_threshold = m_th; // minimal weight of a maximum in percent of highest maximum to be considered a hypothesis
+    bool use_distance_weight = false;
+    castVotesAndFindMaxima(object_scene_corrs, votelist, relative_threshold, use_distance_weight,
+                           maxima, vote_indices, m_hough_space);
+
+    std::cout << "Found " << maxima.size() << " maxima" << std::endl;
 
     // TODO VS: selber experimentieren mit
     // #include <pcl/registration/transformation_estimation.h>
@@ -889,158 +858,27 @@ Hough3d::findObjects(
 
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;
-    std::vector<Eigen::Vector3f> positions;
     std::vector<pcl::Correspondences> model_instances;
-    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
-    corr_rejector.setMaximumIterations(10000);
-    corr_rejector.setInlierThreshold(m_bin_size(0));
-    corr_rejector.setInputSource(m_scene_keypoints);
-    corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
-    //corr_rejector.setRefineModel(true); // slightly worse results
+    bool refine_model = false;
+    float inlier_threshold = m_bin_size(0);
+    generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, m_scene_keypoints, object_keypoints,
+                                              inlier_threshold, refine_model, use_hv, transformations, model_instances);
 
-    for(size_t j = 0; j < maxima.size (); ++j)
-    {
-        pcl::Correspondences temp_corrs, filtered_corrs;
-        for (size_t i = 0; i < voteIndices[j].size(); ++i)
-        {
-            temp_corrs.push_back(object_scene_corrs->at(voteIndices[j][i]));
-        }
-
-        if(use_hv)
-        {
-            // skip maxima with insufficient votes for ransac
-            if(temp_corrs.size() < 3)
-            {
-                continue;
-            }
-            // correspondence rejection with ransac
-            corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
-            Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
-            // save transformations for recognition
-            if(!best_transform.isIdentity(0.01))
-            {
-                // keep transformation and correspondences if RANSAC was run successfully
-                transformations.push_back(best_transform);
-                model_instances.push_back(filtered_corrs);
-            }
-        }
-        else
-        {
-            model_instances.push_back(temp_corrs);
-        }
-    }
+    std::cout << "Remaining hypotheses after RANSAC: " << model_instances.size() << std::endl;
 
     // process remaining hypotheses
+    results.clear();
+    positions.clear();
     for(const pcl::Correspondences &filtered_corrs : model_instances)
     {
         unsigned res_class;
         int res_num_votes;
         Eigen::Vector3f res_position;
-        findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-                                        object_center_vectors, res_class, res_num_votes, res_position);
+        findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features, object_center_vectors,
+                                        m_number_of_classes, res_class, res_num_votes, res_position);
         results.push_back({res_class, res_num_votes});
         positions.push_back(res_position);
     }
-
-    return std::make_tuple(results, positions);
-}
-
-
-void Hough3d::findClassAndPositionFromCluster(
-        const pcl::Correspondences &filtered_corrs,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-        const std::vector<Eigen::Vector3f> &object_center_vectors,
-        unsigned &resulting_class,
-        int &resulting_num_votes,
-        Eigen::Vector3f &resulting_position) const
-{
-    // determine position based on filtered correspondences for each remaining class
-    // (ideally, only one class remains after filtering)
-    std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
-    std::vector<int> num_votes(m_number_of_classes);
-    // init
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
-        num_votes[temp_idx] = 0;
-    }
-    // compute
-    for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
-    {
-        unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-        const ISMFeature &cur_feat = object_features->at(match_idx);
-        unsigned class_id = cur_feat.classId;
-
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
-        const ISMFeature &scene_feat = scene_features->at(scene_idx);
-        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
-        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
-        Eigen::Vector3f vote = object_center_vectors.at(match_idx);
-        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
-        all_centers[class_id] += pos;
-        num_votes[class_id] += 1;
-    }
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] /= num_votes[temp_idx];
-    }
-    // find class with max votes
-    unsigned cur_class = 0;
-    int cur_best_num = 0;
-    for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
-    {
-        if(num_votes[class_idx] > cur_best_num)
-        {
-            cur_best_num = num_votes[class_idx];
-            cur_class = class_idx;
-        }
-    }
-
-    // fill in results
-    resulting_class = cur_class;
-    resulting_num_votes = cur_best_num;
-    resulting_position = all_centers[cur_class];
-}
-
-
-pcl::CorrespondencesPtr Hough3d::findNnCorrespondences(
-        const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-        const float matching_threshold) const
-{
-    pcl::CorrespondencesPtr model_scene_corrs(new pcl::Correspondences());
-
-    // loop over all features extracted from the scene
-    #pragma omp parallel for
-    for(int fe = 0; fe < scene_features->size(); fe++)
-    {
-        // insert the query point
-        ISMFeature feature = scene_features->at(fe);
-        flann::Matrix<float> query(new float[feature.descriptor.size()], 1, feature.descriptor.size());
-        for(int i = 0; i < feature.descriptor.size(); i++)
-        {
-            query[0][i] = feature.descriptor.at(i);
-        }
-
-        // prepare results
-        std::vector<std::vector<int>> indices;
-        std::vector<std::vector<float>> distances;
-        m_flann_index.knnSearch(query, indices, distances, 1, flann::SearchParams(128));
-
-        delete[] query.ptr();
-
-        if(distances[0][0] < matching_threshold)
-        {
-            // query index is scene, match is codebook ("object")
-            pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
-            #pragma omp critical
-            {
-                model_scene_corrs->push_back(corr);
-            }
-        }
-    }
-
-    return model_scene_corrs;
 }
 
 

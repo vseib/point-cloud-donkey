@@ -92,18 +92,11 @@ private:
 
     flann::Matrix<float> createFlannDataset();
 
-    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
-                                            findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                        const bool use_hv);
-
-    void findClassAndPositionFromCluster(
-            const pcl::Correspondences &filtered_corrs,
-            const pcl::PointCloud<ISMFeature>::Ptr object_features,
-            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-            const std::vector<Eigen::Vector3f> &object_center_vectors,
-            unsigned &resulting_class,
-            int &resulting_num_votes,
-            Eigen::Vector3f &resulting_position) const;
+    void findObjects(
+            const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+            const bool use_hv,
+            std::vector<std::pair<unsigned, float>> &results,
+            std::vector<Eigen::Vector3f> &positions);
 
     std::vector<std::pair<unsigned, float>> classifyObjectsWithSeparateVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
     std::vector<std::pair<unsigned, float>> classifyObjectsWithUnifiedVotingSpaces(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
@@ -113,10 +106,6 @@ private:
                          std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const;
 
     bool loadModelFromFile(std::string& filename);
-
-    pcl::CorrespondencesPtr findNnCorrespondences(
-            const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-            const float matching_threshold) const;
 
     std::map<unsigned, std::string> m_class_labels;
     std::map<unsigned, std::string> m_instance_labels;
