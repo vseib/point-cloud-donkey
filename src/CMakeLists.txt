@@ -107,12 +107,14 @@ target_link_libraries(eval_pipeline_mccann implicit_shape_model ${Boost_LIBRARIE
 add_executable(eval_pipeline_tombari
     eval_pipelines/eval_pipeline_tombari/eval_hough3d.cpp
     eval_pipelines/eval_pipeline_tombari/hough3d.cpp
+    eval_pipelines/pipeline_building_blocks/pipeline_building_blocks.cpp
 )
 target_link_libraries(eval_pipeline_tombari implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(eval_pipeline_tombari_detection
     eval_pipelines/eval_pipeline_tombari/eval_hough3d_detection.cpp
     eval_pipelines/eval_pipeline_tombari/hough3d.cpp
+    eval_pipelines/pipeline_building_blocks/pipeline_building_blocks.cpp
 )
 target_link_libraries(eval_pipeline_tombari_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
