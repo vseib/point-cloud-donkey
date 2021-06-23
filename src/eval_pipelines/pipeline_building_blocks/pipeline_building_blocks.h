@@ -40,7 +40,7 @@ void castVotesAndFindMaxima(
 void generateClassificationHypotheses(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
-        const pcl::PointCloud<ISMFeature>::Ptr codebook_features,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<std::pair<unsigned, float>> &results);
 
 void generateHypothesesWithAbsoluteOrientation(

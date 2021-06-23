@@ -131,7 +131,7 @@ void castVotesAndFindMaxima(
 void generateClassificationHypotheses(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
-        const pcl::PointCloud<ISMFeature>::Ptr codebook_features,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<std::pair<unsigned, float>> &results)
 {
     // check all maxima since highest valued maximum might still be composed of different class votes
@@ -150,7 +150,7 @@ void generateClassificationHypotheses(
         for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++)
         {
             unsigned match_idx = max_corrs.at(fcorr_idx).index_match;
-            const ISMFeature &cur_feat = codebook_features->at(match_idx);
+            const ISMFeature &cur_feat = object_features->at(match_idx);
             unsigned class_id = cur_feat.classId;
             // add occurence of this class_id
             if(class_occurences.find(class_id) != class_occurences.end())
@@ -166,12 +166,12 @@ void generateClassificationHypotheses(
         // determine most frequent label
         unsigned cur_class = 0;
         int cur_best_num = 0;
-        for(auto occ_elem : class_occurences)
+        for(auto [class_id, num_votes] : class_occurences)
         {
-            if(occ_elem.second > cur_best_num)
+            if(num_votes > cur_best_num)
             {
-                cur_best_num = occ_elem.second;
-                cur_class = occ_elem.first;
+                cur_best_num = num_votes;
+                cur_class = class_id;
             }
         }
         results.push_back({cur_class, cur_best_num});

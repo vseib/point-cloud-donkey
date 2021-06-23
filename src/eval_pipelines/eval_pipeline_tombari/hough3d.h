@@ -61,39 +61,11 @@ public:
 
 private:
 
-    pcl::PointCloud<ISMFeature>::Ptr processPointCloud(pcl::PointCloud<PointT>::Ptr cloud);
-
-    void computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
-                        pcl::PointCloud<pcl::Normal>::Ptr& normals,
-                        pcl::search::Search<PointT>::Ptr searchTree) const;
-
-    void filterNormals(pcl::PointCloud<pcl::Normal>::Ptr normals,
-                       pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
-                       pcl::PointCloud<PointT>::Ptr cloud,
-                       pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const;
-
-    void computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints,
-                          pcl::PointCloud<PointT>::Ptr cloud) const;
-
-    void computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                       pcl::PointCloud<PointT>::Ptr keypoints,
-                                       pcl::PointCloud<PointT>::Ptr cloud,
-                                       pcl::search::Search<PointT>::Ptr searchTree) const;
-
-    void computeDescriptors(pcl::PointCloud<PointT>::Ptr cloud,
-                                   pcl::PointCloud<pcl::Normal>::Ptr normals,
-                                   pcl::PointCloud<PointT>::Ptr keypoints,
-                                   pcl::search::Search<PointT>::Ptr searchTree,
-                                   pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames,
-                                   pcl::PointCloud<ISMFeature>::Ptr &features) const;
-
-    void removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr features,
-                                     pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const;
-
     flann::Matrix<float> createFlannDataset();
 
     void findObjects(
             const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
             const bool use_hv,
             std::vector<std::pair<unsigned, float>> &results,
             std::vector<Eigen::Vector3f> &positions);
@@ -121,17 +93,10 @@ private:
     Eigen::Vector3d m_bin_size;
     std::shared_ptr<pcl::recognition::HoughSpace3D> m_hough_space;
 
-    float m_normal_radius;
-    float m_reference_frame_radius;
-    float m_feature_radius;
-    float m_keypoint_sampling_radius;
-    int m_normal_method;
-    std::string m_feature_type;
     float m_th;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
-    pcl::PointCloud<PointT>::Ptr m_scene_keypoints;
     pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
     std::vector<Eigen::Vector3f> m_center_vectors;
 
