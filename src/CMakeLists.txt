@@ -101,6 +101,8 @@ target_link_libraries(eval_pipeline_knopp ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 add_executable(eval_pipeline_mccann
     eval_pipelines/eval_pipeline_mccann/eval_lnbnn.cpp
     eval_pipelines/eval_pipeline_mccann/lnbnn.cpp
+    eval_pipelines/pipeline_building_blocks/pipeline_building_blocks.cpp
+    eval_pipelines/pipeline_building_blocks/feature_processing.cpp
 )
 target_link_libraries(eval_pipeline_mccann implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 

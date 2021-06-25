@@ -1,14 +1,13 @@
 #include "lnbnn.h"
 
 #include <pcl/io/pcd_io.h>
-#include <pcl/features/shot_omp.h>
-#include <pcl/features/shot_lrf_omp.h>
-#include <pcl/features/normal_3d_omp.h>
-#include <pcl/features/integral_image_normal.h>
-#include <pcl/filters/voxel_grid.h>
+
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
+
+#include "../pipeline_building_blocks/pipeline_building_blocks.h"
+#include "../pipeline_building_blocks/feature_processing.h" // provides namespace fp::
 
 /**
  * Implementation of the approach described in
@@ -23,22 +22,20 @@
 Lnbnn::Lnbnn() : m_features(new pcl::PointCloud<ISMFeature>()), m_flann_index(flann::KDTreeIndexParams(4))
 {
     // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
-    m_normal_radius = 0.05;
-    m_reference_frame_radius = 0.3;
-    m_feature_radius = 0.4;
-    m_keypoint_sampling_radius = 0.2;
-    m_k_search = 11;
-    m_normal_method = 1;
-    m_feature_type = "SHOT";
+    fp::normal_radius = 0.05;
+    fp::reference_frame_radius = 0.3;
+    fp::feature_radius = 0.4;
+    fp::keypoint_sampling_radius = 0.2;
+    fp::normal_method = 1;
+    fp::feature_type = "SHOT";
 
     // use this for datasets: washington, bigbird, ycb
-//    m_normal_radius = 0.005;
-//    m_reference_frame_radius = 0.05;
-//    m_feature_radius = 0.05;
-//    m_keypoint_sampling_radius = 0.02;
-//    m_k_search = 11;
-//    m_normal_method = 0;
-//    m_feature_type = "CSHOT";
+//    fp::normal_radius = 0.005;
+//    fp::reference_frame_radius = 0.05;
+//    fp::feature_radius = 0.05;
+//    fp::keypoint_sampling_radius = 0.02;
+//    fp::normal_method = 0;
+//    fp::feature_type = "CSHOT";
 }
 
 
@@ -79,16 +76,21 @@ void Lnbnn::train(const std::vector<std::string> &filenames,
             std::cerr << "ERROR: loading file " << file << std::endl;
         }
 
-        pcl::PointCloud<ISMFeature>::Ptr features_cleaned = processPointCloud(cloud);
-        for(ISMFeature& ismf : features_cleaned->points)
+        // all these pointers are initialized within the called method
+        pcl::PointCloud<PointT>::Ptr keypoints;
+        pcl::PointCloud<ISMFeature>::Ptr features;
+        pcl::PointCloud<pcl::Normal>::Ptr normals;
+        pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
+        processPointCloud(cloud, keypoints, features, normals, reference_frames);
+        for(ISMFeature& ismf : features->points)
         {
             ismf.classId = tr_class;
             ismf.instanceId = tr_instance;
         }
 
         // add computed features to map
-        (*all_features.at(tr_class)) += (*features_cleaned);
-        num_features += features_cleaned->size();
+        (*all_features.at(tr_class)) += (*features);
+        num_features += features->size();
     }
 
     std::cout << "Extracted " << num_features << " features." << std::endl;
@@ -114,8 +116,12 @@ std::vector<std::pair<unsigned, float>> Lnbnn::classify(const std::string &filen
         return std::vector<std::pair<unsigned, float>>();
     }
 
-    // extract features
-    pcl::PointCloud<ISMFeature>::Ptr features = processPointCloud(cloud);
+    // all these pointers are initialized within the called method
+    pcl::PointCloud<PointT>::Ptr keypoints;
+    pcl::PointCloud<ISMFeature>::Ptr features;
+    pcl::PointCloud<pcl::Normal>::Ptr normals;
+    pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
+    processPointCloud(cloud, keypoints, features, normals, reference_frames);
 
     // get class distances
     std::vector<std::pair<unsigned, float>> results = accumulateClassDistances(features);
@@ -140,281 +146,6 @@ bool Lnbnn::loadModel(std::string &filename)
     m_flann_index.buildIndex();
 
     return true;
-}
-
-
-pcl::PointCloud<ISMFeature>::Ptr Lnbnn::processPointCloud(pcl::PointCloud<PointT>::Ptr cloud) const
-{
-    // create search tree
-    pcl::search::Search<PointT>::Ptr searchTree;
-    searchTree = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
-
-    // compute normals
-    pcl::PointCloud<pcl::Normal>::Ptr normals;
-    computeNormals(cloud, normals, searchTree);
-
-    // filter normals
-    pcl::PointCloud<pcl::Normal>::Ptr normals_without_nan;
-    pcl::PointCloud<PointT>::Ptr cloud_without_nan;
-    filterNormals(normals, normals_without_nan, cloud, cloud_without_nan);
-
-    // compute keypoints
-    pcl::PointCloud<PointT>::Ptr keypoints;
-    computeKeypoints(keypoints, cloud_without_nan);
-
-    // compute reference frames
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
-    computeReferenceFrames(reference_frames, keypoints, cloud_without_nan, searchTree);
-
-    // compute descriptors
-    pcl::PointCloud<ISMFeature>::Ptr features;
-    computeDescriptors(cloud_without_nan, normals_without_nan, keypoints, searchTree, reference_frames, features);
-
-    // remove NAN features
-    pcl::PointCloud<ISMFeature>::Ptr features_cleaned;
-    removeNanDescriptors(features, features_cleaned);
-
-    return features_cleaned;
-}
-
-
-void Lnbnn::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
-                           pcl::PointCloud<pcl::Normal>::Ptr& normals,
-                           pcl::search::Search<PointT>::Ptr searchTree) const
-{
-    normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
-
-//    if(m_normal_method == 0 && cloud->isOrganized())
-//    {
-//        std::cout << " --- 1 --- " << std::endl;
-//        pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
-//        normalEst.setInputCloud(cloud);
-//        normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
-//        normalEst.setMaxDepthChangeFactor(0.02f);
-//        normalEst.setNormalSmoothingSize(10.0f);
-//        normalEst.useSensorOriginAsViewPoint();
-//        normalEst.compute(*normals);
-//    }
-//    else if(m_normal_method == 0 && !cloud->isOrganized())
-    if(m_normal_method == 0)
-    {
-         // prepare PCL normal estimation object
-        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(cloud);
-        normalEst.setNumberOfThreads(0);
-        normalEst.setSearchMethod(searchTree);
-        normalEst.setRadiusSearch(m_normal_radius);
-        normalEst.setViewPoint(0,0,0);
-        normalEst.compute(*normals);
-    }
-    else
-    {
-        // prepare PCL normal estimation object
-        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(cloud);
-        normalEst.setNumberOfThreads(0);
-        normalEst.setSearchMethod(searchTree);
-        normalEst.setRadiusSearch(m_normal_radius);
-
-        // move model to origin, then point normals away from origin
-        pcl::PointCloud<PointT>::Ptr model_no_centroid(new pcl::PointCloud<PointT>());
-        pcl::copyPointCloud(*cloud, *model_no_centroid);
-
-        // compute the object centroid
-        Eigen::Vector4f centroid4f;
-        pcl::compute3DCentroid(*model_no_centroid, centroid4f);
-        Eigen::Vector3f centroid(centroid4f[0], centroid4f[1], centroid4f[2]);
-        // remove centroid for normal computation
-        for(PointT& point : model_no_centroid->points)
-        {
-            point.x -= centroid.x();
-            point.y -= centroid.y();
-            point.z -= centroid.z();
-        }
-        normalEst.setInputCloud(model_no_centroid);
-        normalEst.setViewPoint(0,0,0);
-        normalEst.compute(*normals);
-        // invert normals
-        for(pcl::Normal& norm : normals->points)
-        {
-            norm.normal_x *= -1;
-            norm.normal_y *= -1;
-            norm.normal_z *= -1;
-        }
-    }
-}
-
-void Lnbnn::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr normals,
-                          pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
-                          pcl::PointCloud<PointT>::Ptr cloud,
-                          pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const
-{
-    std::vector<int> mapping;
-    normals_without_nan = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
-    pcl::removeNaNNormalsFromPointCloud(*normals, *normals_without_nan, mapping);
-
-    // create new point cloud without NaN normals
-    cloud_without_nan = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
-    for (int i = 0; i < (int)mapping.size(); i++)
-    {
-        cloud_without_nan->push_back(cloud->at(mapping[i]));
-    }
-}
-
-
-void Lnbnn::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr cloud) const
-{
-    pcl::VoxelGrid<PointT> voxelGrid;
-    voxelGrid.setInputCloud(cloud);
-    voxelGrid.setLeafSize(m_keypoint_sampling_radius, m_keypoint_sampling_radius, m_keypoint_sampling_radius);
-    keypoints = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
-    voxelGrid.filter(*keypoints);
-}
-
-
-void Lnbnn::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                   pcl::PointCloud<PointT>::Ptr keypoints,
-                                   pcl::PointCloud<PointT>::Ptr cloud,
-                                   pcl::search::Search<PointT>::Ptr searchTree) const
-{
-    reference_frames = pcl::PointCloud<pcl::ReferenceFrame>::Ptr(new pcl::PointCloud<pcl::ReferenceFrame>());
-    pcl::SHOTLocalReferenceFrameEstimationOMP<PointT, pcl::ReferenceFrame> refEst;
-    refEst.setRadiusSearch(m_reference_frame_radius);
-    refEst.setInputCloud(keypoints);
-    refEst.setSearchSurface(cloud);
-    refEst.setSearchMethod(searchTree);
-    refEst.compute(*reference_frames);
-
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr cleanReferenceFrames(new pcl::PointCloud<pcl::ReferenceFrame>());
-    pcl::PointCloud<PointT>::Ptr cleanKeypoints(new pcl::PointCloud<PointT>());
-    for(int i = 0; i < (int)reference_frames->size(); i++)
-    {
-        const pcl::ReferenceFrame& frame = reference_frames->at(i);
-        if(std::isfinite(frame.x_axis[0]) && std::isfinite(frame.y_axis[0]) && std::isfinite(frame.z_axis[0]))
-        {
-            cleanReferenceFrames->push_back(frame);
-            cleanKeypoints->push_back(keypoints->at(i));
-        }
-    }
-
-    keypoints = cleanKeypoints;
-    reference_frames = cleanReferenceFrames;
-}
-
-
-void Lnbnn::computeDescriptors(pcl::PointCloud<PointT>::Ptr cloud,
-                               pcl::PointCloud<pcl::Normal>::Ptr normals,
-                               pcl::PointCloud<PointT>::Ptr keypoints,
-                               pcl::search::Search<PointT>::Ptr searchTree,
-                               pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames,
-                               pcl::PointCloud<ISMFeature>::Ptr &features) const
-{
-    if(m_feature_type == "SHOT")
-    {
-        pcl::SHOTEstimationOMP<PointT, pcl::Normal, pcl::SHOT352> shotEst;
-        shotEst.setSearchSurface(cloud);
-        shotEst.setInputNormals(normals);
-        shotEst.setInputCloud(keypoints);
-        shotEst.setInputReferenceFrames(reference_frames);
-        shotEst.setSearchMethod(searchTree);
-        shotEst.setRadiusSearch(m_feature_radius);
-        pcl::PointCloud<pcl::SHOT352>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT352>());
-        shotEst.compute(*shot_features);
-
-        // create descriptor point cloud
-        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-        features->resize(shot_features->size());
-
-        for (int i = 0; i < (int)shot_features->size(); i++)
-        {
-            ISMFeature& feature = features->at(i);
-            const pcl::SHOT352& shot = shot_features->at(i);
-
-            // store the descriptor
-            feature.descriptor.resize(352);
-            for (int j = 0; j < feature.descriptor.size(); j++)
-                feature.descriptor[j] = shot.descriptor[j];
-        }
-    }
-    else if(m_feature_type == "CSHOT")
-    {
-        pcl::SHOTColorEstimationOMP<PointT, pcl::Normal, pcl::SHOT1344> shotEst;
-
-        // temporary workaround to fix race conditions in OMP version of CSHOT in PCL
-        if (shotEst.sRGB_LUT[0] < 0)
-        {
-          for (int i = 0; i < 256; i++)
-          {
-            float f = static_cast<float> (i) / 255.0f;
-            if (f > 0.04045)
-              shotEst.sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
-            else
-              shotEst.sRGB_LUT[i] = f / 12.92f;
-          }
-
-          for (int i = 0; i < 4000; i++)
-          {
-            float f = static_cast<float> (i) / 4000.0f;
-            if (f > 0.008856)
-              shotEst.sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
-            else
-              shotEst.sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
-          }
-        }
-
-        shotEst.setSearchSurface(cloud);
-        shotEst.setInputNormals(normals);
-        shotEst.setInputCloud(keypoints);
-        shotEst.setInputReferenceFrames(reference_frames);
-        shotEst.setSearchMethod(searchTree);
-        shotEst.setRadiusSearch(m_feature_radius);
-        pcl::PointCloud<pcl::SHOT1344>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT1344>());
-        shotEst.compute(*shot_features);
-
-        // create descriptor point cloud
-        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-        features->resize(shot_features->size());
-
-        for (int i = 0; i < (int)shot_features->size(); i++)
-        {
-            ISMFeature& feature = features->at(i);
-            const pcl::SHOT1344& shot = shot_features->at(i);
-
-            // store the descriptor
-            feature.descriptor.resize(1344);
-            for (int j = 0; j < feature.descriptor.size(); j++)
-                feature.descriptor[j] = shot.descriptor[j];
-        }
-    }
-}
-
-
-void Lnbnn::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr features,
-                                 pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const
-{
-    features_cleaned = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-    features_cleaned->header = features->header;
-    features_cleaned->height = 1;
-    features_cleaned->is_dense = false;
-    bool nan_found = false;
-    for(int a = 0; a < features->size(); a++)
-    {
-        ISMFeature fff = features->at(a);
-        for(int b = 0; b < fff.descriptor.size(); b++)
-        {
-            if(std::isnan(fff.descriptor.at(b)))
-            {
-                nan_found = true;
-                break;
-            }
-        }
-        if(!nan_found)
-        {
-            features_cleaned->push_back(fff);
-        }
-        nan_found = false;
-    }
-    features_cleaned->width = features_cleaned->size();
 }
 
 
@@ -449,7 +180,7 @@ std::vector<std::pair<unsigned, float>> Lnbnn::accumulateClassDistances(
         class_distances.push_back({i, 0.0f});
     }
 
-    int k_search = m_k_search;
+    int k_search = 11;
 
     // loop over all features extracted from the input model
     #pragma omp parallel for
