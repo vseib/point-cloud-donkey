@@ -194,7 +194,6 @@ std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &fil
         return std::vector<std::pair<unsigned, float>>();
     }
 
-    // extract features
     // all these pointers are initialized within the called method
     pcl::PointCloud<PointT>::Ptr keypoints;
     pcl::PointCloud<ISMFeature>::Ptr features;

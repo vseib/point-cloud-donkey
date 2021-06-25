@@ -5,7 +5,6 @@
 #include <string>
 #include <flann/flann.hpp>
 #include <pcl/features/feature.h>
-
 #include "../../implicit_shape_model/utils/ism_feature.h"
 
 using namespace ism3d;
