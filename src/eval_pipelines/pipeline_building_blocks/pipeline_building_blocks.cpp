@@ -193,8 +193,8 @@ void generateHypothesesWithAbsoluteOrientation(
     pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
     corr_rejector.setMaximumIterations(10000);
     corr_rejector.setInlierThreshold(inlier_threshold);
-    corr_rejector.setInputSource(scene_keypoints);
-    corr_rejector.setInputTarget(object_keypoints);
+    corr_rejector.setInputSource(object_keypoints);
+    corr_rejector.setInputTarget(scene_keypoints);
     corr_rejector.setRefineModel(refine_model); // slightly worse results if true
 
     for(size_t j = 0; j < vote_indices.size (); ++j)
