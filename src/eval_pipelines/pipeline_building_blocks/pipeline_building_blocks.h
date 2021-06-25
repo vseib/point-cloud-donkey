@@ -43,6 +43,11 @@ void generateClassificationHypotheses(
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<std::pair<unsigned, float>> &results);
 
+void generateClassificationHypotheses(
+        const std::vector<pcl::Correspondences> &clustered_corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        std::vector<std::pair<unsigned, float>> &results);
+
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,

@@ -134,17 +134,33 @@ void generateClassificationHypotheses(
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<std::pair<unsigned, float>> &results)
 {
-    // check all maxima since highest valued maximum might still be composed of different class votes
-    // therefore we need to count votes per class per maximum
-    results.clear();
+    std::vector<pcl::Correspondences> clustered_corrs;
     for (size_t j = 0; j < vote_indices.size (); ++j)
     {
-        std::map<unsigned, int> class_occurences;
         pcl::Correspondences max_corrs;
         for (size_t i = 0; i < vote_indices[j].size(); ++i)
         {
             max_corrs.push_back(object_scene_corrs->at(vote_indices[j][i]));
         }
+        clustered_corrs.push_back(max_corrs);
+    }
+
+    generateClassificationHypotheses(clustered_corrs, object_features, results);
+}
+
+
+void generateClassificationHypotheses(
+        const std::vector<pcl::Correspondences> &clustered_corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        std::vector<std::pair<unsigned, float>> &results)
+{
+    // check all maxima since highest valued maximum might still be composed of different class votes
+    // therefore we need to count votes per class per maximum
+    results.clear();
+    for (size_t j = 0; j < clustered_corrs.size (); ++j)
+    {
+        std::map<unsigned, int> class_occurences;
+        pcl::Correspondences max_corrs = clustered_corrs[j];
 
         // count class occurences in filtered corrs
         for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++)
@@ -179,6 +195,8 @@ void generateClassificationHypotheses(
 }
 
 
+
+
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
@@ -197,6 +215,7 @@ void generateHypothesesWithAbsoluteOrientation(
     corr_rejector.setInputTarget(scene_keypoints);
     corr_rejector.setRefineModel(refine_model); // slightly worse results if true
 
+    // correspondences were grouped by hough voting
     for(size_t j = 0; j < vote_indices.size (); ++j)
     {
         pcl::Correspondences temp_corrs, filtered_corrs;

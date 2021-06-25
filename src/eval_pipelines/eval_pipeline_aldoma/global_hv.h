@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <flann/flann.hpp>
-#include <pcl/features/feature.h>
+#include <pcl/correspondence.h>
 #include "../../implicit_shape_model/utils/ism_feature.h"
 #include "../../implicit_shape_model/voting/voting_maximum.h"
 
@@ -60,44 +60,23 @@ public:
 
 private:
 
-    pcl::PointCloud<ISMFeature>::Ptr processPointCloud(pcl::PointCloud<PointT>::Ptr cloud);
-
-    void computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
-                        pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                        pcl::search::Search<PointT>::Ptr searchTree) const;
-
-    void filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                       pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
-                       pcl::PointCloud<PointT>::Ptr &cloud,
-                       pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const;
-
-    void computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints,
-                          pcl::PointCloud<PointT>::Ptr &cloud) const;
-
-    void computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                       pcl::PointCloud<PointT>::Ptr &keypoints,
-                                       pcl::PointCloud<PointT>::Ptr &cloud,
-                                       pcl::search::Search<PointT>::Ptr &searchTree) const;
-
-    void computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
-                                   pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                                   pcl::PointCloud<PointT>::Ptr &keypoints,
-                                   pcl::search::Search<PointT>::Ptr &searchTree,
-                                   pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                   pcl::PointCloud<ISMFeature>::Ptr &features) const;
-
-    void removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &features,
-                                     pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const;
-
     flann::Matrix<float> createFlannDataset() const;
 
-    std::vector<std::pair<unsigned, float>> classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                           const bool use_hough) const;
+    void classifyObject(
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+            const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+            const bool use_hough,
+            std::vector<std::pair<unsigned, float>> &results) const;
 
-    std::tuple<std::vector<std::pair<unsigned, float> >, std::vector<Eigen::Vector3f> >
-                                            findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                                                        const pcl::PointCloud<PointT>::Ptr cloud,
-                                                        const bool use_hv, const bool use_global_hv) const;
+    std::tuple<std::vector<std::pair<unsigned, float>>, std::vector<Eigen::Vector3f> >
+                                            findObjects(
+            const pcl::PointCloud<PointT>::Ptr cloud,
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+            const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+            const bool use_hv, const bool use_global_hv) const;
+
     void findClassAndPositionFromCluster(
             const pcl::Correspondences &filtered_corrs,
             const pcl::PointCloud<ISMFeature>::Ptr object_features,
@@ -112,31 +91,19 @@ private:
 
     bool loadModelFromFile(std::string& filename);
 
-    pcl::CorrespondencesPtr findNnCorrespondences(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const;
-
     std::map<unsigned, std::string> m_class_labels;
     std::map<unsigned, std::string> m_instance_labels;
     std::map<unsigned, unsigned> m_instance_to_class_map;
 
-    float m_normal_radius;
-    float m_reference_frame_radius;
-    float m_feature_radius;
-    float m_keypoint_sampling_radius;
-    int m_k_search;
-    int m_normal_method;
-    std::string m_feature_type;
+    // TODO VS check these params
     float m_corr_threshold;
     float m_bin_size;
-
-    // TODO VS check these params
     int m_icp_max_iter;
     float m_icp_corr_distance;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features;
-    pcl::PointCloud<PointT>::Ptr m_scene_keypoints;
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr m_scene_lrf;
     std::vector<Eigen::Vector3f> m_center_vectors;
 
     flann::Index<flann::L2<float>> m_flann_index;
