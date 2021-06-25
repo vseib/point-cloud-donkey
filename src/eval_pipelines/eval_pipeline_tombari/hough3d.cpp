@@ -24,6 +24,17 @@
 // TODO VS: find good params for eval, in detection try additionally to sample 1000 key points per model in training and 3000 per
 // scene in testing as described by tombari in the paper
 
+/* params to verify:
+ *
+ ***** bin size, relThreshold
+ * with or without matching threshold
+ * with or without refine model
+ * with or without distance weight
+ *
+ *  * with or without hv --> am ende einmal mit besten params
+ */
+
+
 Hough3d::Hough3d(std::string dataset, float bin, float th) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
@@ -34,6 +45,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th) :
             dataset == "sh12" || dataset == "mn10" || dataset == "mn40")
     {
         /// classification
+        m_th = 0.1;
         m_min_coord = Eigen::Vector3d(-2.0, -2.0, -2.0);
         m_max_coord = Eigen::Vector3d(2.0, 2.0, 2.0);
         m_bin_size = Eigen::Vector3d(0.5, 0.5, 0.5);
@@ -49,9 +61,10 @@ Hough3d::Hough3d(std::string dataset, float bin, float th) :
     else if(dataset == "wash" || dataset == "bigbird" || dataset == "ycb")
     {
         /// classification
+        m_th = 0.1;
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
-        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02); // TODO VS find good params
+        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
@@ -65,7 +78,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th) :
         m_th = th;
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
-        m_bin_size = Eigen::Vector3d(bin, bin, bin); // TODO VS find good params
+        m_bin_size = Eigen::Vector3d(bin, bin, bin);
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
@@ -435,23 +448,11 @@ void Hough3d::findObjects(
 
     std::cout << "Found " << maxima.size() << " maxima" << std::endl;
 
-    // TODO VS: selber experimentieren mit
-    // #include <pcl/registration/transformation_estimation.h>
-    // oder
-    // #include <pcl/registration/transformation_estimation_svd.h>
-    // in Verbindung mit
-    // transformation_validation.h
-    // siehe auch:
-    // #include <pcl/sample_consensus/msac.h>
-    //
-    // siehe auch in OpenCV (es nutzt Ransac) und gibt eine Konfidenz: cv::estimateAffine3D
-    // (also eine Kombination aus pcl transformation estimation und transformation validation)
-
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;
     std::vector<pcl::Correspondences> model_instances;
     bool refine_model = false;
-    float inlier_threshold = m_bin_size(0);
+    float inlier_threshold = m_bin_size(0); // original implementation is only bin size
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                               inlier_threshold, refine_model, use_hv, transformations, model_instances);
 
