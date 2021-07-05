@@ -1,6 +1,8 @@
 #include "pipeline_building_blocks.h"
 #include "../../implicit_shape_model/utils/utils.h"
 
+#include <pcl/recognition/cg/hough_3d.h>
+#include <pcl/recognition/cg/geometric_consistency.h>
 #include <pcl/registration/correspondence_rejection_sample_consensus.h>
 
 
@@ -128,6 +130,58 @@ void castVotesAndFindMaxima(
 }
 
 
+void clusterCorrespondences(
+        const pcl::CorrespondencesPtr object_scene_corrs,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const bool use_distance_weight,
+        const float bin_size,
+        const float corr_threshold,
+        const float lrf_radius,
+        const bool use_hough,
+        const bool recognize,
+        std::vector<pcl::Correspondences> &clustered_corrs,
+        std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> &rototranslations)
+{
+    //  Using Hough3D - i.e. hypothesis generation of tombari
+    if(use_hough)
+    {
+        //  Clustering
+        pcl::Hough3DGrouping<PointT, PointT, pcl::ReferenceFrame, pcl::ReferenceFrame> clusterer;
+        clusterer.setHoughBinSize(bin_size);
+        clusterer.setHoughThreshold(corr_threshold);
+        clusterer.setUseInterpolation(true);
+        clusterer.setUseDistanceWeight(use_distance_weight);
+        clusterer.setInputRf(object_lrf);
+        clusterer.setSceneRf(scene_lrf);
+        clusterer.setLocalRfSearchRadius(lrf_radius);
+        clusterer.setInputCloud(object_keypoints);
+        clusterer.setSceneCloud(scene_keypoints);
+        clusterer.setModelSceneCorrespondences(object_scene_corrs);
+        if(recognize)
+            clusterer.recognize(rototranslations, clustered_corrs);
+        else
+            clusterer.cluster(clustered_corrs);
+    }
+    else // Using GeometricConsistency - i.e. hypothesis generation of chen (default in the aldoma pipeline)
+    {
+        pcl::GeometricConsistencyGrouping<PointT, PointT> gc_clusterer;
+        gc_clusterer.setGCSize(bin_size);
+        gc_clusterer.setGCThreshold(corr_threshold);
+        gc_clusterer.setInputCloud(object_keypoints);
+        gc_clusterer.setSceneCloud(scene_keypoints);
+        gc_clusterer.setModelSceneCorrespondences(object_scene_corrs);
+        gc_clusterer.cluster(clustered_corrs);
+        if(recognize)
+            gc_clusterer.recognize(rototranslations, clustered_corrs);
+        else
+            gc_clusterer.cluster(clustered_corrs);
+    }
+}
+
+
 void generateClassificationHypotheses(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
@@ -195,8 +249,6 @@ void generateClassificationHypotheses(
 }
 
 
-
-
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
@@ -224,13 +276,14 @@ void generateHypothesesWithAbsoluteOrientation(
             temp_corrs.push_back(object_scene_corrs->at(vote_indices[j][i]));
         }
 
+        // skip maxima with view votes, mostly FP
+        if(temp_corrs.size() < 3)
+        {
+            continue;
+        }
+
         if(use_hv)
         {
-            // skip maxima with insufficient votes for ransac
-            if(temp_corrs.size() < 3)
-            {
-                continue;
-            }
             // correspondence rejection with ransac
             corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
             Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();

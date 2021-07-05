@@ -69,21 +69,15 @@ private:
             const bool use_hough,
             std::vector<std::pair<unsigned, float>> &results) const;
 
-    std::tuple<std::vector<std::pair<unsigned, float>>, std::vector<Eigen::Vector3f> >
-                                            findObjects(
+    void findObjects(
             const pcl::PointCloud<PointT>::Ptr cloud,
             const pcl::PointCloud<ISMFeature>::Ptr scene_features,
             const pcl::PointCloud<PointT>::Ptr scene_keypoints,
             const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
-            const bool use_hv, const bool use_global_hv) const;
-
-    void findClassAndPositionFromCluster(
-            const pcl::Correspondences &filtered_corrs,
-            const pcl::PointCloud<ISMFeature>::Ptr object_features,
-            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-            unsigned &resulting_class,
-            int &resulting_num_votes,
-            Eigen::Vector3f &resulting_position) const;
+            const bool use_hv,
+            const bool use_global_hv,
+            std::vector<std::pair<unsigned, float>> &results,
+            std::vector<Eigen::Vector3f> &positions) const;
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,

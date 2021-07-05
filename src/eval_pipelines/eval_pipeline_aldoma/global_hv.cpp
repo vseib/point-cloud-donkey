@@ -2,8 +2,6 @@
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/correspondence.h>
-#include <pcl/recognition/cg/hough_3d.h>
-#include <pcl/recognition/cg/geometric_consistency.h>
 #include <pcl/registration/icp.h>
 #include <pcl/recognition/hv/hv_go.h>
 
@@ -233,7 +231,7 @@ std::vector<VotingMaximum> GlobalHV::detect(const std::string &filename,
     bool use_tombari_variant = use_hough;
     bool use_aldoma_hv = use_global_hv;
     findObjects(cloud, features, keypoints, reference_frames,
-                use_tombari_variant, use_aldoma_hv);
+                use_tombari_variant, use_aldoma_hv, results, positions);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -316,38 +314,15 @@ void GlobalHV::classifyObject(
     remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
             object_keypoints, object_features, object_center_vectors, object_lrf);
 
-
     // Actual Clustering
     std::vector<pcl::Correspondences> clustered_corrs;
-    //  Using Hough3D - i.e. hypothesis generation of tombari
-    if(use_hough)
-    {
-        //  Clustering
-        pcl::Hough3DGrouping<PointT, PointT, pcl::ReferenceFrame, pcl::ReferenceFrame> clusterer;
-        clusterer.setHoughBinSize(m_bin_size);
-        clusterer.setHoughThreshold(m_corr_threshold);
-        clusterer.setUseInterpolation(true);
-        clusterer.setUseDistanceWeight(false);
-        clusterer.setInputRf(object_lrf);
-        clusterer.setSceneRf(scene_lrf);
-        clusterer.setLocalRfSearchRadius(fp::reference_frame_radius);
-        clusterer.setInputCloud(object_keypoints);
-        clusterer.setSceneCloud(scene_keypoints);
-        clusterer.setModelSceneCorrespondences(object_scene_corrs);
-        clusterer.cluster(clustered_corrs);
-        //clusterer.recognize(rototranslations, clustered_corrs);
-    }
-    else // Using GeometricConsistency - i.e. hypothesis generation of chen (default in the aldoma pipeline)
-    {
-        pcl::GeometricConsistencyGrouping<PointT, PointT> gc_clusterer;
-        gc_clusterer.setGCSize(m_bin_size);
-        gc_clusterer.setGCThreshold(m_corr_threshold);
-        gc_clusterer.setInputCloud(object_keypoints);
-        gc_clusterer.setSceneCloud(scene_keypoints);
-        gc_clusterer.setModelSceneCorrespondences(object_scene_corrs);
-        gc_clusterer.cluster(clustered_corrs);
-        //gc_clusterer.recognize(rototranslations, clustered_corrs);
-    }
+    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
+    bool use_distance_weight = false;
+    bool recognize = false; // false for classification
+    clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
+                           scene_lrf, object_lrf, use_distance_weight, m_bin_size,
+                           m_corr_threshold, fp::reference_frame_radius, use_hough,
+                           recognize, clustered_corrs, rototranslations);
 
     std::cout << "Found " << clustered_corrs.size();
     if(clustered_corrs.size() != 1)
@@ -358,15 +333,15 @@ void GlobalHV::classifyObject(
     generateClassificationHypotheses(clustered_corrs, object_features, results);
 }
 
-
-
-std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
-GlobalHV::findObjects(
+void GlobalHV::findObjects(
         const pcl::PointCloud<PointT>::Ptr scene_cloud,
         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
-        const bool use_hough, const bool use_global_hv) const
+        const bool use_hough,
+        const bool use_global_hv,
+        std::vector<std::pair<unsigned, float>> &results,
+        std::vector<Eigen::Vector3f> &positions) const
 {
     // get model-scene correspondences
     // query index is scene, match index is codebook ("object")
@@ -385,53 +360,23 @@ GlobalHV::findObjects(
     remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
             object_keypoints, object_features, object_center_vectors, object_lrf);
 
-
-
-
     // Actual Clustering
-    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
     std::vector<pcl::Correspondences> clustered_corrs;
-
-    //  Using Hough3D - i.e. hypothesis generation of tombari
-    if(use_hough)
-    {
-        //  Clustering
-        pcl::Hough3DGrouping<PointT, PointT, pcl::ReferenceFrame, pcl::ReferenceFrame> clusterer;
-        clusterer.setHoughBinSize(m_bin_size);
-        clusterer.setHoughThreshold(m_corr_threshold);
-        clusterer.setUseInterpolation(true);
-        clusterer.setUseDistanceWeight(false);
-        clusterer.setInputRf(object_lrf);
-        clusterer.setSceneRf(scene_lrf);
-        clusterer.setLocalRfSearchRadius(fp::reference_frame_radius);
-        clusterer.setInputCloud(object_keypoints);
-        clusterer.setSceneCloud(scene_keypoints);
-        clusterer.setModelSceneCorrespondences(object_scene_corrs);
-        //clusterer.cluster(clustered_corrs);
-        clusterer.recognize(rototranslations, clustered_corrs);
-    }
-    else // Using GeometricConsistency - i.e. hypothesis generation of chen (default in the aldoma pipeline)
-    {
-        pcl::GeometricConsistencyGrouping<PointT, PointT> gc_clusterer;
-        gc_clusterer.setGCSize(m_bin_size);
-        gc_clusterer.setGCThreshold(m_corr_threshold);
-        gc_clusterer.setInputCloud(object_keypoints);
-        gc_clusterer.setSceneCloud(scene_keypoints);
-        gc_clusterer.setModelSceneCorrespondences(object_scene_corrs);
-        //gc_clusterer.cluster(clustered_corrs);
-        gc_clusterer.recognize(rototranslations, clustered_corrs);
-    }
-
+    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
+    bool use_distance_weight = false;
+    bool recognize = true; // true for detection
+    clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
+                           scene_lrf, object_lrf, use_distance_weight, m_bin_size,
+                           m_corr_threshold, fp::reference_frame_radius, use_hough,
+                           recognize, clustered_corrs, rototranslations);
 
     // ------ this is where the aldoma contibution starts -------
-    std::vector<std::pair<unsigned, float>> results;
-    std::vector<Eigen::Vector3f> positions;
 
     // Stop if no instances
     if (rototranslations.size () <= 0)
     {
         std::cout << "No instances found!" << std::endl;
-        return std::make_tuple(results, positions);
+        return;
     }
     else
     {
@@ -510,6 +455,7 @@ GlobalHV::findObjects(
                 int res_num_votes;
                 Eigen::Vector3f res_position;
                 findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+                                                object_center_vectors, m_number_of_classes,
                                                 res_class, res_num_votes, res_position);
 
                 // find aligned position
@@ -534,80 +480,19 @@ GlobalHV::findObjects(
     //       tombari pipeline (i.e. executable "eval_pipeline_tombari_detection")
     else
     {
-        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima
+        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima/clusters
         {
             pcl::Correspondences filtered_corrs = clustered_corrs[j];
             unsigned res_class;
             int res_num_votes;
             Eigen::Vector3f res_position;
             findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+                                            object_center_vectors, m_number_of_classes,
                                             res_class, res_num_votes, res_position);
             results.push_back({res_class, res_num_votes});
             positions.push_back(res_position);
         }
     }
-
-    return std::make_tuple(results, positions);
-}
-
-
-//TODO refactor away
-void GlobalHV::findClassAndPositionFromCluster(
-        const pcl::Correspondences &filtered_corrs,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-        unsigned &resulting_class,
-        int &resulting_num_votes,
-        Eigen::Vector3f &resulting_position) const
-{
-    // determine position based on filtered correspondences for each remaining class
-    // (ideally, only one class remains after filtering)
-    std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
-    std::vector<int> num_votes(m_number_of_classes);
-    // init
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
-        num_votes[temp_idx] = 0;
-    }
-    // compute
-    for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
-    {
-        // match_idx refers to the modified list, not the original codebook!!!
-        unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-        // const ISMFeature &cur_feat = m_features->at(match_idx);
-        const ISMFeature &cur_feat = object_features->at(match_idx);
-        unsigned class_id = cur_feat.classId;
-
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
-        const ISMFeature &scene_feat = scene_features->at(scene_idx);
-        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
-        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
-        Eigen::Vector3f vote = m_center_vectors.at(match_idx);
-        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
-        all_centers[class_id] += pos;
-        num_votes[class_id] += 1;
-    }
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] /= num_votes[temp_idx];
-    }
-    // find class with max votes
-    unsigned cur_class = 0;
-    int cur_best_num = 0;
-    for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
-    {
-        if(num_votes[class_idx] > cur_best_num)
-        {
-            cur_best_num = num_votes[class_idx];
-            cur_class = class_idx;
-        }
-    }
-
-    // fill in results
-    resulting_class = cur_class;
-    resulting_num_votes = cur_best_num;
-    resulting_position = all_centers[cur_class];
 }
 
 

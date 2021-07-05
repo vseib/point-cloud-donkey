@@ -37,6 +37,21 @@ void castVotesAndFindMaxima(
         std::vector<std::vector<int>> &vote_indices,
         std::shared_ptr<pcl::recognition::HoughSpace3D> &hough_space);
 
+void clusterCorrespondences(
+        const pcl::CorrespondencesPtr object_scene_corrs,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const bool use_distance_weight,
+        const float bin_size,
+        const float corr_threshold,
+        const float lrf_radius,
+        const bool use_hough,
+        const bool recognize,
+        std::vector<pcl::Correspondences> &clustered_corrs,
+        std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> &rototranslations);
+
 void generateClassificationHypotheses(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
