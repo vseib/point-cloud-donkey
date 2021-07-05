@@ -91,10 +91,10 @@ public:
             }
             else if(class_ids[0] == class_ids[1] && class_ids[0] != class_ids[2])
             {
-                // if k1 and k2 are same class ...
-                if(distances[0][0] / distances[0][2] < m_distance_ratio_threshold)
+                // if k1 and k2 are same class
+                if(distances[0][1] / distances[0][2] < m_distance_ratio_threshold)
                 {
-                    // accept if valid distance ratio between k1 and k3 (TODO VS: or k2 and k3?)
+                    // accept if valid distance ratio between k2 and k3 (TODO VS: or k1 and k3?)
                     activatedCodewords.push_back(codewords[indices[0][0]]);
                     std::cout << " ---- case 2" << std::endl;
                 }
