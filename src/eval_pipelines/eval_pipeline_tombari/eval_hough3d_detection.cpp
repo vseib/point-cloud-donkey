@@ -49,7 +49,7 @@
 
 int main (int argc, char** argv)
 {
-    if(argc != 5)
+    if(argc != 3)
     {
         std::cout << std::endl << "Usage:" << std::endl << std::endl;
         std::cout << argv[0] << " [dataset file] [model name]" << std::endl << std::endl;
@@ -71,8 +71,6 @@ int main (int argc, char** argv)
     // input data
     std::string dataset = argv[1];
     std::string model = argv[2];
-    float bin = atof(argv[3]);
-    float th = atof(argv[4]);
 
     // parse input
     std::vector<std::string> filenames;
@@ -84,9 +82,10 @@ int main (int argc, char** argv)
     // find dataset name from input file
     std::string datasetname;
     int pos1 = dataset.find_first_of('_');
-    int pos2 = dataset.find_last_of('_');
     std::string str1 = dataset.substr(0, pos1);
-    std::string str2 = dataset.substr(pos1+1, pos2-pos1-1);
+    int pos2 = dataset.substr(pos1+1).find_first_of('_');
+    std::string str2 = dataset.substr(pos1+1, pos2);
+
     if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
     {
         datasetname = str2;
@@ -96,7 +95,7 @@ int main (int argc, char** argv)
         datasetname = str1;
     }
 
-    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname, bin, th));
+    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname));
 
     // workaround to set "mode"
     {
@@ -198,7 +197,7 @@ int main (int argc, char** argv)
             std::vector<DetectionObject> detected_objects;
 
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
-            std::ofstream summaryFile("output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_"+outputname);
+            std::ofstream summaryFile("output_tombari_"+outputname);
 
             for(unsigned i = 0; i < filenames.size(); i++)
             {

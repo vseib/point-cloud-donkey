@@ -18,7 +18,7 @@ class Hough3d
 {
 
 public:
-    Hough3d(std::string dataset, float bin=-1, float th=-1);
+    Hough3d(std::string dataset);
 
     virtual ~Hough3d()
     {
