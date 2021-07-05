@@ -29,6 +29,19 @@
  */
 
 
+// TODO VS: selber experimentieren mit
+// #include <pcl/registration/transformation_estimation.h>
+// oder
+// #include <pcl/registration/transformation_estimation_svd.h>
+// in Verbindung mit
+// transformation_validation.h
+// siehe auch:
+// #include <pcl/sample_consensus/msac.h>
+//
+// siehe auch in OpenCV (es nutzt Ransac) und gibt eine Konfidenz: cv::estimateAffine3D
+// (also eine Kombination aus pcl transformation estimation und transformation validation)
+
+
 SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_scene_keypoints(new pcl::PointCloud<PointT>()),
@@ -215,15 +228,6 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl:
     // --> this requires to have separate codebooks for matching, otherwise transformations won't make sense
     // alternative with a common codebook: matching threshold
 
-    // TODO VS: own idea for filtering:
-    // match knn with k = 3
-    // if all are same class -> accept
-    // if k1 and k2 are same class
-    //       -> accept if valid distance ratio between k1 and k3
-    // otherwise: distance ratio between k1 and k2 -> accept or discard
-    // if k2 and k3 are same, but different from k1, accept k2 if distance ratio k1-k2 invalid?
-    // if all are different
-    //      -> accept if valid distance ratio between k1 and k2
 
     // object keypoints are simply the matched keypoints from the codebook
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
