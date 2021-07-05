@@ -330,7 +330,7 @@ namespace ism3d
         bool m_instance_labels_primary;
 
         // TODO VS temp
-        static int m_counter;
+        inline static int m_counter = 0;
         double getElapsedTime(boost::timer::cpu_timer timer, std::string format);
         std::map<std::string, double> m_processing_times;
     };

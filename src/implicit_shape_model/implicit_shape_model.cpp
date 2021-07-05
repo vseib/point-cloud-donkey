@@ -69,8 +69,6 @@
 #include <log4cxx/consoleappender.h>
 #include <log4cxx/basicconfigurator.h>
 
-// TODO VS temp for debug
-int ism3d::ImplicitShapeModel::m_counter = 0;
 
 namespace ism3d
 {
