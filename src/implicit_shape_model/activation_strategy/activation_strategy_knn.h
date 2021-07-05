@@ -77,7 +77,7 @@ public:
             float dist1 = distances[0][0];
             float dist2 = distances[0][1];
             // if distance is too close, consider the match random
-            if(dist1/dist2 > m_distance_ratio_threshold)
+            if(dist1/dist2 < m_distance_ratio_threshold)
             {
                 indices[0].clear();
             }
