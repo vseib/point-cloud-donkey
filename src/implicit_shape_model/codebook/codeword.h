@@ -37,8 +37,9 @@ namespace ism3d
          * @param data the data vector
          * @param numFeatures the number of features from which the codeword was learned
          * @param weight computed weight of the descriptor that represents the codeword
+         * @param class_id class id of this codeword if created from exactly 1 feature
          */
-        Codeword(const std::vector<float>& data, int numFeatures, float weight);
+        Codeword(const std::vector<float>& data, int numFeatures, float weight, int class_id = -1);
 
         /**
          * @brief Set or change the data vector.
@@ -68,6 +69,11 @@ namespace ism3d
 
         float getWeight() const;
 
+        int getClassId() const
+        {
+            return m_class_id;
+        }
+
         const std::vector<Eigen::Vector3f>& getFeaturePositions() const;
 
     protected:
@@ -77,10 +83,11 @@ namespace ism3d
 
     private:
         static int m_maxId;
-        int m_id;
+        int m_id; // codeword id
         float m_weight; // descriptor weight
         std::vector<float> m_data; // this is the descriptor
         int m_numFeatures;
+        int m_class_id; // only makes sense if codeword is created from exactly 1 feature
     };
 }
 

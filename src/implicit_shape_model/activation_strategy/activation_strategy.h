@@ -63,7 +63,7 @@ namespace ism3d
 
         bool m_use_distance_ratio;
         float m_distance_ratio_threshold;
-        bool m_is_detection;
+        bool m_is_detection; // indicates whether training or detection/testing is running
     };
 }
 

@@ -18,6 +18,7 @@
 #include "codeword_distribution.h"
 #include "../activation_strategy/activation_strategy.h"
 #include "../activation_strategy/activation_strategy_knn.h"
+#include "../activation_strategy/activation_strategy_knn_rule.h"
 #include "../activation_strategy/activation_strategy_inn.h"
 #include "../activation_strategy/activation_strategy_threshold.h"
 
@@ -117,12 +118,19 @@ void Codebook::activate(const std::vector<std::shared_ptr<Codeword>> &codewords,
                 const ISMFeature& feature = modelFeatures->at(j);
                 std::vector<std::shared_ptr<Codeword>> activatedCodewords;
 
+                // TODO VS: refactor activation strategies to always use the activate method without typecast
                 // activate codeword with the current feature
                 if(m_activationStrategy->getType() == "KNN")
                 {
                     ActivationStrategyKNN* asknn = dynamic_cast<ActivationStrategyKNN*>(m_activationStrategy);
                     activatedCodewords = asknn->activateKNN(feature, codewords, index, flann_exact_match);
                 }
+                else if(m_activationStrategy->getType() == "KNNRule")
+                {
+                    ActivationStrategyKnnRule* asknnrule = dynamic_cast<ActivationStrategyKnnRule*>(m_activationStrategy);
+                    activatedCodewords = asknnrule->activateKNN(feature, codewords, index, flann_exact_match);
+                }
+                // TODO VS get rid of INN - too slow too bad
                 else if(m_activationStrategy->getType() == "INN")
                 {
                     ActivationStrategyINN* asinn = dynamic_cast<ActivationStrategyINN*>(m_activationStrategy);

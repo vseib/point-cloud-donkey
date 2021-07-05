@@ -15,11 +15,13 @@ namespace ism3d
 {
     int Codeword::m_maxId = 0;
 
-    Codeword::Codeword(const std::vector<float>& data, int numFeatures, float weight)
+    Codeword::Codeword(const std::vector<float>& data, int numFeatures, float weight, int class_id)
     {
         m_data = std::vector<float>(data);
         m_numFeatures = numFeatures;
         m_weight = weight;
+
+        m_class_id = class_id;
 
         m_id = m_maxId;
         m_maxId++;

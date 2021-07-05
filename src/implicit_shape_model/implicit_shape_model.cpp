@@ -418,8 +418,11 @@ void ImplicitShapeModel::train()
     std::vector<std::shared_ptr<Codeword>> codewords;
     for (int i = 0; i < (int)clusterCenters.size(); i++)
     {
+        // adding the class id to codewords as workaround: need to have class access during activation
+        unsigned cur_class = allFeatures_ranked->at(i).classId;
+
          // init with uniform weights // TODO VS: codeword weight is never anything else than 1.0f - remove??
-        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f));
+        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f, cur_class));
         codewords.push_back(codeword);
     }
 

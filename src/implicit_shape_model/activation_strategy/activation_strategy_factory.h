@@ -14,6 +14,7 @@
 #include "../utils/factory.h"
 #include "activation_strategy_threshold.h"
 #include "activation_strategy_knn.h"
+#include "activation_strategy_knn_rule.h"
 #include "activation_strategy_inn.h"
 
 namespace ism3d
@@ -23,6 +24,8 @@ namespace ism3d
     {
         if (type == ActivationStrategyKNN::getTypeStatic())
             return new ActivationStrategyKNN();
+        else if (type == ActivationStrategyKnnRule::getTypeStatic())
+            return new ActivationStrategyKnnRule();
         else if (type == ActivationStrategyINN::getTypeStatic())
             return new ActivationStrategyINN();
         else if (type == ActivationStrategyThreshold::getTypeStatic())

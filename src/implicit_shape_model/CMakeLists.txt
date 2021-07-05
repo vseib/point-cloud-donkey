@@ -61,6 +61,7 @@ add_library(implicit_shape_model
     activation_strategy/activation_strategy.cpp
     activation_strategy/activation_strategy_threshold.cpp
     activation_strategy/activation_strategy_knn.cpp
+    activation_strategy/activation_strategy_knn_rule.cpp
     activation_strategy/activation_strategy_inn.cpp
     classifier/custom_SVM.cpp
     classifier/global_classifier.cpp
