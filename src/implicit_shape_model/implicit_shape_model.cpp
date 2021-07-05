@@ -264,8 +264,9 @@ void ImplicitShapeModel::train()
             point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
 
-            // TODO VS: refactor this param to m_color_transform
-            // ZERO, NORMAL_XYZ, JET
+
+
+            // TODO VS: remove this completely
             if(m_set_color_to_zero)
             {
                 LOG_INFO("Setting color to 0 in loaded point cloud");
@@ -276,7 +277,6 @@ void ImplicitShapeModel::train()
                     point_cloud->at(i).b = 0;
                 }
             }
-            // TODO VS: refactor this param to m_color_transform
             bool normal_xyz_color_transform = false;
             if(normal_xyz_color_transform)
             {
@@ -289,22 +289,24 @@ void ImplicitShapeModel::train()
                     point_cloud->at(i).b = point.normal_x * 255.0f;
                 }
             }
-            // TODO VS: refactor this param to m_color_transform
             bool jet_color_transform = false;
             if(jet_color_transform)
             {
                 LOG_INFO("Setting color to JET color scheme in loaded point cloud");
                 for(int i = 0; i < point_cloud->size(); i++)
                 {
-//                    const PointNormalT point = point_cloud->at(i);
-//                    point_cloud->at(i).r = point.normal_x / 255.0f;
-//                    point_cloud->at(i).g = point.normal_y / 255.0f;
-//                    point_cloud->at(i).b = point.normal_z / 255.0f;
+                    // note: assuming x,y,z are in [-1|1]
+                    point_cloud->at(i).r = 127.5f + (point_cloud->at(i).x * 127.5f);
+                    point_cloud->at(i).g = 127.5f + (point_cloud->at(i).y * 127.5f);
+                    point_cloud->at(i).b = 127.5f + (point_cloud->at(i).z * 127.5f);
                 }
 //                std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
 //                LOG_INFO("now saving, name is: "+ name);
 //                pcl::io::savePCDFileASCII(name, *point_cloud);
             }
+
+
+
 
 
             // compute bounding box
@@ -381,7 +383,7 @@ void ImplicitShapeModel::train()
     }
 
     // store average sizes as a hint for bandwidth during detection
-    m_voting->determineAverageBoundingBoxDimensions(boundingBoxes);
+    m_voting->determineAverageBoundingBoxDimensions(boundingBoxes); // TODO VS: remove this if inferior to standard params
     // forward global feature to voting class to store them
     m_voting->forwardGlobalFeatures(globalFeatures);
 
@@ -1661,6 +1663,7 @@ std::map<unsigned, pcl::PointCloud<PointT>::Ptr > ImplicitShapeModel::analyzeVot
 
     return all_votings;
 }
+
 
 void ImplicitShapeModel::addMaximaForDebug(std::map<unsigned, pcl::PointCloud<PointT>::Ptr > &all_votings,
                                            std::vector<VotingMaximum> &positions)
