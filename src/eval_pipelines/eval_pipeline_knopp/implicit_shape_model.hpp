@@ -1005,14 +1005,33 @@ pcl::ism::ImplicitShapeModelEstimation<FeatureSize, PointT, NormalT>::clusterDes
       number_of_clusters_ = (unsigned) (cluster_rate_ * histograms.size());
 
   labels.resize (histograms.size(), 1);
-  computeKMeansClustering (
-    points_to_cluster,
-    number_of_clusters_,
-    labels,
-    TermCriteria(TermCriteria::EPS|TermCriteria::COUNT, 10, 0.01f),//1000
-    1, // 5
-    PP_CENTERS,
-    clusters_centers);
+
+//  if(number_of_clusters_ == histograms.size ())
+//  {
+//      // this means no clustering
+//      clusters_centers = points_to_cluster;
+//      for (unsigned int i_label = 0; i_label < number_of_clusters_; i_label++)
+//      {
+//          labels (i_label, 0) = i_label; // label means here "cluster id", not ground truth class label!
+//      }
+//  }
+//  else
+//  {
+      computeKMeansClustering (
+        points_to_cluster,
+        number_of_clusters_,
+        labels,
+        TermCriteria(TermCriteria::EPS|TermCriteria::COUNT, 10, 0.01f),//1000
+        1, // 5
+        PP_CENTERS,
+        clusters_centers);
+//  }
+
+//      for(int i = 0; i < number_of_clusters_; i++)
+//      {
+//          std::cout << labels(i,0) << "  ";
+//      }
+
 
   return (true);
 }
