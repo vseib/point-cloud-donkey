@@ -72,6 +72,7 @@ namespace ism3d
         oa << m_numFeatures;
         oa << m_weight;
         oa << m_data;
+        oa << m_class_id;
     }
 
     bool Codeword::iLoadData(boost::archive::binary_iarchive &ia)
@@ -80,6 +81,7 @@ namespace ism3d
         ia >> m_numFeatures;
         ia >> m_weight;
         ia >> m_data;
+        ia >> m_class_id;
 
         return true;
     }
