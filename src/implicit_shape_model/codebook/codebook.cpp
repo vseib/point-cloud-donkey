@@ -492,6 +492,11 @@ void Codebook::castVotes(pcl::PointCloud<ISMFeature>::Ptr features,
             ActivationStrategyKNN* asknn = dynamic_cast<ActivationStrategyKNN*>(m_activationStrategy);
             activatedCodewords = asknn->activateKNN(feature, codewords, index, flann_exact_match);
         }
+        else if(m_activationStrategy->getType() == "KNNRule")
+        {
+            ActivationStrategyKnnRule* asknnrule = dynamic_cast<ActivationStrategyKnnRule*>(m_activationStrategy);
+            activatedCodewords = asknnrule->activateKNN(feature, codewords, index, flann_exact_match);
+        }
         else if(m_activationStrategy->getType() == "INN")
         {
             ActivationStrategyINN* asinn = dynamic_cast<ActivationStrategyINN*>(m_activationStrategy);
@@ -856,7 +861,7 @@ bool Codebook::iLoadData(boost::archive::binary_iarchive &ia)
     m_codeword_dim = m_codewords.at(0)->getData().size();
 
     // fill list with partial codewords
-    if(m_use_partial_shot)
+    if(m_use_partial_shot) // TODO VS remove completely or at least into separate file
     {
         int hist_size = 11;
         std::string desc_type = "SHOT";
