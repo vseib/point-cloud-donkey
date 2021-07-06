@@ -64,7 +64,6 @@ public:
         std::vector<std::vector<int>> indices;
         std::vector<std::vector<float>> distances;
         flann::SearchParams params = flann_exact_match ? flann::SearchParams(-1) : flann::SearchParams(128);
-        std::cout << "-------------- m_k is  " << m_k << std::endl;
         index.knnSearch(query, indices, distances, 3, params);
 
         delete[] query.ptr();
@@ -87,7 +86,6 @@ public:
             {
                 // if all are same, accept match
                 activatedCodewords.push_back(codewords[indices[0][0]]);
-                std::cout << " ---- case 1" << std::endl;
             }
             else if(class_ids[0] == class_ids[1] && class_ids[0] != class_ids[2])
             {
@@ -96,7 +94,6 @@ public:
                 {
                     // accept if valid distance ratio between k2 and k3 (TODO VS: or k1 and k3?)
                     activatedCodewords.push_back(codewords[indices[0][0]]);
-                    std::cout << " ---- case 2" << std::endl;
                 }
             }
             else if(class_ids[0] != class_ids[1] && class_ids[1] == class_ids[2])
@@ -106,7 +103,6 @@ public:
                 {
                     // accept __k2__ if distance ratio k1-k2 INvalid? (TODO VS: AND k2-k3 valid?)
                     activatedCodewords.push_back(codewords[indices[0][1]]);
-                    std::cout << " ---- case 3" << std::endl;
                 }
             }
             else if(class_ids[0] != class_ids[1] && class_ids[1] != class_ids[2])
@@ -116,7 +112,6 @@ public:
                 {
                     // accept if valid distance ratio between k1 and k2
                     activatedCodewords.push_back(codewords[indices[0][0]]);
-                    std::cout << " ---- case 4" << std::endl;
                 }
             }
         }
