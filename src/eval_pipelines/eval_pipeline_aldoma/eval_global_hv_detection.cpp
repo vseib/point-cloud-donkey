@@ -90,9 +90,10 @@ int main (int argc, char** argv)
     // find dataset name from input file
     std::string datasetname;
     int pos1 = dataset.find_first_of('_');
-    int pos2 = dataset.find_last_of('_');
     std::string str1 = dataset.substr(0, pos1);
-    std::string str2 = dataset.substr(pos1+1, pos2-pos1-1);
+    int pos2 = dataset.substr(pos1+1).find_first_of('_');
+    std::string str2 = dataset.substr(pos1+1, pos2);
+
     if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
     {
         datasetname = str2;

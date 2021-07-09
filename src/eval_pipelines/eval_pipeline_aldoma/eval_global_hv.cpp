@@ -99,9 +99,10 @@ int main (int argc, char** argv)
     // find dataset name from input file
     std::string datasetname;
     int pos1 = dataset.find_first_of('_');
-    int pos2 = dataset.find_last_of('_');
     std::string str1 = dataset.substr(0, pos1);
+    int pos2 = dataset.substr(pos1+1).find_first_of('_');
     std::string str2 = dataset.substr(pos1+1, pos2);
+
     if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
     {
         datasetname = str2;
@@ -167,7 +168,7 @@ int main (int argc, char** argv)
                 std::cout << "Processing file " << filename << std::endl;
 
                 std::vector<std::pair<unsigned, float>> results;
-                bool use_hough = false; // false --> use chen (default), true --> use tombare to generate hypotheses
+                bool use_hough = false; // false --> use chen (default), true --> use tombari to generate hypotheses
                 results = global_hv->classify(filename, use_hough);
 
                 // lookup real class ids if instances were used as primary labels
