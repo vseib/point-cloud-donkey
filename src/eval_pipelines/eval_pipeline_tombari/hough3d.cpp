@@ -35,7 +35,7 @@ Hough3d::Hough3d(std::string dataset) :
             dataset == "sh12" || dataset == "mn10" || dataset == "mn40")
     {
         /// classification
-        m_th = 0.1;
+        m_th = -0.1;
         m_min_coord = Eigen::Vector3d(-2.0, -2.0, -2.0);
         m_max_coord = Eigen::Vector3d(2.0, 2.0, 2.0);
         m_bin_size = Eigen::Vector3d(0.5, 0.5, 0.5);
@@ -51,7 +51,7 @@ Hough3d::Hough3d(std::string dataset) :
     else if(dataset == "washington" || dataset == "bigbird" || dataset == "ycb")
     {
         /// classification
-        m_th = 0.1;
+        m_th = -0.1;
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
         m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
@@ -76,13 +76,13 @@ Hough3d::Hough3d(std::string dataset) :
         if(dataset == "dataset1")
         {
             fp::feature_type = "SHOT";
-            m_th = 0.01;
+            m_th = -0.01;
             m_bin_size = Eigen::Vector3d(0.01, 0.01, 0.01);
         }
         if(dataset == "dataset5")
         {
             fp::feature_type = "CSHOT";
-            m_th = 0.50;
+            m_th = -0.50;
             m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
         }
     }
