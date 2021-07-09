@@ -4,7 +4,8 @@
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/recognition/cg/geometric_consistency.h>
 #include <pcl/registration/correspondence_rejection_sample_consensus.h>
-
+#include <pcl/registration/icp.h>
+#include <pcl/recognition/hv/hv_go.h>
 
 pcl::CorrespondencesPtr findNnCorrespondences(
         const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
@@ -126,7 +127,7 @@ void castVotesAndFindMaxima(
             hough_space->voteInt(vote, 1.0, vid);
         }
     }
-    hough_space->findMaxima(-relative_threshold, maxima, vote_indices);
+    hough_space->findMaxima(relative_threshold, maxima, vote_indices);
 }
 
 
@@ -151,7 +152,7 @@ void clusterCorrespondences(
         //  Clustering
         pcl::Hough3DGrouping<PointT, PointT, pcl::ReferenceFrame, pcl::ReferenceFrame> clusterer;
         clusterer.setHoughBinSize(bin_size);
-        clusterer.setHoughThreshold(corr_threshold);
+        clusterer.setHoughThreshold(corr_threshold); // NOTE: relative hough threshold!
         clusterer.setUseInterpolation(true);
         clusterer.setUseDistanceWeight(use_distance_weight);
         clusterer.setInputRf(object_lrf);
@@ -169,7 +170,7 @@ void clusterCorrespondences(
     {
         pcl::GeometricConsistencyGrouping<PointT, PointT> gc_clusterer;
         gc_clusterer.setGCSize(bin_size);
-        gc_clusterer.setGCThreshold(corr_threshold);
+        gc_clusterer.setGCThreshold(corr_threshold); // NOTE: cluster size, i.e. num of votes!
         gc_clusterer.setInputCloud(object_keypoints);
         gc_clusterer.setSceneCloud(scene_keypoints);
         gc_clusterer.setModelSceneCorrespondences(object_scene_corrs);
@@ -357,3 +358,83 @@ void findClassAndPositionFromCluster(
 }
 
 
+void generateCloudsFromTransformations(
+        const std::vector<pcl::Correspondences> clustered_corrs,
+        const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances)
+{
+    for(size_t i = 0; i < rototranslations.size (); ++i)
+    {
+        pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
+        // NOTE: object_keypoints might contain multiple objects, so use only keypoints of a single cluster
+        pcl::PointCloud<PointT>::Ptr cluster_keypoints(new pcl::PointCloud<PointT>());
+        pcl::Correspondences this_cluster = clustered_corrs[i];
+        for(const pcl::Correspondence &corr : this_cluster)
+        {
+            const ISMFeature &feat = object_features->at(corr.index_match);
+            PointT keypoint = PointT(feat.x, feat.y, feat.z);
+            cluster_keypoints->push_back(keypoint);
+        }
+        pcl::transformPointCloud(*cluster_keypoints, *rotated_model, rototranslations[i]);
+        instances.push_back(rotated_model);
+    }
+}
+
+
+void alignCloudsWithICP(
+        const float icp_max_iterations,
+        const float icp_correspondence_distance,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances)
+{
+    for (size_t i = 0; i < instances.size (); ++i)
+    {
+        pcl::IterativeClosestPoint<PointT, PointT> icp;
+        icp.setMaximumIterations(icp_max_iterations);
+        icp.setMaxCorrespondenceDistance(icp_correspondence_distance);
+        icp.setInputTarget(scene_keypoints); // scene keypoints slightly better than scene cloud
+        icp.setInputSource(instances[i]);
+        pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
+        icp.align(*registered);
+        registered_instances.push_back(registered);
+    //            std::cout << "Instance " << i << " ";
+    //            if (icp.hasConverged ())
+    //            {
+    //                std::cout << "Aligned!" << std::endl;
+    //            }
+    //            else
+    //            {
+    //                std::cout << "Not Aligned!" << std::endl;
+    //            }
+    }
+}
+
+
+// Hypothesis Verification
+void runGlobalHV(
+        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        const float inlier_threshold,
+        const float occlusion_threshold,
+        const float regularizer,
+        const float clutter_regularizer,
+        const float radius_clutter,
+        const bool detect_clutter,
+        const float normal_radius,
+        std::vector<bool> &hypotheses_mask)
+{
+    pcl::GlobalHypothesesVerification<PointT, PointT> GoHv;
+    GoHv.setSceneCloud(scene_cloud);  // Scene Cloud
+    GoHv.addModels(registered_instances, true);  //Models to verify
+    GoHv.setInlierThreshold(inlier_threshold);
+    GoHv.setOcclusionThreshold(occlusion_threshold);
+    GoHv.setRegularizer(regularizer);
+    GoHv.setClutterRegularizer(clutter_regularizer);
+    GoHv.setRadiusClutter(radius_clutter);
+    GoHv.setDetectClutter(detect_clutter);
+    GoHv.setRadiusNormals(normal_radius);
+    GoHv.verify();
+    GoHv.getMask(hypotheses_mask);  // i-element TRUE if hvModels[i] verifies hypotheses
+}

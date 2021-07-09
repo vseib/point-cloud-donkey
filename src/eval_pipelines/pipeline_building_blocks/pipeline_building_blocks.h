@@ -83,3 +83,28 @@ void findClassAndPositionFromCluster(
         unsigned &resulting_class,
         int &resulting_num_votes,
         Eigen::Vector3f &resulting_position);
+
+void generateCloudsFromTransformations(
+        const std::vector<pcl::Correspondences> clustered_corrs,
+        const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances);
+
+void alignCloudsWithICP(
+        const float icp_max_iterations,
+        const float icp_correspondence_distance,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances);
+
+void runGlobalHV(
+        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        const float inlier_threshold,
+        const float occlusion_threshold,
+        const float regularizer,
+        const float clutter_regularizer,
+        const float radius_clutter,
+        const bool detect_clutter,
+        const float normal_radius,
+        std::vector<bool> &hypotheses_mask);

@@ -67,7 +67,7 @@ private:
             const pcl::PointCloud<PointT>::Ptr scene_keypoints,
             const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
             const bool use_hough,
-            std::vector<std::pair<unsigned, float>> &results) const;
+            std::vector<std::pair<unsigned, float>> &results);
 
     void findObjects(
             const pcl::PointCloud<PointT>::Ptr cloud,
@@ -77,7 +77,7 @@ private:
             const bool use_hv,
             const bool use_global_hv,
             std::vector<std::pair<unsigned, float>> &results,
-            std::vector<Eigen::Vector3f> &positions) const;
+            std::vector<Eigen::Vector3f> &positions);
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
