@@ -47,7 +47,7 @@ namespace ism3d
                                                                             pcl::PointCloud<PointT>::ConstPtr eigenValues,
                                                                             pcl::PointCloud<pcl::Normal>::ConstPtr normals,
                                                                             pcl::PointCloud<PointT>::Ptr pointsWithoutNaNNormals,
-                                                                            pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
+                                                                            pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan, // TODO VS: get rid of it if not needed
                                                                             pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                                             pcl::search::Search<PointT>::Ptr search)
     {      
