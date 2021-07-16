@@ -562,7 +562,7 @@ void findPositionFromTransformedObjectKeypoints(
 
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
-        const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations,
+        const std::vector<Eigen::Matrix4f> rototranslations,
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances)
 {
@@ -647,16 +647,17 @@ void runGlobalHV(
 void performSelfAdaptedHoughVoting(
         const pcl::CorrespondencesPtr &object_scene_corrs,
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
-         const pcl::PointCloud<ISMFeature>::Ptr object_features,
-         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
-         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
-         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
-         float initial_matching_threshold,
-         float rel_threshold,
-         std::vector<double> &maxima,
-         std::vector<std::vector<int>> &vote_indices,
-         pcl::CorrespondencesPtr &model_scene_corrs_filtered)
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        float initial_matching_threshold,
+        float rel_threshold,
+        std::vector<double> &maxima,
+        std::vector<std::vector<int>> &vote_indices,
+        pcl::CorrespondencesPtr &model_scene_corrs_filtered,
+        float &found_bin_size)
 {
     std::cout << "Total number of correspondences: " << object_scene_corrs->size() << std::endl;
 
@@ -702,6 +703,7 @@ void performSelfAdaptedHoughVoting(
             Eigen::Vector3d min_coord = Eigen::Vector3d(0, 0, 0);
             Eigen::Vector3d max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
             Eigen::Vector3d bin_size = Eigen::Vector3d(b_l,b_w,1);
+            found_bin_size = 0.5 * (b_l + b_w); // forward bin size to calling method
             // using 3d since there is no 2d hough in pcl
             std::shared_ptr<pcl::recognition::HoughSpace3D> hough_space;
             hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(min_coord, bin_size, max_coord);
@@ -865,5 +867,49 @@ void prepareSelfAdaptedVoting(
             rmse_T_min_max.second = rmse_t_i;
 
         votes.push_back({rmse_e_i, rmse_t_i});
+    }
+}
+
+
+void getMetricsAndInlierPoints(
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+        const float threshold,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &inlier_points_of_instances,
+        std::vector<float> &fs_metrics,
+        std::vector<float> &mr_metrics)
+{
+    for(const pcl::PointCloud<PointT>::ConstPtr &cloud : registered_instances)
+    {
+        // fitness score 1
+        float fs1 = 0;
+        float point_inlier_threshold = threshold; // paper works with meshes: threshold is 2 * mesh resolution
+        pcl::PointCloud<PointT>::Ptr inlier_cloud(new pcl::PointCloud<PointT>());
+
+        pcl::KdTreeFLANN<PointT> kdtree;
+        kdtree.setInputCloud(scene_cloud);
+        for(const PointT &p : cloud->points)
+        {
+            std::vector<int> indices(1);
+            std::vector<float> distances(1);
+            kdtree.nearestKSearch(p, 1, indices, distances);
+            if(distances.size() > 0)
+            {
+                fs1 += distances[0];
+                if(distances[0] < point_inlier_threshold)
+                {
+                    inlier_cloud->push_back(p);
+                }
+            }
+        }
+        // average point distance after registration
+        fs1 /= cloud->size();
+        // ratio of inliers of this instance
+        float mr1 = float(inlier_cloud->size()) / float(cloud->size());
+
+        // fill in results
+        inlier_points_of_instances.emplace_back(std::move(inlier_cloud));
+        fs_metrics.emplace_back(std::move(fs1));
+        mr_metrics.emplace_back(std::move(mr1));
     }
 }

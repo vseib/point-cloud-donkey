@@ -552,7 +552,7 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     // query/source index is codebook ("object"), match/target index is scene
     // !!!
     // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
-    float matching_threshold = 0.5; //std::numeric_limits<float>::max();
+    float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
 
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
@@ -586,8 +586,8 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;
     std::vector<pcl::Correspondences> model_instances;
-    bool refine_model = false; // helps improve the results sometimes
-    float inlier_threshold = m_bin_size(0); // doubling this threshold decreases precision and recall
+    bool refine_model = true; // helps improve the results sometimes
+    float inlier_threshold = m_bin_size(0);
     bool separate_voting_spaces = false;
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                               inlier_threshold, refine_model, separate_voting_spaces, use_hv,

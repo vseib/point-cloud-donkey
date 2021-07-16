@@ -68,8 +68,14 @@ private:
             const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
             std::vector<std::pair<unsigned, float>> &results);
 
-    void findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-                     const pcl::PointCloud<PointT>::Ptr cloud);
+    void findObjects(
+            const pcl::PointCloud<PointT>::Ptr scene_cloud,
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+            const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+            const bool use_hv,
+            std::vector<std::pair<unsigned, float>> &results,
+            std::vector<Eigen::Vector3f> &positions);
 
     std::vector<pcl::Correspondences> getCorrespondeceClustersFromMaxima(
             const std::vector<double> &maxima,

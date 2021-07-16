@@ -112,7 +112,7 @@ void findPositionFromTransformedObjectKeypoints(
 
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
-        const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations,
+        const std::vector<Eigen::Matrix4f> rototranslations,
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances);
 
@@ -147,7 +147,8 @@ void performSelfAdaptedHoughVoting(
         float rel_threshold,
         std::vector<double> &maxima,
         std::vector<std::vector<int>> &vote_indices,
-        pcl::CorrespondencesPtr &model_scene_corrs_filtered);
+        pcl::CorrespondencesPtr &model_scene_corrs_filtered,
+        float &found_bin_size);
 
 void prepareSelfAdaptedVoting(
         const pcl::CorrespondencesPtr &object_scene_corrs_filtered,
@@ -160,3 +161,11 @@ void prepareSelfAdaptedVoting(
         std::vector<std::pair<float,float>> &votes,
         std::pair<float,float> &rmse_E_min_max,
         std::pair<float,float> &rmse_T_min_max);
+
+void getMetricsAndInlierPoints(
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        const pcl::PointCloud<PointT>::Ptr scene_cloud,
+        const float threshold,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &inlier_points_of_instances,
+        std::vector<float> &fs_metrics,
+        std::vector<float> &mr_metrics);

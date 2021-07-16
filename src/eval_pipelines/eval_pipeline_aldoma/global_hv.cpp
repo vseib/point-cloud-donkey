@@ -390,7 +390,7 @@ void GlobalHV::findObjects(
 
     // Actual Clustering
     std::vector<pcl::Correspondences> clustered_corrs;
-    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
+    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformations;
     bool use_distance_weight = false;
     bool recognize = true; // true for detection
     // NOTE: if hough is used, m_corr_threshold is the relative hough threshold,
@@ -404,26 +404,31 @@ void GlobalHV::findObjects(
     clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
                            scene_lrf, object_lrf, use_distance_weight, m_bin_size,
                            m_corr_threshold, fp::reference_frame_radius, use_hough,
-                           recognize, clustered_corrs, rototranslations);
+                           recognize, clustered_corrs, transformations);
 
     // ------ this is where the aldoma contribution starts -------
-
     // Stop if no instances
-    if (rototranslations.size () <= 0)
+    if (transformations.size () <= 0)
     {
         std::cout << "No instances found!" << std::endl;
         return;
     }
     else
     {
-        std::cout << "Resulting clusters: " << rototranslations.size() << std::endl;
+        std::cout << "Resulting clusters: " << transformations.size() << std::endl;
     }
 
     if(use_global_hv) // aldoma global hypotheses verification
     {
-        // Generates clouds for each instance found
+        // convert to get rid of explicit alignment
+        std::vector<Eigen::Matrix4f> transformations_temp;
+        for(auto &tr : transformations)
+        {
+            transformations_temp.push_back(std::move(tr));
+        }
+        // Generate clouds for each instance found
         std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
-        generateCloudsFromTransformations(clustered_corrs, rototranslations, object_features, instances);
+        generateCloudsFromTransformations(clustered_corrs, transformations_temp, object_features, instances);
 
         // ICP
         std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
@@ -433,7 +438,8 @@ void GlobalHV::findObjects(
         alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
                            scene_keypoints, instances, registered_instances);
 
-        std::cout << "-------- registered instances size: " << registered_instances.size() << std::endl;
+        std::cout << "Registered instances: " << registered_instances.size() << std::endl;
+
         std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2; // NOTE TODO VS debug: crashes if this is used
         for(auto inst : registered_instances)
         {
