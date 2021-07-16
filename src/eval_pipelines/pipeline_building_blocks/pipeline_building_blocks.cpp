@@ -35,8 +35,13 @@ pcl::CorrespondencesPtr findNnCorrespondences(
 
         if(distances[0][0] < matching_threshold)
         {
-            // query index is scene, match is codebook ("object")
-            pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
+            // for all following PCL algorithms to work correctly, we need to swap query and match
+            // this is because all PCL algrithms handle the object as source (query) and the scene as target (match)
+            // (e.g. for registration, ransac, ...), but so far we have the scene as query and the object as match
+            // !!!
+            // now: query/source index is codebook ("object"), match/target index is scene
+            // !!!
+            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
             #pragma omp critical
             {
                 model_scene_corrs->push_back(corr);
@@ -61,9 +66,9 @@ void remapIndicesToLocalCloud(
     // however in order not to pass the whole codebook, we need to adjust the index mapping
     for(unsigned i = 0; i < object_scene_corrs->size(); i++)
     {
-        // create new list of keypoints and reassign the object (i.e. match) index
+        // create new list of keypoints and reassign the object (i.e. query) index
         pcl::Correspondence &corr = object_scene_corrs->at(i);
-        int &index = corr.index_match;
+        int index = corr.index_query;
         const ISMFeature &feat = all_features->at(index);
         object_features->push_back(feat);
         object_center_vectors.push_back(all_center_vectors.at(index));
@@ -75,7 +80,7 @@ void remapIndicesToLocalCloud(
         object_lrf->push_back(lrf);
         // remap index to new position in the created point clouds
         // no longer referring to m_features, but now to object_features
-        index = i;
+        corr.index_query = i;
     }
 }
 
@@ -88,11 +93,11 @@ std::vector<Eigen::Vector3f> prepareCenterVotes(
     std::vector<Eigen::Vector3f> votelist;
     for(const pcl::Correspondence &corr : *object_scene_corrs)
     {
-        const ISMFeature &scene_feat = scene_features->at(corr.index_query);
+        const ISMFeature &scene_feat = scene_features->at(corr.index_match);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
 
-        Eigen::Vector3f vote = object_center_vectors.at(corr.index_match);
+        Eigen::Vector3f vote = object_center_vectors.at(corr.index_query);
         Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
         votelist.push_back(center);
     }
@@ -220,8 +225,8 @@ void generateClassificationHypotheses(
         // count class occurences in filtered corrs
         for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++)
         {
-            unsigned match_idx = max_corrs.at(fcorr_idx).index_match;
-            const ISMFeature &cur_feat = object_features->at(match_idx);
+            unsigned obj_idx = max_corrs.at(fcorr_idx).index_query;
+            const ISMFeature &cur_feat = object_features->at(obj_idx);
             unsigned class_id = cur_feat.classId;
             // add occurence of this class_id
             if(class_occurences.find(class_id) != class_occurences.end())
@@ -257,6 +262,7 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
+        const bool separate_voting_spaces,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances)
@@ -264,23 +270,52 @@ void generateHypothesesWithAbsoluteOrientation(
     pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
     corr_rejector.setMaximumIterations(10000);
     corr_rejector.setInlierThreshold(inlier_threshold);
-    corr_rejector.setInputSource(object_keypoints);
-    corr_rejector.setInputTarget(scene_keypoints);
-    corr_rejector.setRefineModel(refine_model); // slightly worse results if true
+    corr_rejector.setRefineModel(refine_model);
+    if(!separate_voting_spaces) // just use common clouds
+    {
+        corr_rejector.setInputSource(object_keypoints);
+        corr_rejector.setInputTarget(scene_keypoints);
+    }
 
     // correspondences were grouped by hough voting
-    for(size_t j = 0; j < vote_indices.size (); ++j)
+    for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
     {
-        pcl::Correspondences temp_corrs, filtered_corrs;
-        for (size_t i = 0; i < vote_indices[j].size(); ++i)
-        {
-            temp_corrs.push_back(object_scene_corrs->at(vote_indices[j][i]));
-        }
-
         // skip maxima with view votes, mostly FP
-        if(temp_corrs.size() < 3)
+        if(vote_indices[j].size() < 3)
         {
             continue;
+        }
+
+        pcl::Correspondences temp_corrs, filtered_corrs;
+        std::vector<int> mapping_object;
+        std::vector<int> mapping_scene;
+
+        if(separate_voting_spaces) // create clouds for each maximum and remap indices
+        {
+            // will be filled with points of current maximum
+            pcl::PointCloud<PointT>::Ptr max_scene_keypoints(new pcl::PointCloud<PointT>());
+            pcl::PointCloud<PointT>::Ptr max_object_keypoints(new pcl::PointCloud<PointT>());
+
+            for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
+            {
+                pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
+                temp_corrs.push_back(pcl::Correspondence(i, i, corr.distance)); // now correspondences refer to local cloud copy of maximum
+                max_scene_keypoints->push_back(scene_keypoints->at(corr.index_match));
+                max_object_keypoints->push_back(object_keypoints->at(corr.index_query));
+                mapping_scene.push_back(corr.index_match);
+                mapping_object.push_back(corr.index_query);
+            }
+
+            corr_rejector.setInputSource(max_object_keypoints);
+            corr_rejector.setInputTarget(max_scene_keypoints);
+        }
+        else
+        {
+            for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
+            {
+                pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
+                temp_corrs.push_back(corr);
+            }
         }
 
         if(use_hv)
@@ -289,15 +324,35 @@ void generateHypothesesWithAbsoluteOrientation(
             corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
             Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
             // save transformations for recognition
-            if(!best_transform.isIdentity(0.01))
+            if(!best_transform.isIdentity(0.0001))
             {
                 // keep transformation and correspondences if RANSAC was run successfully
                 transformations.push_back(best_transform);
+                if(separate_voting_spaces) // remap indices back to common clouds
+                {
+                    // remap indices from local maximum cloud to input clouds
+                    for(int i = 0; i < filtered_corrs.size(); i++)
+                    {
+                        pcl::Correspondence &corr = filtered_corrs.at(i);
+                        corr.index_query = mapping_object[corr.index_query];
+                        corr.index_match = mapping_scene[corr.index_match];
+                    }
+                }
                 model_instances.push_back(filtered_corrs);
             }
         }
         else
         {
+            if(separate_voting_spaces) // remap indices back to common clouds
+            {
+                // remap indices from local maximum cloud to input clouds
+                for(int i = 0; i < temp_corrs.size(); i++)
+                {
+                    pcl::Correspondence &corr = temp_corrs.at(i);
+                    corr.index_query = mapping_object[corr.index_query];
+                    corr.index_match = mapping_scene[corr.index_match];
+                }
+            }
             model_instances.push_back(temp_corrs);
         }
     }
@@ -322,15 +377,15 @@ void findClassAndPositionFromCluster(
     // compute
     for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
     {
-        unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-        const ISMFeature &cur_feat = object_features->at(match_idx);
+        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_query;
+        const ISMFeature &cur_feat = object_features->at(object_idx);
         unsigned class_id = cur_feat.classId;
 
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
+        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_match;
         const ISMFeature &scene_feat = scene_features->at(scene_idx);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
-        Eigen::Vector3f vote = object_center_vectors.at(match_idx);
+        Eigen::Vector3f vote = object_center_vectors.at(object_idx);
         Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
         all_centers[class_id] += pos;
         num_votes[class_id] += 1;
@@ -358,6 +413,152 @@ void findClassAndPositionFromCluster(
 }
 
 
+void findClassAndPositionFromTransformedObjectKeypoints(
+        const pcl::Correspondences &filtered_corrs,
+        const Eigen::Matrix4f &transformation,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
+        const int num_classes,
+        unsigned &resulting_class,
+        int &resulting_num_votes,
+        Eigen::Vector3f &resulting_position)
+{
+    // extract instance specific data based on correspondences
+    pcl::PointCloud<PointT>::Ptr instance_object_keypoints(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<ISMFeature>::Ptr instance_object_features(new pcl::PointCloud<ISMFeature>());
+    std::vector<Eigen::Vector3f> instance_center_vectors;
+    for(unsigned corr_idx; corr_idx < filtered_corrs.size(); corr_idx++)
+    {
+        pcl::Correspondence corr = filtered_corrs.at(corr_idx);
+        instance_object_keypoints->push_back(object_keypoints->at(corr.index_query));
+        instance_object_features->push_back(object_features->at(corr.index_query));
+        instance_center_vectors.push_back(object_center_vectors.at(corr.index_query));
+    }
+
+    // determine position based on keypoints
+    std::vector<Eigen::Vector3f> all_centers(num_classes, Eigen::Vector3f(0.0f,0.0f,0.0f));
+    std::vector<int> num_votes(num_classes, 0);
+
+    // transform original (i.e. object) keypoints with found cluster transformation
+    pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
+    pcl::transformPointCloud(*instance_object_keypoints, *rotated_model, transformation);
+
+    // perform center voting with transformed object keypoints, using the object's lrf
+    for(unsigned idx = 0; idx < rotated_model->size(); idx++)
+    {
+        const ISMFeature &cur_feat = instance_object_features->at(idx);
+        unsigned class_id = cur_feat.classId;
+        pcl::ReferenceFrame ref = cur_feat.referenceFrame; // NOTE: using object's lrf
+
+        PointT keyPoint = rotated_model->at(idx);
+        Eigen::Vector3f keyPos = keyPoint.getArray3fMap();
+        Eigen::Vector3f vote = instance_center_vectors.at(idx);
+        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
+        all_centers[class_id] += pos;
+        num_votes[class_id] += 1;
+    }
+    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
+    {
+        all_centers[temp_idx] /= num_votes[temp_idx];
+    }
+    // find class with max votes
+    unsigned cur_class = 0;
+    int cur_best_num = 0;
+    for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
+    {
+        if(num_votes[class_idx] > cur_best_num)
+        {
+            cur_best_num = num_votes[class_idx];
+            cur_class = class_idx;
+        }
+    }
+
+    // fill in results
+    resulting_class = cur_class;
+    resulting_num_votes = cur_best_num;
+    resulting_position = all_centers[cur_class];
+}
+
+
+void findPositionFromCluster(
+        const pcl::Correspondences &filtered_corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
+        Eigen::Vector3f &resulting_position)
+{
+    // determine position based on filtered correspondences
+    // (ideally, only one class remains after filtering)
+    Eigen::Vector3f center = Eigen::Vector3f(0.0f,0.0f,0.0f);
+    int num = 0;
+
+    // compute
+    for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
+    {
+        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_query;
+        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_match;
+        const ISMFeature &scene_feat = scene_features->at(scene_idx);
+        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
+        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
+        Eigen::Vector3f vote = object_center_vectors.at(object_idx);
+        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
+        center += pos;
+        num++;
+    }
+    // fill in results
+    center /= float(num);
+    resulting_position = center;
+}
+
+
+void findPositionFromTransformedObjectKeypoints(
+        const pcl::Correspondences &filtered_corrs,
+        const Eigen::Matrix4f &transformation,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
+        Eigen::Vector3f &resulting_position)
+{
+    // extract instance specific data based on correspondences
+    pcl::PointCloud<PointT>::Ptr instance_object_keypoints(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<ISMFeature>::Ptr instance_object_features(new pcl::PointCloud<ISMFeature>());
+    std::vector<Eigen::Vector3f> instance_center_vectors;
+    for(unsigned corr_idx; corr_idx < filtered_corrs.size(); corr_idx++)
+    {
+        pcl::Correspondence corr = filtered_corrs.at(corr_idx);
+        instance_object_keypoints->push_back(object_keypoints->at(corr.index_query));
+        instance_object_features->push_back(object_features->at(corr.index_query));
+        instance_center_vectors.push_back(object_center_vectors.at(corr.index_query));
+    }
+
+    // determine position based on keypoints
+    Eigen::Vector3f center = Eigen::Vector3f(0.0f,0.0f,0.0f);
+    int num = 0;
+
+    // transform original (i.e. object) keypoints with found cluster transformation
+    pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
+    pcl::transformPointCloud(*instance_object_keypoints, *rotated_model, transformation);
+
+    // perform center voting with transformed object keypoints, using the object's lrf
+    for(unsigned idx = 0; idx < rotated_model->size(); idx++)
+    {
+        const ISMFeature &cur_feat = instance_object_features->at(idx);
+        pcl::ReferenceFrame ref = cur_feat.referenceFrame; // NOTE: using object's lrf
+
+        PointT keyPoint = rotated_model->at(idx);
+        Eigen::Vector3f keyPos = keyPoint.getArray3fMap();
+        Eigen::Vector3f vote = instance_center_vectors.at(idx);
+        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
+        center += pos;
+        num++;
+    }
+
+    // fill in results
+    center /= float(num);
+    resulting_position = center;
+}
+
+
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
         const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations,
@@ -372,7 +573,7 @@ void generateCloudsFromTransformations(
         pcl::Correspondences this_cluster = clustered_corrs[i];
         for(const pcl::Correspondence &corr : this_cluster)
         {
-            const ISMFeature &feat = object_features->at(corr.index_match);
+            const ISMFeature &feat = object_features->at(corr.index_query);
             PointT keypoint = PointT(feat.x, feat.y, feat.z);
             cluster_keypoints->push_back(keypoint);
         }
@@ -394,8 +595,8 @@ void alignCloudsWithICP(
         pcl::IterativeClosestPoint<PointT, PointT> icp;
         icp.setMaximumIterations(icp_max_iterations);
         icp.setMaxCorrespondenceDistance(icp_correspondence_distance);
-        icp.setInputTarget(scene_keypoints); // scene keypoints slightly better than scene cloud
         icp.setInputSource(instances[i]);
+        icp.setInputTarget(scene_keypoints); // scene keypoints slightly better than scene cloud
         pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
         icp.align(*registered);
         registered_instances.push_back(registered);
@@ -415,7 +616,7 @@ void alignCloudsWithICP(
 // Hypothesis Verification
 void runGlobalHV(
         const pcl::PointCloud<PointT>::Ptr scene_cloud,
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances,
         const float inlier_threshold,
         const float occlusion_threshold,
         const float regularizer,
@@ -435,6 +636,8 @@ void runGlobalHV(
     GoHv.setRadiusClutter(radius_clutter);
     GoHv.setDetectClutter(detect_clutter);
     GoHv.setRadiusNormals(normal_radius);
+    std::cout << "-------- global hv before verify " << std::endl;
     GoHv.verify();
+    std::cout << "-------- global hv after verify " << std::endl;
     GoHv.getMask(hypotheses_mask);  // i-element TRUE if hvModels[i] verifies hypotheses
 }

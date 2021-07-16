@@ -70,6 +70,7 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
+        const bool separate_voting_spaces,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances);
@@ -82,6 +83,31 @@ void findClassAndPositionFromCluster(
         const int num_classes,
         unsigned &resulting_class,
         int &resulting_num_votes,
+        Eigen::Vector3f &resulting_position);
+
+void findClassAndPositionFromTransformedObjectKeypoints(
+        const pcl::Correspondences &filtered_corrs,
+        const Eigen::Matrix4f &transformation,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
+        const int num_classes,
+        unsigned &resulting_class,
+        int &resulting_num_votes,
+        Eigen::Vector3f &resulting_position);
+
+void findPositionFromCluster(
+        const pcl::Correspondences &filtered_corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
+        Eigen::Vector3f &resulting_position);
+
+void findPositionFromTransformedObjectKeypoints(
+        const pcl::Correspondences &filtered_corrs,
+        const Eigen::Matrix4f &transformation,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const std::vector<Eigen::Vector3f> &object_center_vectors,
         Eigen::Vector3f &resulting_position);
 
 void generateCloudsFromTransformations(
@@ -99,7 +125,7 @@ void alignCloudsWithICP(
 
 void runGlobalHV(
         const pcl::PointCloud<PointT>::Ptr scene_cloud,
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances,
         const float inlier_threshold,
         const float occlusion_threshold,
         const float regularizer,
