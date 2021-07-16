@@ -1,5 +1,6 @@
 #include "pipeline_building_blocks.h"
 #include "../../implicit_shape_model/utils/utils.h"
+#include "../../implicit_shape_model/utils/distance.h"
 
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/recognition/cg/geometric_consistency.h>
@@ -640,4 +641,229 @@ void runGlobalHV(
     GoHv.verify();
     std::cout << "-------- global hv after verify " << std::endl;
     GoHv.getMask(hypotheses_mask);  // i-element TRUE if hvModels[i] verifies hypotheses
+}
+
+
+void performSelfAdaptedHoughVoting(
+        const pcl::CorrespondencesPtr &object_scene_corrs,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+         const pcl::PointCloud<ISMFeature>::Ptr object_features,
+         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+         float initial_matching_threshold,
+         float rel_threshold,
+         std::vector<double> &maxima,
+         std::vector<std::vector<int>> &vote_indices,
+         pcl::CorrespondencesPtr &model_scene_corrs_filtered)
+{
+    std::cout << "Total number of correspondences: " << object_scene_corrs->size() << std::endl;
+
+    std::vector<double> filtered_maxima;
+    std::vector<std::vector<int>> filtered_vote_indices;
+
+    // self-adapt measure for number of correspondences after filtering
+    float t_corr = initial_matching_threshold;
+    float ratio;
+    do
+    {
+        // increase number of matches by increasing the threshold
+        t_corr += 0.1;
+
+        // apply feature distance threshold
+        model_scene_corrs_filtered->clear();
+        for(const pcl::Correspondence &corr : *object_scene_corrs)
+        {
+            if(corr.distance < t_corr)
+                model_scene_corrs_filtered->push_back(corr);
+        }
+
+        std::cout << "Selecting " << model_scene_corrs_filtered->size() << " correspondences with threshold " << t_corr << std::endl;
+
+        // prepare votes and hough space
+        std::vector<std::pair<float,float>> votes; // first: rmse_E, second: rmse_T
+        std::pair<float,float> rmse_E_min_max = {std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
+        std::pair<float,float> rmse_T_min_max = {std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
+        prepareSelfAdaptedVoting(model_scene_corrs_filtered, object_keypoints, object_features, object_lrf,
+                                 scene_keypoints, scene_features, scene_lrf, votes, rmse_E_min_max, rmse_T_min_max);
+
+        // self-adapt measure for number of bins
+        int h_n = 5; // number of bins per dimension, taken from paper
+        while(h_n >= 3)
+        {
+            std::cout << "Constructing Houghspace with " << h_n << " bins per dimension" << std::endl;
+
+            // construct hough space - degrade the 3rd dimension to represent 2d hough
+            // size of dims
+            float b_l = (rmse_E_min_max.second - rmse_E_min_max.first) / h_n;
+            float b_w = (rmse_T_min_max.second - rmse_T_min_max.first) / h_n;
+
+            Eigen::Vector3d min_coord = Eigen::Vector3d(0, 0, 0);
+            Eigen::Vector3d max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
+            Eigen::Vector3d bin_size = Eigen::Vector3d(b_l,b_w,1);
+            // using 3d since there is no 2d hough in pcl
+            std::shared_ptr<pcl::recognition::HoughSpace3D> hough_space;
+            hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(min_coord, bin_size, max_coord);
+
+            // vote all votes into empty hough space
+            hough_space->reset();
+            maxima.clear();
+            vote_indices.clear();
+            for(int vid = 0; vid < votes.size(); vid++)
+            {
+                Eigen::Vector3d vote(votes[vid].first, votes[vid].second, 0);
+                // voting with interpolation
+                // votes are in the same order as correspondences, vid is therefore the index in the correspondence list
+                hough_space->voteInt(vote, 1.0, vid);
+            }
+            // find maxima
+            hough_space->findMaxima(rel_threshold, maxima, vote_indices);
+
+            // only keep maxima with at least 3 votes
+            filtered_maxima.clear();
+            filtered_vote_indices.clear();
+            for(int idx = 0; idx < maxima.size(); idx++)
+            {
+                if(vote_indices[idx].size() >= 3)
+                {
+                    filtered_maxima.push_back(maxima[idx]);
+                    filtered_vote_indices.push_back(vote_indices[idx]);
+                }
+            }
+
+            // if maxima are found, continue with next step
+            if(filtered_maxima.size() > 0)
+            {
+                break;
+            }
+            h_n--; // reduce number of bins and search again
+        }
+
+        // if maxima are found, continue with next step
+        if(filtered_maxima.size() > 0)
+        {
+            break;
+        }
+
+        float n = float(object_scene_corrs->size());
+        float m = float(model_scene_corrs_filtered->size());
+        ratio = m/n;
+    }while(ratio < 0.5); // check if we have already selected at least 50% of all matches
+
+    std::cout << "Found " << filtered_maxima.size() << " maxima" << std::endl;
+    maxima = filtered_maxima;
+    vote_indices = filtered_vote_indices;
+}
+
+
+void prepareSelfAdaptedVoting(
+        const pcl::CorrespondencesPtr &object_scene_corrs_filtered,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        std::vector<std::pair<float,float>> &votes,
+        std::pair<float,float> &rmse_E_min_max,
+        std::pair<float,float> &rmse_T_min_max)
+{
+    std::vector<Eigen::Vector3f> rotations;
+    std::vector<Eigen::Vector3f> translations;
+    std::vector<float> matching_weights;
+    float max_weight = 0;
+    for(const pcl::Correspondence &corr : *object_scene_corrs_filtered)
+    {
+        // get rotation matrix
+        pcl::ReferenceFrame lrf_scene = scene_lrf->at(corr.index_match);
+        pcl::ReferenceFrame lrf_object = object_lrf->at(corr.index_query);
+        Eigen::Matrix3f lrf_s = lrf_scene.getMatrix3fMap();
+        Eigen::Matrix3f lrf_o = lrf_object.getMatrix3fMap();
+        Eigen::Matrix3f R = lrf_s.transpose() * lrf_o;
+        // get translation vector
+        Eigen::Vector3f keypoint_scene = scene_keypoints->at(corr.index_match).getVector3fMap();
+        Eigen::Vector3f keypoint_object = object_keypoints->at(corr.index_query).getVector3fMap();
+        Eigen::Vector3f T = keypoint_scene - R * keypoint_object;
+        // convert rotation to euler angles
+        float phi, theta, psi;
+        if(R(3,3) == 0)
+        {
+            phi = 0;
+        }
+        else
+        {
+            phi = std::atan(R(3,2) / R(3,3));
+        }
+        if(R(3,3) == 0 && R(3,2) == 0)
+        {
+            theta = 0;
+        }
+        else
+        {
+            theta = std::atan(-R(3,1) / std::sqrt(R(3,2)*R(3,2) + R(3,3)*R(3,3)));
+        }
+        if(R(1,1) == 0)
+        {
+            psi = 0;
+        }
+        else
+        {
+            psi = atan(R(2,1)/R(1,1));
+        }
+        // store translations and rotations
+        rotations.push_back(Eigen::Vector3f(phi, theta, psi));
+        translations.push_back(T);
+
+        // compute descriptor distance as weight
+        ISMFeature feat_scene = scene_features->at(corr.index_match);
+        ISMFeature feat_object = object_features->at(corr.index_query);
+        DistanceEuclidean dist;
+        float weight_raw = dist(feat_object.descriptor, feat_scene.descriptor);
+        max_weight = weight_raw > max_weight ? weight_raw : max_weight;
+        matching_weights.push_back(weight_raw);
+    }
+
+    // compute the center values and all weights from raw values that were saved
+    Eigen::Vector3f E_c(0,0,0);
+    Eigen::Vector3f T_c(0,0,0);
+    float sum_weights = 0;
+    for(unsigned i = 0; i < rotations.size(); i++)
+    {
+        float &raw_weight = matching_weights.at(i);
+        raw_weight = 1 - (raw_weight / max_weight);
+        sum_weights += raw_weight;
+        E_c += raw_weight * rotations.at(i);
+        T_c += raw_weight * translations.at(i);
+    }
+    // not in the paper, but shouldn't it be normalized by sum of weights?
+    // NOTE: missing normalization does not affect results negatively
+    //E_c /= sum_weights;
+    //T_c /= sum_weights;
+
+    // compute RMSEs as votes
+    for(unsigned i = 0; i < rotations.size(); i++)
+    {
+        Eigen::Vector3f rot = rotations.at(i);
+        float ex = rot.x()-E_c.x();
+        float ey = rot.y()-E_c.y();
+        float ez = rot.z()-E_c.z();
+        float rmse_e_i = std::sqrt((ex*ex + ey*ey + ez*ez)/3);
+        if(rmse_e_i < rmse_E_min_max.first)
+            rmse_E_min_max.first = rmse_e_i;
+        if(rmse_e_i > rmse_E_min_max.second)
+            rmse_E_min_max.second = rmse_e_i;
+
+        Eigen::Vector3f tr = translations.at(i);
+        float tx = tr.x() - T_c.x();
+        float ty = tr.y() - T_c.y();
+        float tz = tr.z() - T_c.z();
+        float rmse_t_i = std::sqrt((tx*tx + ty*ty + tz*tz)/3);
+        if(rmse_t_i < rmse_T_min_max.first)
+            rmse_T_min_max.first = rmse_t_i;
+        if(rmse_t_i > rmse_T_min_max.second)
+            rmse_T_min_max.second = rmse_t_i;
+
+        votes.push_back({rmse_e_i, rmse_t_i});
+    }
 }

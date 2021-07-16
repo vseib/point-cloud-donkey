@@ -1,5 +1,3 @@
-#include "self_adapt_hghv.h"
-
 #include <pcl/io/pcd_io.h>
 #include <pcl/features/shot_omp.h>
 #include <pcl/features/shot_lrf_omp.h>
@@ -17,6 +15,9 @@
 #include "../../implicit_shape_model/utils/utils.h"
 #include "../../implicit_shape_model/utils/distance.h"
 
+#include "self_adapt_hghv.h"
+#include "../pipeline_building_blocks/pipeline_building_blocks.h"
+#include "../pipeline_building_blocks/feature_processing.h" // provides namespace fp::
 
 /**
  * Evaluation pipeline for the approach described in
@@ -44,8 +45,6 @@
 
 SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
     m_features(new pcl::PointCloud<ISMFeature>()),
-    m_scene_keypoints(new pcl::PointCloud<PointT>()),
-    m_scene_lrf(new pcl::PointCloud<pcl::ReferenceFrame>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
     std::cout << "-------- loading parameters for " << dataset << " dataset --------" << std::endl;
@@ -56,44 +55,50 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
         /// classification
         // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
         m_corr_threshold = -0.1;
-        m_normal_radius = 0.05;
-        m_reference_frame_radius = 0.3;
-        m_feature_radius = 0.4;
-        m_keypoint_sampling_radius = 0.2;
-        m_k_search = 1; // TODO remove
-        m_normal_method = 1;
-        m_feature_type = "SHOT";
+
+        fp::normal_radius = 0.05;
+        fp::reference_frame_radius = 0.3;
+        fp::feature_radius = 0.4;
+        fp::keypoint_sampling_radius = 0.2;
+        fp::normal_method = 1;
+        fp::feature_type = "SHOT";
     }
     else if(dataset == "wash" || dataset == "bigbird" || dataset == "ycb")
     {
         /// classification
         m_corr_threshold = -0.5; // TODO VS check param
-        m_normal_radius = 0.005;
-        m_reference_frame_radius = 0.05;
-        m_feature_radius = 0.05;
-        m_keypoint_sampling_radius = 0.02;
-        m_k_search = 1;
-        m_normal_method = 0;
-        m_feature_type = "CSHOT";
+
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.05;
+        fp::feature_radius = 0.05;
+        fp::keypoint_sampling_radius = 0.02;
+        fp::normal_method = 0;
+        fp::feature_type = "CSHOT";
     }
     else if(dataset == "dataset1" || dataset == "dataset5")
     {
         /// detection
-        m_corr_threshold = th;
-        m_normal_radius = 0.005;
-        m_reference_frame_radius = 0.05;
-        m_feature_radius = 0.05;
-        m_keypoint_sampling_radius = 0.02;
-        m_k_search = 1;
-        m_normal_method = 0;
+        m_corr_threshold = -th;
+
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.05;
+        fp::feature_radius = 0.05;
+        fp::keypoint_sampling_radius = 0.02;
+        fp::normal_method = 0;
 
         m_icp_max_iter = 100;
         m_icp_corr_distance = 0.05;
 
         if(dataset == "dataset1")
-            m_feature_type = "SHOT";
+        {
+            fp::normal_method = 1;
+            fp::feature_type = "SHOT";
+        }
         if(dataset == "dataset5")
-            m_feature_type = "CSHOT";
+        {
+            fp::normal_method = 0;
+            fp::feature_type = "CSHOT";
+        }
     }
     else
     {
@@ -146,8 +151,14 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
            std::cerr << "ERROR: loading file " << file << std::endl;
        }
 
-       pcl::PointCloud<ISMFeature>::Ptr features_cleaned = processPointCloud(cloud);
-       for(ISMFeature& ismf : features_cleaned->points)
+       // all these pointers are initialized within the called method
+       pcl::PointCloud<PointT>::Ptr keypoints;
+       pcl::PointCloud<ISMFeature>::Ptr features;
+       pcl::PointCloud<pcl::Normal>::Ptr normals;
+       pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
+       processPointCloud(cloud, keypoints, features, normals, reference_frames);
+
+       for(ISMFeature& ismf : features->points)
        {
            // assign labels
            ismf.classId = tr_class;
@@ -163,8 +174,8 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
        }
 
        // add computed features to map
-       (*all_features.at(tr_class)) += (*features_cleaned);
-       num_features += features_cleaned->size();
+       (*all_features.at(tr_class)) += (*features);
+       num_features += features->size();
    }
 
    std::cout << "Extracted " << num_features << " features." << std::endl;
@@ -190,12 +201,16 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::strin
         return std::vector<std::pair<unsigned, float>>();
     }
 
-    // extract features
-    pcl::PointCloud<ISMFeature>::Ptr features = processPointCloud(cloud);
+    // all these pointers are initialized within the called method
+    pcl::PointCloud<PointT>::Ptr keypoints;
+    pcl::PointCloud<ISMFeature>::Ptr features;
+    pcl::PointCloud<pcl::Normal>::Ptr normals;
+    pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
+    processPointCloud(cloud, keypoints, features, normals, reference_frames);
 
     // get results
     std::vector<std::pair<unsigned, float>> results;
-    results = classifyObject(features);
+    classifyObject(features, keypoints, reference_frames, results);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -207,12 +222,21 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classify(const std::strin
 }
 
 
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl::PointCloud<ISMFeature>::Ptr& scene_features)
+void SelfAdaptHGHV::classifyObject(
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        std::vector<std::pair<unsigned, float>> &results)
 {
     // get model-scene correspondences
-    // query index is scene, match index is codebook ("object")
-    pcl::CorrespondencesPtr model_scene_corrs = findNnCorrespondences(scene_features);
-    std::cout << "Found " << model_scene_corrs->size() << " correspondences" << std::endl;
+    // !!!
+    // query/source index is codebook ("object"), match/target index is scene
+    // !!!
+    // do not apply a threshold here, it is done during the self-adapted voting
+    float matching_threshold = std::numeric_limits<float>::max();
+    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
+
+    std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
     bool use_first_ransac = false;
     // NOTE: first RANSAC in the method of zhou et al. is used to eliminate false correspondences
@@ -230,322 +254,27 @@ std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::classifyObject(const pcl:
 
 
     // object keypoints are simply the matched keypoints from the codebook
+    // however in order not to pass the whole codebook, we need to adjust the index mapping
     pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
     pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
+    std::vector<Eigen::Vector3f> object_center_vectors; // NOTE: unused here
     pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    // however in order not to pass the whole codebook, we need to ajust the index mapping
-    for(unsigned i = 0; i < model_scene_corrs->size(); i++)
-    {
-        // create new list of keypoints and reassign the object (i.e. match) index
-        pcl::Correspondence &corr = model_scene_corrs->at(i);
-        int &index = corr.index_match;
-        const ISMFeature &feat = m_features->at(index);
-        object_features->push_back(feat);
+    remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
+            object_keypoints, object_features, object_center_vectors, object_lrf);
 
-        PointT keypoint = PointT(feat.x, feat.y, feat.z);
-        index = object_keypoints->size(); // remap index to new position in the created point cloud
-        object_keypoints->push_back(keypoint);
-
-        pcl::ReferenceFrame lrf = feat.referenceFrame;
-        object_lrf->push_back(lrf);
-    }
-
+    // cast votes (without center vectors) and retrieve maxima
     std::vector<double> maxima;
-    std::vector<std::vector<int>> voteIndices;
+    std::vector<std::vector<int>> vote_indices;
     pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
-    performSelfAdaptedHoughVoting(maxima, voteIndices, model_scene_corrs_filtered,
-                                  model_scene_corrs, object_keypoints, object_features, object_lrf);
+    float initial_matching_threshold = 0.4;
+    float rel_threshold = m_corr_threshold;
+    performSelfAdaptedHoughVoting(object_scene_corrs, object_keypoints, object_features, object_lrf,
+                                  scene_keypoints, scene_features, scene_lrf, initial_matching_threshold,
+                                  rel_threshold, maxima, vote_indices, model_scene_corrs_filtered);
 
     // check all maxima since highest valued maximum might still be composed of different class votes
     // therefore we need to count votes per class per maximum
-    std::vector<std::pair<unsigned, float>> results;
-    results = std::move(getResultsFromMaxima(maxima, voteIndices, model_scene_corrs_filtered, object_features));
-    return results;
-}
-
-
-void SelfAdaptHGHV::performSelfAdaptedHoughVoting(std::vector<double> &maxima,
-                                   std::vector<std::vector<int>> &voteIndices,
-                                   pcl::CorrespondencesPtr &model_scene_corrs_filtered,
-                                   const pcl::CorrespondencesPtr &model_scene_corrs,
-                                   const pcl::PointCloud<PointT>::Ptr object_keypoints,
-                                   const pcl::PointCloud<ISMFeature>::Ptr object_features,
-                                   const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf)
-{
-    std::cout << "Total number of correspondences: " << model_scene_corrs->size() << std::endl;
-
-    std::vector<double> filtered_maxima;
-    std::vector<std::vector<int>> filtered_vote_indices;
-
-    // self-adapt measure for number of correspondences after filtering
-    float t_corr = 0.4;
-    float ratio;
-    do
-    {
-        // increase number of matches by increasing the threshold
-        t_corr += 0.1;
-
-        // apply feature distance threshold
-        model_scene_corrs_filtered->clear();
-        for(const pcl::Correspondence &corr : *model_scene_corrs)
-        {
-            if(corr.distance < t_corr)
-                model_scene_corrs_filtered->push_back(corr);
-        }
-
-        std::cout << "Selecting " << model_scene_corrs_filtered->size() << " correspondences with threshold " << t_corr << std::endl;
-
-        // prepare votes and hough space
-        std::vector<std::pair<float,float>> votes; // first: rmse_E, second: rmse_T
-        std::pair<float,float> rmse_E_min_max = {std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
-        std::pair<float,float> rmse_T_min_max = {std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
-        prepare_voting(votes, rmse_E_min_max, rmse_T_min_max,
-                       model_scene_corrs_filtered, object_keypoints, object_features, object_lrf);
-
-        // self-adapt measure for number of bins
-        int h_n = 5; // number of bins per dimension
-        while(h_n >= 3)
-        {
-            std::cout << "Constructing Houghspace with " << h_n << " bins per dimension" << std::endl;
-
-            // construct hough space - degrade the 3rd dimension to represent 2d hough
-            // size of dims
-            float b_l = (rmse_E_min_max.second - rmse_E_min_max.first) / h_n;
-            float b_w = (rmse_T_min_max.second - rmse_T_min_max.first) / h_n;
-
-            m_min_coord = Eigen::Vector3d(0, 0, 0);
-            m_max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
-            m_bin_size = Eigen::Vector3d(b_l,b_w,1);
-            m_hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(m_min_coord, m_bin_size, m_max_coord);
-
-            // vote all votes into empty hough space
-            m_hough_space->reset();
-            maxima.clear();
-            voteIndices.clear();
-            for(int vid = 0; vid < votes.size(); vid++)
-            {
-                Eigen::Vector3d vote(votes[vid].first, votes[vid].second, 0);
-                // voting with interpolation
-                // votes are in the same order as correspondences, vid is therefore the index in the correspondence list
-                m_hough_space->voteInt(vote, 1.0, vid);
-            }
-            // find maxima
-            float m_relThreshold = 0.01f; // TODO VS tune threshold: must be member and set differently for classification / detection
-            m_hough_space->findMaxima(-m_relThreshold, maxima, voteIndices);
-
-            // only keep maxima with at least 3 votes
-            filtered_maxima.clear();
-            filtered_vote_indices.clear();
-            for(int idx = 0; idx < maxima.size(); idx++)
-            {
-                if(voteIndices[idx].size() >= 3)
-                {
-                    filtered_maxima.push_back(maxima[idx]);
-                    filtered_vote_indices.push_back(voteIndices[idx]);
-                }
-            }
-
-            // if maxima are found, continue with next step
-            if(filtered_maxima.size() > 0)
-            {
-                break;
-            }
-            h_n--; // reduce number of bins and search again
-        }
-
-        // if maxima are found, continue with next step
-        if(filtered_maxima.size() > 0)
-        {
-            break;
-        }
-
-        float n = float(model_scene_corrs->size());
-        float m = float(model_scene_corrs_filtered->size());
-        ratio = m/n;
-    }while(ratio < 0.5); // check if we have already selected at least 50% of all matches
-
-    std::cout << "Found " << filtered_maxima.size() << " maxima" << std::endl;
-    maxima = filtered_maxima;
-    voteIndices = filtered_vote_indices;
-}
-
-
-void SelfAdaptHGHV::prepare_voting(
-            std::vector<std::pair<float,float>> &votes,
-            std::pair<float,float> &rmse_E_min_max,
-            std::pair<float,float> &rmse_T_min_max,
-            const pcl::CorrespondencesPtr &model_scene_corrs_filtered,
-            const pcl::PointCloud<PointT>::Ptr object_keypoints,
-            const pcl::PointCloud<ISMFeature>::Ptr object_features,
-            const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf) const
-{
-    std::vector<Eigen::Vector3f> rotations;
-    std::vector<Eigen::Vector3f> translations;
-    std::vector<float> matching_weights;
-    float max_weight = 0;
-    for(const pcl::Correspondence &corr : *model_scene_corrs_filtered)
-    {
-        // get rotation matrix
-        pcl::ReferenceFrame lrf_scene = m_scene_lrf->at(corr.index_query);
-        pcl::ReferenceFrame lrf_object = object_lrf->at(corr.index_match);
-        Eigen::Matrix3f lrf_s = lrf_scene.getMatrix3fMap();
-        Eigen::Matrix3f lrf_o = lrf_object.getMatrix3fMap();
-        Eigen::Matrix3f R = lrf_s.transpose() * lrf_o;
-        // get translation vector
-        Eigen::Vector3f keypoint_scene = m_scene_keypoints->at(corr.index_query).getVector3fMap();
-        Eigen::Vector3f keypoint_object = object_keypoints->at(corr.index_match).getVector3fMap();
-        Eigen::Vector3f T = keypoint_scene - R * keypoint_object;
-        // convert rotation to euler angles
-        float phi, theta, psi;
-        if(R(3,3) == 0)
-        {
-            phi = 0;
-        }
-        else
-        {
-            phi = std::atan(R(3,2) / R(3,3));
-        }
-        if(R(3,3) == 0 && R(3,2) == 0)
-        {
-            theta = 0;
-        }
-        else
-        {
-            theta = std::atan(-R(3,1) / std::sqrt(R(3,2)*R(3,2) + R(3,3)*R(3,3)));
-        }
-        if(R(1,1) == 0)
-        {
-            psi = 0;
-        }
-        else
-        {
-            psi = atan(R(2,1)/R(1,1));
-        }
-        // store translations and rotations
-        rotations.push_back(Eigen::Vector3f(phi, theta, psi));
-        translations.push_back(T);
-
-        // compute descriptor distance as weight
-        ISMFeature feat_scene = m_features->at(corr.index_query);
-        ISMFeature feat_object = object_features->at(corr.index_match);
-        DistanceEuclidean dist;
-        float weight_raw = dist(feat_object.descriptor, feat_scene.descriptor);
-        max_weight = weight_raw > max_weight ? weight_raw : max_weight;
-        matching_weights.push_back(weight_raw);
-    }
-
-    // compute the center values and all weights from raw values that were saved
-    Eigen::Vector3f E_c(0,0,0);
-    Eigen::Vector3f T_c(0,0,0);
-    float sum_weights = 0;
-    for(unsigned i = 0; i < rotations.size(); i++)
-    {
-        float &raw_weight = matching_weights.at(i);
-        raw_weight = 1 - (raw_weight / max_weight);
-        sum_weights += raw_weight;
-        E_c += raw_weight * rotations.at(i);
-        T_c += raw_weight * translations.at(i);
-    }
-    // not in the paper, but shouldn't it be normalized by sum of weights?
-    // NOTE: missing normalization does not affect results negatively
-    //E_c /= sum_weights;
-    //T_c /= sum_weights;
-
-    // compute RMSEs as votes
-    for(unsigned i = 0; i < rotations.size(); i++)
-    {
-        Eigen::Vector3f rot = rotations.at(i);
-        float ex = rot.x()-E_c.x();
-        float ey = rot.y()-E_c.y();
-        float ez = rot.z()-E_c.z();
-        float rmse_e_i = std::sqrt((ex*ex + ey*ey + ez*ez)/3);
-        if(rmse_e_i < rmse_E_min_max.first)
-            rmse_E_min_max.first = rmse_e_i;
-        if(rmse_e_i > rmse_E_min_max.second)
-            rmse_E_min_max.second = rmse_e_i;
-
-        Eigen::Vector3f tr = translations.at(i);
-        float tx = tr.x() - T_c.x();
-        float ty = tr.y() - T_c.y();
-        float tz = tr.z() - T_c.z();
-        float rmse_t_i = std::sqrt((tx*tx + ty*ty + tz*tz)/3);
-        if(rmse_t_i < rmse_T_min_max.first)
-            rmse_T_min_max.first = rmse_t_i;
-        if(rmse_t_i > rmse_T_min_max.second)
-            rmse_T_min_max.second = rmse_t_i;
-
-        votes.push_back({rmse_e_i, rmse_t_i});
-    }
-}
-
-
-std::vector<pcl::Correspondences> SelfAdaptHGHV::getCorrespondeceClustersFromMaxima(
-        const std::vector<double> &maxima,
-        const std::vector<std::vector<int>> &voteIndices,
-        const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const
-{
-    std::vector<pcl::Correspondences> clustered_corrs;
-    for (size_t j = 0; j < maxima.size (); ++j) // loop over all maxima
-    {
-        pcl::Correspondences max_corrs;
-        for (size_t i = 0; i < voteIndices[j].size(); ++i)
-        {
-            max_corrs.push_back(model_scene_corrs_filtered->at(voteIndices[j][i]));
-        }
-        clustered_corrs.push_back(max_corrs);
-    }
-    return clustered_corrs;
-}
-
-
-std::vector<std::pair<unsigned, float>> SelfAdaptHGHV::getResultsFromMaxima(
-        const std::vector<double> &maxima,
-        const std::vector<std::vector<int>> &voteIndices,
-        const pcl::CorrespondencesPtr &model_scene_corrs_filtered,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features) const
-{
-    std::vector<std::pair<unsigned, float>> results;
-    for (size_t j = 0; j < maxima.size (); ++j) // loop over all maxima
-    {
-        std::map<unsigned, int> class_occurences;
-        pcl::Correspondences max_corrs;
-        for (size_t i = 0; i < voteIndices[j].size(); ++i)
-        {
-            max_corrs.push_back(model_scene_corrs_filtered->at(voteIndices[j][i]));
-        }
-
-        // count class occurences in filtered corrs
-        for(unsigned fcorr_idx = 0; fcorr_idx < max_corrs.size(); fcorr_idx++) // loop over all correspondences per max
-        {
-            // match_idx refers to the modified list, not the original codebook!!!
-            unsigned match_idx = max_corrs.at(fcorr_idx).index_match;
-            const ISMFeature &cur_feat = object_features->at(match_idx);
-            unsigned class_id = cur_feat.classId;
-            // add occurence of this class_id
-            if(class_occurences.find(class_id) != class_occurences.end())
-            {
-                class_occurences.at(class_id) += 1;
-            }
-            else
-            {
-                class_occurences.insert({class_id, 1});
-            }
-        }
-
-        // determine most frequent label
-        unsigned cur_class = 0;
-        int cur_best_num = 0;
-        for(auto occ_elem : class_occurences)
-        {
-            if(occ_elem.second > cur_best_num)
-            {
-                cur_best_num = occ_elem.second;
-                cur_class = occ_elem.first;
-            }
-        }
-        results.push_back({cur_class, cur_best_num});
-    }
-    return results;
+    generateClassificationHypotheses(object_scene_corrs, vote_indices, object_features, results);
 }
 
 
@@ -558,15 +287,20 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename)
       return std::vector<VotingMaximum>();
     }
 
-    // extract features
-    pcl::PointCloud<ISMFeature>::Ptr features = processPointCloud(cloud);
+    // all these pointers are initialized within the called method
+    pcl::PointCloud<PointT>::Ptr keypoints;
+    pcl::PointCloud<ISMFeature>::Ptr features;
+    pcl::PointCloud<pcl::Normal>::Ptr normals;
+    pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
+    processPointCloud(cloud, keypoints, features, normals, reference_frames);
+
 
     std::vector<VotingMaximum> result_maxima;
 
     // get results
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
-    std::tie(results, positions) = findObjects(features, cloud);
+    findObjects(features, cloud); // results, positions
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -590,14 +324,19 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename)
 }
 
 
-std::tuple<std::vector<std::pair<unsigned, float>>,std::vector<Eigen::Vector3f>>
-SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+void SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
                            const pcl::PointCloud<PointT>::Ptr scene_cloud)
 {
     // get model-scene correspondences
-    // query index is scene, match index is codebook ("object")
-    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features);
+    // !!!
+    // query/source index is codebook ("object"), match/target index is scene
+    // !!!
+    // do not apply a threshold here, it is done during the self-adapted voting
+    float matching_threshold = std::numeric_limits<float>::max();
+    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
+
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
+
 
     // TODO VS
     // run first RANSAC here to eliminate false correspondences - how exactly?
@@ -617,80 +356,86 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
     // if all are different
     //      -> accept if valid distance ratio between k1 and k2
 
-    // object keypoints are simply the matched keypoints from the codebook
-    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    // however in order not to pass the whole codebook, we need to adjust the index mapping
-    for(unsigned i = 0; i < object_scene_corrs->size(); i++)
-    {
-        // create new list of keypoints and reassign the object (i.e. match) index
-        pcl::Correspondence &corr = object_scene_corrs->at(i);
-        int &index = corr.index_match;
-        const ISMFeature &feat = m_features->at(index);
-        object_features->push_back(feat);
+//    // object keypoints are simply the matched keypoints from the codebook
+//    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
+//    pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
+//    pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
+//    // however in order not to pass the whole codebook, we need to adjust the index mapping
+//    for(unsigned i = 0; i < object_scene_corrs->size(); i++)
+//    {
+//        // create new list of keypoints and reassign the object (i.e. match) index
+//        pcl::Correspondence &corr = object_scene_corrs->at(i);
+//        int &index = corr.index_match;
+//        const ISMFeature &feat = m_features->at(index);
+//        object_features->push_back(feat);
 
-        PointT keypoint = PointT(feat.x, feat.y, feat.z);
-        index = object_keypoints->size(); // remap index to new position in the created point cloud
-        object_keypoints->push_back(keypoint);
+//        PointT keypoint = PointT(feat.x, feat.y, feat.z);
+//        index = object_keypoints->size(); // remap index to new position in the created point cloud
+//        object_keypoints->push_back(keypoint);
 
-        pcl::ReferenceFrame lrf = feat.referenceFrame;
-        object_lrf->push_back(lrf);
-    }
+//        pcl::ReferenceFrame lrf = feat.referenceFrame;
+//        object_lrf->push_back(lrf);
+//    }
 
-    std::vector<double> maxima;
-    std::vector<std::vector<int>> voteIndices;
-    pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
-    performSelfAdaptedHoughVoting(maxima, voteIndices, model_scene_corrs_filtered,
-                                  object_scene_corrs, object_keypoints, object_features, object_lrf);
+//    std::vector<double> maxima;
+//    std::vector<std::vector<int>> voteIndices;
+//    pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
+//    performSelfAdaptedHoughVoting(maxima, voteIndices, model_scene_corrs_filtered,
+//                                  object_scene_corrs, object_keypoints, object_features, object_lrf);
 
-    // get clusters from each maximum, note that correspondences might still be of different classes
-    std::vector<pcl::Correspondences> clustered_corrs;
-    clustered_corrs = std::move(getCorrespondeceClustersFromMaxima(maxima, voteIndices, model_scene_corrs_filtered));
+//    // get clusters from each maximum, note that correspondences might still be of different classes
+//    std::vector<pcl::Correspondences> clustered_corrs;
+//    clustered_corrs = std::move(getCorrespondeceClustersFromMaxima(maxima, voteIndices, model_scene_corrs_filtered));
 
-    // generate 6DOF hypotheses from clusters
-    std::vector<std::pair<unsigned, float>> results;
-    std::vector<Eigen::Vector3f> positions;
-    std::vector<Eigen::Matrix4f> transformations;
-    std::vector<pcl::Correspondences> filtered_clustered_corrs;
-    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
-    corr_rejector.setMaximumIterations(10000);
-    corr_rejector.setInlierThreshold(m_bin_size(0));
-    corr_rejector.setInputSource(m_scene_keypoints);
-    corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
-    //corr_rejector.setRefineModel(true); // TODO VS verify: slightly worse results
+//    // generate 6DOF hypotheses from clusters
+//    std::vector<std::pair<unsigned, float>> results;
+//    std::vector<Eigen::Vector3f> positions;
+//    std::vector<Eigen::Matrix4f> transformations;
+//    std::vector<pcl::Correspondences> filtered_clustered_corrs;
+//    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
+//    corr_rejector.setMaximumIterations(10000);
+//    corr_rejector.setInlierThreshold(m_bin_size(0));
+//    corr_rejector.setInputSource(m_scene_keypoints);
+//    corr_rejector.setInputTarget(object_keypoints); // idea: use keypoints of features matched in the codebook
+//    //corr_rejector.setRefineModel(true); // TODO VS verify: slightly worse results
 
-    // second RANSAC: filter correspondence groups by position
-    for(const pcl::Correspondences &temp_corrs : clustered_corrs)
-    {
-        pcl::Correspondences filtered_corrs;
-        corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
-        Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
+//    // second RANSAC: filter correspondence groups by position
+//    for(const pcl::Correspondences &temp_corrs : clustered_corrs)
+//    {
+//        pcl::Correspondences filtered_corrs;
+//        corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
+//        Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
 
-        // TODO VS check if best_transform is computed with "absolute orientation"
-        // check code of corr_rejector --> confirmed it is using absolute orientation!!!
+//        // TODO VS check if best_transform is computed with "absolute orientation"
+//        // check code of corr_rejector --> confirmed it is using absolute orientation!!!
 
-        // TODO VS check for background knowledge:
-        // https://www.ais.uni-bonn.de/papers/RAM_2015_Holz_PCL_Registration_Tutorial.pdf
-        // https://www.programmersought.com/article/93804217152/
+//        // TODO VS check for background knowledge:
+//        // https://www.ais.uni-bonn.de/papers/RAM_2015_Holz_PCL_Registration_Tutorial.pdf
+//        // https://www.programmersought.com/article/93804217152/
 
-        // TODO VS check if this if clause works and makes sense
-        if(!best_transform.isIdentity(0.01))
-        {
-            // keep transformation and correspondences if RANSAC was run successfully
-            transformations.push_back(best_transform);
-            filtered_clustered_corrs.push_back(filtered_corrs);
+//        // TODO VS check if this if clause works and makes sense
+//        if(!best_transform.isIdentity(0.01))
+//        {
+//            // keep transformation and correspondences if RANSAC was run successfully
+//            transformations.push_back(best_transform);
+//            filtered_clustered_corrs.push_back(filtered_corrs);
 
-            // TODO VS: the following is probably not needed at this point
-            unsigned res_class;
-            int res_num_votes;
-            Eigen::Vector3f res_position;
-            findClassAndPositionFromCluster(filtered_corrs, m_features, scene_features,
-                                            res_class, res_num_votes, res_position);
-            results.push_back({res_class, res_num_votes});
-            positions.push_back(res_position);
-        }
-    }
+//            // TODO VS: the following is probably not needed at this point
+//            unsigned res_class;
+//            int res_num_votes;
+//            Eigen::Vector3f res_position;
+//            findClassAndPositionFromCluster(filtered_corrs, m_features, scene_features,
+//                                            res_class, res_num_votes, res_position);
+//            results.push_back({res_class, res_num_votes});
+//            positions.push_back(res_position);
+//        }
+//    }
+
+
+
+
+
+
 
 //    // ------ this is where the aldoma contibution starts -------
 //    std::vector<std::pair<unsigned, float>> results;
@@ -816,8 +561,29 @@ SelfAdaptHGHV::findObjects(const pcl::PointCloud<ISMFeature>::Ptr& scene_feature
 //        }
 //    }
 
-    return std::make_tuple(results, positions);
+
 }
+
+
+
+std::vector<pcl::Correspondences> SelfAdaptHGHV::getCorrespondeceClustersFromMaxima(
+        const std::vector<double> &maxima,
+        const std::vector<std::vector<int>> &voteIndices,
+        const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const
+{
+    std::vector<pcl::Correspondences> clustered_corrs;
+    for (size_t j = 0; j < maxima.size (); ++j) // loop over all maxima
+    {
+        pcl::Correspondences max_corrs;
+        for (size_t i = 0; i < voteIndices[j].size(); ++i)
+        {
+            max_corrs.push_back(model_scene_corrs_filtered->at(voteIndices[j][i]));
+        }
+        clustered_corrs.push_back(max_corrs);
+    }
+    return clustered_corrs;
+}
+
 
 
 void SelfAdaptHGHV::findClassAndPositionFromCluster(
@@ -892,298 +658,6 @@ bool SelfAdaptHGHV::loadModel(std::string &filename)
 }
 
 
-pcl::PointCloud<ISMFeature>::Ptr SelfAdaptHGHV::processPointCloud(pcl::PointCloud<PointT>::Ptr cloud)
-{
-    // create search tree
-    pcl::search::Search<PointT>::Ptr searchTree;
-    searchTree = pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
-
-    // compute normals
-    pcl::PointCloud<pcl::Normal>::Ptr normals;
-    computeNormals(cloud, normals, searchTree);
-
-    // filter normals
-    pcl::PointCloud<pcl::Normal>::Ptr normals_without_nan;
-    pcl::PointCloud<PointT>::Ptr cloud_without_nan;
-    filterNormals(normals, normals_without_nan, cloud, cloud_without_nan);
-
-    // compute keypoints
-    pcl::PointCloud<PointT>::Ptr keypoints;
-    computeKeypoints(keypoints, cloud_without_nan);
-    m_scene_keypoints = keypoints;
-
-    // compute reference frames
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr reference_frames;
-    computeReferenceFrames(reference_frames, keypoints, cloud_without_nan, searchTree);
-    m_scene_lrf = reference_frames;
-
-    // sort out invalid reference frames and associated keypoints
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr cleanReferenceFrames(new pcl::PointCloud<pcl::ReferenceFrame>());
-    pcl::PointCloud<PointT>::Ptr cleanKeypoints(new pcl::PointCloud<PointT>());
-    unsigned missedFrames = 0;
-    for (int i = 0; i < (int)reference_frames->size(); i++) {
-        const pcl::ReferenceFrame& frame = reference_frames->at(i);
-        if (std::isfinite (frame.x_axis[0]) &&
-                std::isfinite (frame.y_axis[0]) &&
-                std::isfinite (frame.z_axis[0])) {
-            cleanReferenceFrames->push_back(frame);
-            cleanKeypoints->push_back(keypoints->at(i));
-        }
-        else
-            missedFrames++;
-    }
-
-    // compute descriptors
-    pcl::PointCloud<ISMFeature>::Ptr features;
-    computeDescriptors(cloud_without_nan, normals_without_nan, cleanKeypoints, searchTree, cleanReferenceFrames, features);
-
-
-    // store keypoint positions and reference frames
-    for (int i = 0; i < (int)features->size(); i++)
-    {
-        ISMFeature& feature = features->at(i);
-        const PointT& keypoint = cleanKeypoints->at(i);
-        feature.x = keypoint.x;
-        feature.y = keypoint.y;
-        feature.z = keypoint.z;
-        feature.referenceFrame = cleanReferenceFrames->at(i);
-    }
-
-    // remove NAN features
-    pcl::PointCloud<ISMFeature>::Ptr features_cleaned;
-    removeNanDescriptors(features, features_cleaned);
-
-    return features_cleaned;
-}
-
-
-void SelfAdaptHGHV::computeNormals(pcl::PointCloud<PointT>::Ptr cloud,
-                           pcl::PointCloud<pcl::Normal>::Ptr& normals,
-                           pcl::search::Search<PointT>::Ptr searchTree) const
-{
-    normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
-
-    if(m_normal_method == 0)
-    {
-         // prepare PCL normal estimation object
-        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(cloud);
-        normalEst.setNumberOfThreads(0);
-        normalEst.setSearchMethod(searchTree);
-        normalEst.setRadiusSearch(m_normal_radius);
-        normalEst.setViewPoint(0,0,0);
-        normalEst.compute(*normals);
-    }
-    else
-    {
-        // prepare PCL normal estimation object
-        pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
-        normalEst.setInputCloud(cloud);
-        normalEst.setSearchMethod(searchTree);
-        normalEst.setRadiusSearch(m_normal_radius);
-
-        // move model to origin, then point normals away from origin
-        pcl::PointCloud<PointT>::Ptr model_no_centroid(new pcl::PointCloud<PointT>());
-        pcl::copyPointCloud(*cloud, *model_no_centroid);
-
-        // compute the object centroid
-        Eigen::Vector4f centroid4f;
-        pcl::compute3DCentroid(*model_no_centroid, centroid4f);
-        Eigen::Vector3f centroid(centroid4f[0], centroid4f[1], centroid4f[2]);
-        // remove centroid for normal computation
-        for(PointT& point : model_no_centroid->points)
-        {
-            point.x -= centroid.x();
-            point.y -= centroid.y();
-            point.z -= centroid.z();
-        }
-        normalEst.setInputCloud(model_no_centroid);
-        normalEst.setViewPoint(0,0,0);
-        normalEst.compute(*normals);
-        // invert normals
-        for(pcl::Normal& norm : normals->points)
-        {
-            norm.normal_x *= -1;
-            norm.normal_y *= -1;
-            norm.normal_z *= -1;
-        }
-    }
-}
-
-void SelfAdaptHGHV::filterNormals(pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                          pcl::PointCloud<pcl::Normal>::Ptr &normals_without_nan,
-                          pcl::PointCloud<PointT>::Ptr &cloud,
-                          pcl::PointCloud<PointT>::Ptr &cloud_without_nan) const
-{
-    std::vector<int> mapping;
-    normals_without_nan = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
-    pcl::removeNaNNormalsFromPointCloud(*normals, *normals_without_nan, mapping);
-
-    // create new point cloud without NaN normals
-    cloud_without_nan = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
-    for (int i = 0; i < (int)mapping.size(); i++)
-    {
-        cloud_without_nan->push_back(cloud->at(mapping[i]));
-    }
-}
-
-
-void SelfAdaptHGHV::computeKeypoints(pcl::PointCloud<PointT>::Ptr &keypoints, pcl::PointCloud<PointT>::Ptr &cloud) const
-{
-    pcl::VoxelGrid<PointT> voxelGrid;
-    voxelGrid.setInputCloud(cloud);
-    voxelGrid.setLeafSize(m_keypoint_sampling_radius, m_keypoint_sampling_radius, m_keypoint_sampling_radius);
-    keypoints = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
-    voxelGrid.filter(*keypoints);
-}
-
-
-void SelfAdaptHGHV::computeReferenceFrames(pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                                   pcl::PointCloud<PointT>::Ptr &keypoints,
-                                   pcl::PointCloud<PointT>::Ptr &cloud,
-                                   pcl::search::Search<PointT>::Ptr &searchTree) const
-{
-    reference_frames = pcl::PointCloud<pcl::ReferenceFrame>::Ptr(new pcl::PointCloud<pcl::ReferenceFrame>());
-    pcl::SHOTLocalReferenceFrameEstimationOMP<PointT, pcl::ReferenceFrame> refEst;
-    refEst.setRadiusSearch(m_reference_frame_radius);
-    refEst.setInputCloud(keypoints);
-    refEst.setSearchSurface(cloud);
-    refEst.setSearchMethod(searchTree);
-    refEst.compute(*reference_frames);
-
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr cleanReferenceFrames(new pcl::PointCloud<pcl::ReferenceFrame>());
-    pcl::PointCloud<PointT>::Ptr cleanKeypoints(new pcl::PointCloud<PointT>());
-    for(int i = 0; i < (int)reference_frames->size(); i++)
-    {
-        const pcl::ReferenceFrame& frame = reference_frames->at(i);
-        if(std::isfinite(frame.x_axis[0]) && std::isfinite(frame.y_axis[0]) && std::isfinite(frame.z_axis[0]))
-        {
-            cleanReferenceFrames->push_back(frame);
-            cleanKeypoints->push_back(keypoints->at(i));
-        }
-    }
-
-    keypoints = cleanKeypoints;
-    reference_frames = cleanReferenceFrames;
-}
-
-
-void SelfAdaptHGHV::computeDescriptors(pcl::PointCloud<PointT>::Ptr &cloud,
-                               pcl::PointCloud<pcl::Normal>::Ptr &normals,
-                               pcl::PointCloud<PointT>::Ptr &keypoints,
-                               pcl::search::Search<PointT>::Ptr &searchTree,
-                               pcl::PointCloud<pcl::ReferenceFrame>::Ptr &reference_frames,
-                               pcl::PointCloud<ISMFeature>::Ptr &features) const
-{
-    if(m_feature_type == "SHOT")
-    {
-        pcl::SHOTEstimationOMP<PointT, pcl::Normal, pcl::SHOT352> shotEst;
-        shotEst.setSearchSurface(cloud);
-        shotEst.setInputNormals(normals);
-        shotEst.setInputCloud(keypoints);
-        shotEst.setInputReferenceFrames(reference_frames);
-        shotEst.setSearchMethod(searchTree);
-        shotEst.setRadiusSearch(m_feature_radius);
-        pcl::PointCloud<pcl::SHOT352>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT352>());
-        shotEst.compute(*shot_features);
-
-        // create descriptor point cloud
-        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-        features->resize(shot_features->size());
-
-        for (int i = 0; i < (int)shot_features->size(); i++)
-        {
-            ISMFeature& feature = features->at(i);
-            const pcl::SHOT352& shot = shot_features->at(i);
-
-            // store the descriptor
-            feature.descriptor.resize(352);
-            for (int j = 0; j < feature.descriptor.size(); j++)
-                feature.descriptor[j] = shot.descriptor[j];
-        }
-    }
-    else if(m_feature_type == "CSHOT")
-    {
-        pcl::SHOTColorEstimationOMP<PointT, pcl::Normal, pcl::SHOT1344> shotEst;
-
-        // temporary workaround to fix race conditions in OMP version of CSHOT in PCL
-        if (shotEst.sRGB_LUT[0] < 0)
-        {
-          for (int i = 0; i < 256; i++)
-          {
-            float f = static_cast<float> (i) / 255.0f;
-            if (f > 0.04045)
-              shotEst.sRGB_LUT[i] = powf ((f + 0.055f) / 1.055f, 2.4f);
-            else
-              shotEst.sRGB_LUT[i] = f / 12.92f;
-          }
-
-          for (int i = 0; i < 4000; i++)
-          {
-            float f = static_cast<float> (i) / 4000.0f;
-            if (f > 0.008856)
-              shotEst.sXYZ_LUT[i] = static_cast<float> (powf (f, 0.3333f));
-            else
-              shotEst.sXYZ_LUT[i] = static_cast<float>((7.787 * f) + (16.0 / 116.0));
-          }
-        }
-
-        shotEst.setSearchSurface(cloud);
-        shotEst.setInputNormals(normals);
-        shotEst.setInputCloud(keypoints);
-        shotEst.setInputReferenceFrames(reference_frames);
-        shotEst.setSearchMethod(searchTree);
-        shotEst.setRadiusSearch(m_feature_radius);
-        pcl::PointCloud<pcl::SHOT1344>::Ptr shot_features(new pcl::PointCloud<pcl::SHOT1344>());
-        shotEst.compute(*shot_features);
-
-        // create descriptor point cloud
-        features = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-        features->resize(shot_features->size());
-
-        for (int i = 0; i < (int)shot_features->size(); i++)
-        {
-            ISMFeature& feature = features->at(i);
-            const pcl::SHOT1344& shot = shot_features->at(i);
-
-            // store the descriptor
-            feature.descriptor.resize(1344);
-            for (int j = 0; j < feature.descriptor.size(); j++)
-                feature.descriptor[j] = shot.descriptor[j];
-        }
-    }
-}
-
-
-void SelfAdaptHGHV::removeNanDescriptors(pcl::PointCloud<ISMFeature>::Ptr &features,
-                                 pcl::PointCloud<ISMFeature>::Ptr &features_cleaned) const
-{
-    features_cleaned = pcl::PointCloud<ISMFeature>::Ptr(new pcl::PointCloud<ISMFeature>());
-    features_cleaned->header = features->header;
-    features_cleaned->height = 1;
-    features_cleaned->is_dense = false;
-    bool nan_found = false;
-    for(int a = 0; a < features->size(); a++)
-    {
-        ISMFeature fff = features->at(a);
-        for(int b = 0; b < fff.descriptor.size(); b++)
-        {
-            if(std::isnan(fff.descriptor.at(b)))
-            {
-                nan_found = true;
-                break;
-            }
-        }
-        if(!nan_found)
-        {
-            features_cleaned->push_back(fff);
-        }
-        nan_found = false;
-    }
-    features_cleaned->width = features_cleaned->size();
-}
-
-
 flann::Matrix<float> SelfAdaptHGHV::createFlannDataset() const
 {
     // create a dataset with all features for matching / activation
@@ -1205,45 +679,6 @@ flann::Matrix<float> SelfAdaptHGHV::createFlannDataset() const
     return dataset;
 }
 
-
-pcl::CorrespondencesPtr SelfAdaptHGHV::findNnCorrespondences(const pcl::PointCloud<ISMFeature>::Ptr& scene_features) const
-{
-    pcl::CorrespondencesPtr model_scene_corrs(new pcl::Correspondences());
-
-    // loop over all features extracted from the scene
-    #pragma omp parallel for
-    for(int fe = 0; fe < scene_features->size(); fe++)
-    {
-        // insert the query point
-        ISMFeature feature = scene_features->at(fe);
-        flann::Matrix<float> query(new float[feature.descriptor.size()], 1, feature.descriptor.size());
-        for(int i = 0; i < feature.descriptor.size(); i++)
-        {
-            query[0][i] = feature.descriptor.at(i);
-        }
-
-        // prepare results
-        std::vector<std::vector<int>> indices;
-        std::vector<std::vector<float>> distances;
-        m_flann_index.knnSearch(query, indices, distances, 1, flann::SearchParams(128));
-
-        delete[] query.ptr();
-
-        // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
-        float threshold = std::numeric_limits<float>::max();
-        if(distances[0][0] < threshold)
-        {
-            // query index is scene, match is codebook ("object")
-            pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
-            #pragma omp critical
-            {
-                model_scene_corrs->push_back(corr);
-            }
-        }
-    }
-
-    return model_scene_corrs;
-}
 
 bool SelfAdaptHGHV::saveModelToFile(std::string &filename,
                               std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,

@@ -134,3 +134,29 @@ void runGlobalHV(
         const bool detect_clutter,
         const float normal_radius,
         std::vector<bool> &hypotheses_mask);
+
+void performSelfAdaptedHoughVoting(
+        const pcl::CorrespondencesPtr &object_scene_corrs,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        float initial_matching_threshold,
+        float rel_threshold,
+        std::vector<double> &maxima,
+        std::vector<std::vector<int>> &vote_indices,
+        pcl::CorrespondencesPtr &model_scene_corrs_filtered);
+
+void prepareSelfAdaptedVoting(
+        const pcl::CorrespondencesPtr &object_scene_corrs_filtered,
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        std::vector<std::pair<float,float>> &votes,
+        std::pair<float,float> &rmse_E_min_max,
+        std::pair<float,float> &rmse_T_min_max);

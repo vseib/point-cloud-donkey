@@ -141,12 +141,16 @@ target_link_libraries(eval_pipeline_aldoma_detection implicit_shape_model ${Boos
 add_executable(eval_pipeline_zhou
     eval_pipelines/eval_pipeline_zhou/eval_self_adapt_hghv.cpp
     eval_pipelines/eval_pipeline_zhou/self_adapt_hghv.cpp
+    eval_pipelines/pipeline_building_blocks/pipeline_building_blocks.cpp
+    eval_pipelines/pipeline_building_blocks/feature_processing.cpp
 )
 target_link_libraries(eval_pipeline_zhou implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(eval_pipeline_zhou_detection
     eval_pipelines/eval_pipeline_zhou/eval_self_adapt_hghv_detection.cpp
     eval_pipelines/eval_pipeline_zhou/self_adapt_hghv.cpp
+    eval_pipelines/pipeline_building_blocks/pipeline_building_blocks.cpp
+    eval_pipelines/pipeline_building_blocks/feature_processing.cpp
 )
 target_link_libraries(eval_pipeline_zhou_detection implicit_shape_model ${Boost_LIBRARIES} ${PCL_LIBRARIES})
 
