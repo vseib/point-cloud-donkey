@@ -53,8 +53,8 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
     else if(dataset == "washington" || dataset == "bigbird" || dataset == "ycb")
     {
         /// classification
-        m_bin_size = 0.02; // TODO VS check param
-        m_corr_threshold = -0.1; // TODO VS check param
+        m_bin_size = 0.02;
+        m_corr_threshold = -0.1;
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
@@ -71,15 +71,35 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
         fp::keypoint_sampling_radius = 0.02;
-        fp::normal_method = 0;
 
-        m_icp_max_iter = 100;
-        m_icp_corr_distance = 0.05;
+        // TODO VS: for eval:
+        // bin_size and corr_threshold:     wieder über schleife evaluiert!
+        // eval chen vs. tombari:           zuerst chen!
+        // with weighted_votes or not:      zuerst ohne
+        // matching_threshold:              zuerst ohne
+        // m_corr_threshold:                zuerst standardwert
+
+        // eval use_aligned_cloud or cluster for position   zuerst aligned cloud
+        // eval all global hv params                        zuerst mit defaults
+
+        // TODO also eval this params: NOTE set below in the pipeline!!!!
+//        m_icp_max_iter = 100; // use default
+//        m_icp_corr_distance = bin; // default was 0.05, also check 2*bin later
 
         if(dataset == "dataset1")
+        {
+            fp::normal_method = 1;
             fp::feature_type = "SHOT";
+//            m_corr_threshold = -0.01; // TODO VS include after eval
+//            m_bin_size = Eigen::Vector3d(0.01, 0.01, 0.01);
+        }
         if(dataset == "dataset5")
+        {
+            fp::normal_method = 0;
             fp::feature_type = "CSHOT";
+//            m_corr_threshold = -0.50; // TODO VS include after eval
+//            m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
+        }
     }
     else
     {
@@ -296,7 +316,9 @@ void GlobalHV::classifyObject(
         std::vector<std::pair<unsigned, float>> &results)
 {
     // get model-scene correspondences
-    // query index is scene, match index is codebook ("object")
+    // !!!
+    // query/source index is codebook ("object"), match/target index is scene
+    // !!!
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
@@ -348,7 +370,9 @@ void GlobalHV::findObjects(
         std::vector<Eigen::Vector3f> &positions)
 {
     // get model-scene correspondences
-    // query index is scene, match index is codebook ("object")
+    // !!!
+    // query/source index is codebook ("object"), match/target index is scene
+    // !!!
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
@@ -373,8 +397,10 @@ void GlobalHV::findObjects(
     // otherwise it is the min. number of votes to form a maximum
     if(!use_hough)
     {
-        m_corr_threshold = 3;
+        m_corr_threshold = 5;
     }
+
+    // TODO VS try passing the whole scene cloud instead of only scene keypoints
     clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
                            scene_lrf, object_lrf, use_distance_weight, m_bin_size,
                            m_corr_threshold, fp::reference_frame_radius, use_hough,
@@ -401,23 +427,35 @@ void GlobalHV::findObjects(
 
         // ICP
         std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
-        float icp_max_iterations = m_icp_max_iter;
-        float icp_correspondence_distance = m_icp_corr_distance;
+        float icp_max_iterations = 100;
+        float icp_correspondence_distance = 0.05;
+        // TODO VS try passing the whole scene cloud instead of only scene keypoints
         alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
                            scene_keypoints, instances, registered_instances);
 
+        std::cout << "-------- registered instances size: " << registered_instances.size() << std::endl;
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2; // NOTE TODO VS debug: crashes if this is used
+        for(auto inst : registered_instances)
+        {
+            if(inst->size() > 9)
+                registered_instances2.push_back(inst);
+            std::cout << "         num points: " << inst->size() << std::endl;
+        }
+
+
         // Hypothesis Verification
         std::vector<bool> hypotheses_mask;  // Mask Vector to identify positive hypotheses
-        float inlier_threshold = 0.01;
-        float occlusion_threshold = 0.02;
-        float regularizer = 3.0;
+        float inlier_threshold = m_bin_size; // 0.01;
+        float occlusion_threshold = 0.05; // 0.02
+        float regularizer = 1.0;
         float clutter_regularizer = 5.0;
-        float radius_clutter = 0.25;
+        float radius_clutter = 0.25; // 0.25;
         bool detect_clutter = true;
         runGlobalHV(scene_cloud, registered_instances, inlier_threshold, occlusion_threshold,
                     regularizer, clutter_regularizer, radius_clutter, detect_clutter,
                     fp::normal_radius, hypotheses_mask);
 
+        std::cout << "-------- after global hv " << std::endl;
         for (int i = 0; i < hypotheses_mask.size (); i++)
         {
             if(hypotheses_mask[i])
@@ -435,6 +473,7 @@ void GlobalHV::findObjects(
                                                 res_class, res_num_votes, res_position);
                 if(use_aligned_cloud)
                 {
+                    // TODO VS: since i am using only keypoints, taking the centroid will be not precise
                     // find aligned position
                     pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
                     Eigen::Vector4f centroid4f;
