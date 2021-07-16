@@ -18,7 +18,7 @@ class Hough3d
 {
 
 public:
-    Hough3d(std::string dataset);
+    Hough3d(std::string dataset, float bin = -1, float th = -1);
 
     virtual ~Hough3d()
     {
@@ -31,7 +31,7 @@ public:
 
     std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool useSingleVotingSpace);
 
-    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification);
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification, bool useSingleVotingSpace);
 
     bool loadModel(std::string &filename);
 
@@ -63,20 +63,28 @@ private:
 
     flann::Matrix<float> createFlannDataset();
 
-    void findObjects(
+
+    void classifyObjectsWithSeparateVotingSpaces(
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            std::vector<std::pair<unsigned, float>> &results);
+
+    void classifyObjectsWithSingleVotingSpace(
+            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+            std::vector<std::pair<unsigned, float>> &results);
+
+    void findObjectsWithSingleVotingSpace(
             const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
             const pcl::PointCloud<PointT>::Ptr scene_keypoints,
             const bool use_hv,
             std::vector<std::pair<unsigned, float>> &results,
             std::vector<Eigen::Vector3f> &positions);
 
-    void classifyObjectsWithSeparateVotingSpaces(
-            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-            std::vector<std::pair<unsigned, float>> &results);
-
-    void classifyObjectsWithUnifiedVotingSpaces(
-            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-            std::vector<std::pair<unsigned, float>> &results);
+    void findObjectsWithSeparateVotingSpaces(
+            const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+            const bool use_hv,
+            std::vector<std::pair<unsigned, float>> &results,
+            std::vector<Eigen::Vector3f> &positions);
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
