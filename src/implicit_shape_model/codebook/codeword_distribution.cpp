@@ -48,7 +48,7 @@ namespace ism3d
 
         // get activation position, relative to object center
         Eigen::Vector3f keyPos(feature.x, feature.y, feature.z);
-        Eigen::Vector3f center = boundingBox.position;
+        Eigen::Vector3f center = boundingBox.position; // TODO VS: try swapping bbox for cloud centroid
         Eigen::Vector3f vote = center - keyPos;
         m_originalVotes.push_back(vote);
 
