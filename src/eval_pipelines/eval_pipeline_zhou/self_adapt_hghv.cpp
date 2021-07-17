@@ -244,9 +244,6 @@ void SelfAdaptHGHV::classifyObject(
     // NOTE:
     // * find transformation while eliminating fp with ransac
     // * only keep inliers
-    // --> this requires to have separate codebooks for matching, otherwise transformations won't make sense
-    // alternative with a common codebook: matching threshold
-
 
     // object keypoints are simply the matched keypoints from the codebook
     // however in order not to pass the whole codebook, we need to adjust the index mapping
@@ -295,7 +292,7 @@ std::vector<VotingMaximum> SelfAdaptHGHV::detect(const std::string &filename)
     // get results
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
-    bool use_hv = true; // TODO VS get from calling method
+    bool use_hv = true;
     findObjects(cloud, features, keypoints, reference_frames, use_hv, results, positions);
 
     // here higher values are better
@@ -344,8 +341,7 @@ void SelfAdaptHGHV::findObjects(
     // NOTE:
     // * find transformation while eliminating fp with ransac
     // * only keep inliers
-    // --> this requires to have separate codebooks for matching, otherwise transformations won't make sense
-    // alternative with a common codebook: matching threshold
+
 
     // object keypoints are simply the matched keypoints from the codebook
     // however in order not to pass the whole codebook, we need to adjust the index mapping
@@ -377,7 +373,7 @@ void SelfAdaptHGHV::findObjects(
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                               inlier_threshold, refine_model, separate_voting_spaces, use_hv,
                                               transformations, clustered_corrs);
-    // TODO VS check for background knowledge:
+    // check for background knowledge:
     // https://www.ais.uni-bonn.de/papers/RAM_2015_Holz_PCL_Registration_Tutorial.pdf
     // https://www.programmersought.com/article/93804217152/
 
@@ -403,9 +399,10 @@ void SelfAdaptHGHV::findObjects(
     std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
     float icp_max_iterations = 100;
     float icp_correspondence_distance = 0.05;
+    std::vector<Eigen::Matrix4f> final_transformations;
     // TODO VS try passing the whole scene cloud instead of only scene keypoints
     alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                       scene_keypoints, instances, registered_instances);
+                       scene_keypoints, instances, registered_instances, final_transformations);
 
     // find nearest neighbors for each point of a registered instance in the scene
     std::vector<pcl::PointCloud<PointT>::ConstPtr> inlier_points_of_instances;
@@ -416,7 +413,7 @@ void SelfAdaptHGHV::findObjects(
 
     std::vector<pcl::PointCloud<PointT>::ConstPtr> first_pass_instances;
     std::vector<int> first_pass_indices; // mapping the passed hypotheses to total list of registered instances
-    for(int i = 0; i < inlier_points_of_instances.size(); i++)
+    for(unsigned i = 0; i < inlier_points_of_instances.size(); i++)
     {
         float fs1 = fs_metrics[i];
         float mr1 = mr_metrics[i];
@@ -448,9 +445,10 @@ void SelfAdaptHGHV::findObjects(
     // ---------------------------- second verify ----------------------------
     // ICP
     std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2;
+    std::vector<Eigen::Matrix4f> final_transformations2; // unused
     // TODO VS try passing the whole scene cloud instead of only scene keypoints
     alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                       scene_keypoints, first_pass_instances, registered_instances2);
+                       scene_keypoints, first_pass_instances, registered_instances2, final_transformations2);
 
     // find nearest neighbors for each point of a registered instance in the scene
     std::vector<pcl::PointCloud<PointT>::ConstPtr> inlier_points_of_instances2;
@@ -461,7 +459,7 @@ void SelfAdaptHGHV::findObjects(
 
     std::vector<pcl::PointCloud<PointT>::ConstPtr> second_pass_instances;
     std::vector<int> second_pass_indices; // mapping the passed hypotheses to total list of registered instances
-    for(int i = 0; i < inlier_points_of_instances2.size(); i++)
+    for(unsigned i = 0; i < inlier_points_of_instances2.size(); i++)
     {
         float fs2 = fs_metrics2[i];
         float mr2 = mr_metrics2[i];
@@ -490,120 +488,62 @@ void SelfAdaptHGHV::findObjects(
     // get resulting instances
     std::vector<pcl::PointCloud<PointT>::ConstPtr> verified_instances;
     std::vector<pcl::PointCloud<PointT>::ConstPtr> verified_instances_inliers1;
-    std::vector<pcl::PointCloud<PointT>::ConstPtr> verified_instances_inliers2 = second_pass_instances;
-    std::vector<Eigen::Matrix4f> verified_transformations;
-    for(int i = 0; i < second_pass_instances.size(); i++)
+    // std::vector<pcl::PointCloud<PointT>::ConstPtr> verified_instances_inliers2 = second_pass_instances;
+    std::vector<pcl::Correspondences> verified_corrs;
+    std::vector<Eigen::Matrix4f> verified_final_transforms;
+    for(unsigned i = 0; i < second_pass_instances.size(); i++)
     {
         int second_pass_idx = second_pass_indices[i];
         int first_pass_idx = first_pass_indices[second_pass_idx];
         verified_instances_inliers1.push_back(inlier_points_of_instances[first_pass_idx]);
         verified_instances.push_back(registered_instances[first_pass_idx]);
-        verified_transformations.push_back(transformations[first_pass_idx]);
+        verified_corrs.push_back(clustered_corrs[first_pass_idx]);
+        verified_final_transforms.push_back(final_transformations[first_pass_idx]);
     }
 
-    // TODO VS: find and fill in results
-
-//            if(hypotheses_mask[i])
-//            {
-//                std::cout << "Instance " << i << " is GOOD!" << std::endl;
-//                pcl::Correspondences filtered_corrs = clustered_corrs[i];
-//                unsigned res_class;
-//                int res_num_votes;
-//                Eigen::Vector3f res_position;
-//                findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-//                                                res_class, res_num_votes, res_position);
-
-//                // find aligned position
-//                pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
-//                Eigen::Vector4f centroid4f;
-//                pcl::compute3DCentroid(*reg_inst, centroid4f);
-
-//                // store results
-//                results.push_back({res_class, res_num_votes});
-//                // TODO VS: which position? transformed centroid or position from cluster (the latter was better in first test)
-//                //positions.emplace_back(Eigen::Vector3f(centroid4f.x(), centroid4f.y(), centroid4f.z()));
-//                positions.push_back(res_position);
-//            }
-}
-
-
-
-std::vector<pcl::Correspondences> SelfAdaptHGHV::getCorrespondeceClustersFromMaxima(
-        const std::vector<double> &maxima,
-        const std::vector<std::vector<int>> &voteIndices,
-        const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const
-{
-    std::vector<pcl::Correspondences> clustered_corrs;
-    for (size_t j = 0; j < maxima.size (); ++j) // loop over all maxima
+    // compute resulting class and position
+    for(unsigned i = 0; i < verified_instances.size(); i++)
     {
-        pcl::Correspondences max_corrs;
-        for (size_t i = 0; i < voteIndices[j].size(); ++i)
+        // NOTE: instances are already transformed with the transformations computed earlier,
+        //       but not yet with the final transformation found in first ICP step
+        pcl::PointCloud<PointT>::ConstPtr object = verified_instances.at(i);
+        pcl::PointCloud<PointT>::ConstPtr object_inlier = verified_instances_inliers1.at(i);
+        pcl::Correspondences corrs = verified_corrs[i];
+
+        // find class id
+        unsigned res_class;
+        int res_num_votes;
+        pcl::PointCloud<PointT>::Ptr scene_points(new pcl::PointCloud<PointT>());
+        findClassAndPointsFromCorrespondences(corrs, object_features, scene_features,
+                                              res_class, res_num_votes, scene_points);
+
+        // find aligned position
+        bool use_complete_object = true; // use complete object instance or only the inlier points after first ICP
+        pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
+        if(use_complete_object)
         {
-            max_corrs.push_back(model_scene_corrs_filtered->at(voteIndices[j][i]));
+            pcl::transformPointCloud(*object, *transformed_object, verified_final_transforms[i]);
         }
-        clustered_corrs.push_back(max_corrs);
-    }
-    return clustered_corrs;
-}
-
-
-
-void SelfAdaptHGHV::findClassAndPositionFromCluster(
-        const pcl::Correspondences &filtered_corrs,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-        unsigned &resulting_class,
-        int &resulting_num_votes,
-        Eigen::Vector3f &resulting_position) const
-{
-    // determine position based on filtered correspondences for each remaining class
-    // (ideally, only one class remains after filtering)
-    std::vector<Eigen::Vector3f> all_centers(m_number_of_classes);
-    std::vector<int> num_votes(m_number_of_classes);
-    // init
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] = Eigen::Vector3f(0.0f,0.0f,0.0f);
-        num_votes[temp_idx] = 0;
-    }
-    // compute
-    for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
-    {
-        // match_idx refers to the modified list, not the original codebook!!!
-        unsigned match_idx = filtered_corrs.at(fcorr_idx).index_match;
-        // const ISMFeature &cur_feat = m_features->at(match_idx);
-        const ISMFeature &cur_feat = object_features->at(match_idx);
-        unsigned class_id = cur_feat.classId;
-
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
-        const ISMFeature &scene_feat = scene_features->at(scene_idx);
-        pcl::ReferenceFrame ref = scene_feat.referenceFrame;
-        Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
-        Eigen::Vector3f vote = m_center_vectors.at(match_idx);
-        Eigen::Vector3f pos = keyPos + Utils::rotateBack(vote, ref);
-        all_centers[class_id] += pos;
-        num_votes[class_id] += 1;
-    }
-    for(unsigned temp_idx = 0; temp_idx < all_centers.size(); temp_idx++)
-    {
-        all_centers[temp_idx] /= num_votes[temp_idx];
-    }
-    // find class with max votes
-    unsigned cur_class = 0;
-    int cur_best_num = 0;
-    for(unsigned class_idx = 0; class_idx < num_votes.size(); class_idx++)
-    {
-        if(num_votes[class_idx] > cur_best_num)
+        else
         {
-            cur_best_num = num_votes[class_idx];
-            cur_class = class_idx;
+            pcl::transformPointCloud(*object_inlier, *transformed_object, verified_final_transforms[i]);
         }
-    }
 
-    // fill in results
-    resulting_class = cur_class;
-    resulting_num_votes = cur_best_num;
-    resulting_position = all_centers[cur_class];
+        bool use_object_points = true; // use object points or the corresponding keypoints from the scene
+        Eigen::Vector4f centroid;
+        if(use_object_points)
+        {
+            pcl::compute3DCentroid(*transformed_object, centroid);
+        }
+        else
+        {
+            pcl::compute3DCentroid(*scene_points, centroid);
+        }
+
+        // store results
+        results.push_back({res_class, res_num_votes});
+        positions.push_back(Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z()));
+    }
 }
 
 

@@ -434,9 +434,10 @@ void GlobalHV::findObjects(
         std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
         float icp_max_iterations = 100;
         float icp_correspondence_distance = 0.05;
+        std::vector<Eigen::Matrix4f> final_transformations;
         // TODO VS try passing the whole scene cloud instead of only scene keypoints
         alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                           scene_keypoints, instances, registered_instances);
+                           scene_keypoints, instances, registered_instances, final_transformations);
 
         std::cout << "Registered instances: " << registered_instances.size() << std::endl;
 
@@ -474,12 +475,14 @@ void GlobalHV::findObjects(
                 unsigned res_class;
                 int res_num_votes;
                 Eigen::Vector3f res_position;
+                // TODO check: am i allowed to use center vectors in aldoma method?
                 findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
                                                 object_center_vectors, m_number_of_classes,
                                                 res_class, res_num_votes, res_position);
                 if(use_aligned_cloud)
                 {
                     // TODO VS: since i am using only keypoints, taking the centroid will be not precise
+                    // --> use final_transformations from ICP
                     // find aligned position
                     pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
                     Eigen::Vector4f centroid4f;

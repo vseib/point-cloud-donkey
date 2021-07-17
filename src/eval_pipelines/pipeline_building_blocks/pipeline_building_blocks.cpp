@@ -150,7 +150,7 @@ void clusterCorrespondences(
         const bool use_hough,
         const bool recognize,
         std::vector<pcl::Correspondences> &clustered_corrs,
-        std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> &rototranslations)
+        std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> &transformations)
 {
     //  Using Hough3D - i.e. hypothesis generation of tombari
     if(use_hough)
@@ -168,7 +168,7 @@ void clusterCorrespondences(
         clusterer.setSceneCloud(scene_keypoints);
         clusterer.setModelSceneCorrespondences(object_scene_corrs);
         if(recognize)
-            clusterer.recognize(rototranslations, clustered_corrs);
+            clusterer.recognize(transformations, clustered_corrs);
         else
             clusterer.cluster(clustered_corrs);
     }
@@ -182,7 +182,7 @@ void clusterCorrespondences(
         gc_clusterer.setModelSceneCorrespondences(object_scene_corrs);
         gc_clusterer.cluster(clustered_corrs);
         if(recognize)
-            gc_clusterer.recognize(rototranslations, clustered_corrs);
+            gc_clusterer.recognize(transformations, clustered_corrs);
         else
             gc_clusterer.cluster(clustered_corrs);
     }
@@ -482,6 +482,58 @@ void findClassAndPositionFromTransformedObjectKeypoints(
 }
 
 
+void findClassAndPointsFromCorrespondences(
+        const pcl::Correspondences &corrs,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        unsigned &res_class,
+        int &res_num_votes,
+        pcl::PointCloud<PointT>::Ptr scene_points)
+{
+    // count correspondences per class
+    std::map<unsigned, int> corrs_per_class;
+    for(unsigned i = 0; i < corrs.size(); i++)
+    {
+        unsigned object_idx = corrs.at(i).index_query;
+        const ISMFeature &object_feat = object_features->at(object_idx);
+        unsigned class_id = object_feat.classId;
+
+        if(corrs_per_class.find(class_id) != corrs_per_class.end())
+        {
+            corrs_per_class[class_id]++;
+        }
+        else
+        {
+            corrs_per_class.insert({class_id, 1});
+        }
+    }
+
+    // find most frequent class
+    res_num_votes = 0;
+    for(auto [class_id, num_votes] : corrs_per_class)
+    {
+        if(num_votes > res_num_votes)
+        {
+            res_num_votes = num_votes;
+            res_class = class_id;
+        }
+    }
+
+    // extract points corresponding to most frequent class
+    scene_points->clear();
+    for(unsigned i = 0; i < corrs.size(); i++)
+    {
+        unsigned object_idx = corrs.at(i).index_query;
+        unsigned scene_idx = corrs.at(i).index_match;
+        if(res_class == object_features->at(object_idx).classId)
+        {
+            const ISMFeature &scene_feat = scene_features->at(scene_idx);
+            scene_points->push_back(PointT(scene_feat.x, scene_feat.y, scene_feat.z));
+        }
+    }
+}
+
+
 void findPositionFromCluster(
         const pcl::Correspondences &filtered_corrs,
         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
@@ -562,13 +614,13 @@ void findPositionFromTransformedObjectKeypoints(
 
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
-        const std::vector<Eigen::Matrix4f> rototranslations,
+        const std::vector<Eigen::Matrix4f> transformations,
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances)
 {
-    for(size_t i = 0; i < rototranslations.size (); ++i)
+    for(size_t i = 0; i < transformations.size (); ++i)
     {
-        pcl::PointCloud<PointT>::Ptr rotated_model(new pcl::PointCloud<PointT>());
+        pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
         // NOTE: object_keypoints might contain multiple objects, so use only keypoints of a single cluster
         pcl::PointCloud<PointT>::Ptr cluster_keypoints(new pcl::PointCloud<PointT>());
         pcl::Correspondences this_cluster = clustered_corrs[i];
@@ -578,8 +630,8 @@ void generateCloudsFromTransformations(
             PointT keypoint = PointT(feat.x, feat.y, feat.z);
             cluster_keypoints->push_back(keypoint);
         }
-        pcl::transformPointCloud(*cluster_keypoints, *rotated_model, rototranslations[i]);
-        instances.push_back(rotated_model);
+        pcl::transformPointCloud(*cluster_keypoints, *transformed_object, transformations[i]);
+        instances.push_back(transformed_object);
     }
 }
 
@@ -589,7 +641,8 @@ void alignCloudsWithICP(
         const float icp_correspondence_distance,
         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
         const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances)
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances,
+        std::vector<Eigen::Matrix4f> &final_transformations)
 {
     for (size_t i = 0; i < instances.size (); ++i)
     {
@@ -601,6 +654,7 @@ void alignCloudsWithICP(
         pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
         icp.align(*registered);
         registered_instances.push_back(registered);
+        final_transformations.push_back(icp.getFinalTransformation());
     //            std::cout << "Instance " << i << " ";
     //            if (icp.hasConverged ())
     //            {

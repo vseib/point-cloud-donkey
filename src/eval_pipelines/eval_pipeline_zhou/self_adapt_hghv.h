@@ -77,25 +77,6 @@ private:
             std::vector<std::pair<unsigned, float>> &results,
             std::vector<Eigen::Vector3f> &positions);
 
-    std::vector<pcl::Correspondences> getCorrespondeceClustersFromMaxima(
-            const std::vector<double> &maxima,
-            const std::vector<std::vector<int>> &voteIndices,
-            const pcl::CorrespondencesPtr &model_scene_corrs_filtered) const;
-
-    std::vector<std::pair<unsigned, float>> getResultsFromMaxima(
-                const std::vector<double> &maxima,
-                const std::vector<std::vector<int>> &voteIndices,
-                const pcl::CorrespondencesPtr &model_scene_corrs_filtered,
-                const pcl::PointCloud<ISMFeature>::Ptr object_features) const;
-
-    void findClassAndPositionFromCluster(
-            const pcl::Correspondences &filtered_corrs,
-            const pcl::PointCloud<ISMFeature>::Ptr object_features,
-            const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-            unsigned &resulting_class,
-            int &resulting_num_votes,
-            Eigen::Vector3f &resulting_position) const;
-
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
                          std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const;
