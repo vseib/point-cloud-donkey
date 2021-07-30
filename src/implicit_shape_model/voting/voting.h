@@ -50,6 +50,7 @@ namespace ism3d
             Eigen::Vector3f keypoint;       // associated keypoint position
             Utils::BoundingBox boundingBox; // associated bounding box
             int codewordId;                 // codeword the vote belongs to
+            int vote_id; // TODO VS temp workaround - get rid of it
         };
 
         /**
@@ -129,7 +130,7 @@ namespace ism3d
         Voting();
 
         virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
-                                 const std::vector<Voting::Vote>&,
+                                 std::vector<Voting::Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
                                  std::vector<std::vector<unsigned>>&,

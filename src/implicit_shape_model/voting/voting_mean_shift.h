@@ -40,7 +40,7 @@ namespace ism3d
 
     protected:
         void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                         const std::vector<Voting::Vote>&,
+                         std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<unsigned>> &,
@@ -48,20 +48,34 @@ namespace ism3d
                          std::vector<std::vector<float>>&,
                          unsigned);
         float iGetSeedsRange() const;
+
+        std::vector<Voting::Vote> getVotesInRadius(
+                const pcl::search::KdTree<PointT>::Ptr search,
+                const PointT query,
+                const float radius,
+                std::vector<Voting::Vote> votes);
+
         void iDoMeanShift(const std::vector<Voting::Vote>&,
                           const std::vector<Voting::Vote>&,
                           std::vector<Eigen::Vector3f>&,
+                          std::vector<std::vector<Voting::Vote>> &cluster_votes,
                           std::vector<std::vector<Eigen::Vector3f> >&,
                           pcl::search::KdTree<PointT>::Ptr& search);
-        float estimateDensity(Eigen::Vector3f,
-                              int,
-                              std::vector<float>&,
-                              const std::vector<Voting::Vote>&,
-                              pcl::search::KdTree<PointT>::Ptr& search);
+
+        float estimateDensity(Eigen::Vector3f position,
+                              std::vector<float>& new_cluster_votes_weights,
+                              const std::vector<Voting::Vote>& cluster_votes);
+
+//        float estimateDensity(Eigen::Vector3f,
+//                              int,
+//                              std::vector<float>&,
+//                              const std::vector<Voting::Vote>&,
+//                              pcl::search::KdTree<PointT>::Ptr& search);
 
     private:
         bool computeMeanShift(const std::vector<Voting::Vote>&,
                               const Eigen::Vector3f& center,
+                              std::vector<Voting::Vote> &current_votes,
                               Eigen::Vector3f& newCenter,
                               pcl::search::KdTree<PointT>::Ptr& search) const;
 
@@ -75,9 +89,6 @@ namespace ism3d
         float kernelDerivedGaussian(float) const;
         float kernelUniform(float) const;
         float kernelDerivedUniform(float) const;
-
-        // each position index in this vector represents a vote index, at each position index is the cluster index, the vote belongs to
-        std::vector<int> m_clusterIndices;
 
         // NOTE: trajectories are saved for each class id and store a path of 3d positions for each
         // seed point

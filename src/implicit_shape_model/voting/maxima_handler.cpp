@@ -25,27 +25,35 @@ namespace ism3d
 
     void MaximaHandler::processMaxima(const std::string &type,
                                       const std::vector<Eigen::Vector3f>& clusterCenters,
+                                      const std::vector<std::vector<Voting::Vote>> &cluster_votes,
                                       const float radius,
-                                      std::vector<Eigen::Vector3f>& clusters)
+                                      std::vector<Eigen::Vector3f>& clusters,
+                                      std::vector<std::vector<Voting::Vote>> &processed_cluster_votes)
     {
         // retrieve maximum points
         if(type == "Suppress")
         {
-            suppressNeighborMaxima(clusterCenters, radius, clusters);
+            suppressNeighborMaxima(clusterCenters, cluster_votes, radius, clusters, processed_cluster_votes);
         }
         else if(type == "Average")
         {
-            averageNeighborMaxima(clusterCenters, radius, clusters);
+            // TODO VS eval and remove if worse than suppress
+            LOG_ERROR("----------- maxima handler: average neighbor maxima no longer supported!!!");
+            averageNeighborMaxima(clusterCenters, cluster_votes, radius, clusters, processed_cluster_votes);
         }
         else if(type == "AverageShift")
         {
-            averageShiftNeighborMaxima(clusterCenters, radius, clusters);
+            // TODO VS eval and remove if worse than suppress
+            LOG_ERROR("----------- maxima handler: average shift neighbor maxima no longer supported!!!");
+            averageShiftNeighborMaxima(clusterCenters, cluster_votes, radius, clusters, processed_cluster_votes);
         }
     }
 
     void MaximaHandler::suppressNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
+                                               const std::vector<std::vector<Voting::Vote>> &cluster_votes,
                                                const float radius,
-                                               std::vector<Eigen::Vector3f>& clusters)
+                                               std::vector<Eigen::Vector3f>& clusters,
+                                               std::vector<std::vector<Voting::Vote>> &processed_cluster_votes)
     {
         std::vector<bool> duplicate(maxima.size());
         duplicate.assign(duplicate.size(), false);
@@ -74,13 +82,18 @@ namespace ism3d
         // add correct cluster centers
         for (int i = 0; i < (int)duplicate.size(); i++) {
             if (!duplicate[i])
+            {
                 clusters.push_back(maxima[i]);
+                processed_cluster_votes.push_back(cluster_votes[i]);
+            }
         }
     }
 
     void MaximaHandler::averageNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
+                                              const std::vector<std::vector<Voting::Vote>> &cluster_votes,
                                               const float radius,
-                                              std::vector<Eigen::Vector3f>& clusters)
+                                              std::vector<Eigen::Vector3f>& clusters,
+                                              std::vector<std::vector<Voting::Vote>> &processed_cluster_votes)
     {
         std::vector<std::vector<int>> duplicate_indices(maxima.size());
         for(int i = 0; i < duplicate_indices.size(); i++)
@@ -124,26 +137,45 @@ namespace ism3d
             {
                 // maximum without neighbors can be added directly
                 clusters.push_back(maxima[index_list.at(0)]);
+                processed_cluster_votes.push_back(cluster_votes[index_list.at(0)]);
             }
             else
             {
                 // compute average of maximum and all neighbors
                 Eigen::Vector3f average(0, 0, 0);
-                for (int i = 0; i < index_list.size(); i++)
+                for (int j = 0; j < index_list.size(); j++)
                 {
                     // update shifted position
-                    average += maxima[index_list.at(i)];
+                    average += maxima[index_list.at(j)];
                 }
                 average /= index_list.size();
+
+                // check all votes for resulting average
+                std::vector<Voting::Vote> temp_list;
+                for (int j = 0; j < index_list.size(); j++)
+                {
+                    std::vector<Voting::Vote> votes = cluster_votes[index_list.at(j)];
+                    for(Voting::Vote v : votes)
+                    {
+                        if((v.position - average).norm() < radius)
+                        {
+                            temp_list.push_back(v);
+                        }
+                    }
+                }
+
                 clusters.push_back(average);
+                processed_cluster_votes.push_back(temp_list);
             }
         }
     }
 
 
     void MaximaHandler::averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
+                                                   const std::vector<std::vector<Voting::Vote>> &cluster_votes,
                                                    const float radius,
-                                                   std::vector<Eigen::Vector3f>& clusters)
+                                                   std::vector<Eigen::Vector3f>& clusters,
+                                                   std::vector<std::vector<Voting::Vote>> &processed_cluster_votes)
     {
         std::vector<std::vector<int>> duplicate_indices(maxima.size());
         for(int i = 0; i < duplicate_indices.size(); i++)
@@ -196,13 +228,29 @@ namespace ism3d
             {
                 // compute average of maximum and all neighbors
                 Eigen::Vector3f shifted(0, 0, 0);
-                for (int i = 0; i < index_list.size(); i++)
+                for (int j = 0; j < index_list.size(); j++)
                 {
                     // update shifted position
-                    shifted += maxima[index_list.at(i)];
+                    shifted += maxima[index_list.at(j)];
                 }
                 shifted /= index_list.size();
+
+                // check all votes for resulting average
+                std::vector<Voting::Vote> temp_list;
+                for (int j = 0; j < index_list.size(); j++)
+                {
+                    std::vector<Voting::Vote> votes = cluster_votes[index_list.at(j)];
+                    for(Voting::Vote v : votes)
+                    {
+                        if((v.position - shifted).norm() < radius)
+                        {
+                            temp_list.push_back(v);
+                        }
+                    }
+                }
+
                 clusters.push_back(shifted);
+                processed_cluster_votes.push_back(temp_list);
             }
         }
     }

@@ -15,6 +15,7 @@
 #include <Eigen/Core>
 
 #include "voting_maximum.h"
+#include "voting.h"
 
 namespace ism3d
 {
@@ -84,8 +85,10 @@ namespace ism3d
         // -------------- these methods determine which maxima are kept during mean-shift ------------------
         static void processMaxima(const std::string &type,
                            const std::vector<Eigen::Vector3f>& clusterCenters,
+                           const std::vector<std::vector<Voting::Vote>> &cluster_votes,
                            const float radius,
-                           std::vector<Eigen::Vector3f>& clusters);
+                           std::vector<Eigen::Vector3f>& clusters,
+                           std::vector<std::vector<Voting::Vote>> &processed_cluster_votes);
 
         // -------------- these methods determine how maxima are treated after mean-shift ------------------
         static std::vector<VotingMaximum> filterMaxima(const std::string filter_type, const std::vector<VotingMaximum> &maxima);
@@ -97,17 +100,17 @@ namespace ism3d
         // -------------- these methods determine which maxima are kept during mean-shift ------------------
 
         // only the first maximum in the radius is retained
-        static void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&,
+        static void suppressNeighborMaxima(const std::vector<Eigen::Vector3f>&, const std::vector<std::vector<Voting::Vote> > &cluster_votes,
                                     const float radius,
-                                    std::vector<Eigen::Vector3f>&);
+                                    std::vector<Eigen::Vector3f>&, std::vector<std::vector<Voting::Vote> > &processed_cluster_votes);
         // the average of the maxima in the radius is retained
-        static void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                   const float radius,
-                                   std::vector<Eigen::Vector3f>&);
+        static void averageNeighborMaxima(const std::vector<Eigen::Vector3f>&, const std::vector<std::vector<Voting::Vote> > &cluster_votes,
+                                          const float radius,
+                                          std::vector<Eigen::Vector3f>&, std::vector<std::vector<Voting::Vote> > &processed_cluster_votes);
         // the average of the maxima and its [neighbor's neighbor's ...] neighbors in the radius is retained
-        static void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&,
-                                        const float radius,
-                                        std::vector<Eigen::Vector3f>&);
+        static void averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>&, const std::vector<std::vector<Voting::Vote> > &cluster_votes,
+                                               const float radius,
+                                               std::vector<Eigen::Vector3f>&, std::vector<std::vector<Voting::Vote> > &processed_cluster_votes);
 
         // -------------- these methods determine how maxima are treated after mean-shift ------------------
         static std::vector<VotingMaximum> mergeAndFilterMaxima(const std::vector<VotingMaximum> &maxima, bool merge);
