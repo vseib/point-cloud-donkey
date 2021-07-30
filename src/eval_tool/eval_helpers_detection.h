@@ -155,13 +155,13 @@ computeMetrics(std::vector<DetectionObject> &class_objects_gt,
 
     // compute average precision metric
     float ap = 0.0;
-    float cumul_tp = 0.0;
+    int cumul_tp = 0;
     for(unsigned i = 0; i < tp.size(); i++)
     {
         if(tp[i] == 1)
         {
             cumul_tp += 1;
-            ap += (cumul_tp / (i+1)) * (1.0/num_gt);
+            ap += (float(cumul_tp) / (i+1)) * (1.0/num_gt);
         }
     }
 
@@ -171,7 +171,7 @@ computeMetrics(std::vector<DetectionObject> &class_objects_gt,
         cumul_fp += elem;
     }
 
-    return {float(precision), float(recall), ap, int(cumul_tp), cumul_fp};
+    return {float(precision), float(recall), ap, cumul_tp, cumul_fp};
 }
 
 
