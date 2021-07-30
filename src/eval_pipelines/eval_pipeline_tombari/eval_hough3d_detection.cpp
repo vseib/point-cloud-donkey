@@ -49,7 +49,7 @@
 
 int main (int argc, char** argv)
 {
-    if(argc != 5)
+    if(argc != 7)
     {
         std::cout << std::endl << "Usage:" << std::endl << std::endl;
         std::cout << argv[0] << " [dataset file] [model name]" << std::endl << std::endl;
@@ -74,6 +74,9 @@ int main (int argc, char** argv)
 
     float bin = atof(argv[3]);
     float th = atof(argv[4]);
+    int count = atoi(argv[5]);
+    int count2 = atoi(argv[6]);
+
 
     // parse input
     std::vector<std::string> filenames;
@@ -98,7 +101,7 @@ int main (int argc, char** argv)
         datasetname = str1;
     }
 
-    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname,bin, th));
+    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname,bin, th, count));
 
     // workaround to set "mode"
     {
@@ -200,7 +203,7 @@ int main (int argc, char** argv)
             std::vector<DetectionObject> detected_objects;
 
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
-            std::ofstream summaryFile("output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_"+outputname);
+            std::ofstream summaryFile("output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_"+std::to_string(count)+"_"+"_"+std::to_string(count2)+outputname);
 
             for(unsigned i = 0; i < filenames.size(); i++)
             {
@@ -258,7 +261,8 @@ int main (int argc, char** argv)
                 std::vector<DetectionObject> class_objects_gt = item.second;
                 // these variables sum over each class
                 int num_gt = int(class_objects_gt.size());
-                int cumul_tp, cumul_fp;
+                int cumul_tp = 0;
+                int cumul_fp = 0;
 
                 // if there are no detections for this class
                 if(det_class_map.find(class_label) == det_class_map.end())
@@ -320,11 +324,13 @@ int main (int argc, char** argv)
             mAP /= ap_per_class.size();
             mPrec /= ap_per_class.size();
             mRec /= ap_per_class.size();
+            float fscore = 2*mPrec*mRec / (mPrec+mRec);
             summaryFile << std::endl << std::endl;
             summaryFile << "main metrics:" << std::endl;
             summaryFile << "       mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
             summaryFile << "       mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
-            summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl << std::endl;
+            summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl;
+            summaryFile << "       f-score:        " << std::setw(7) << std::round(fscore*10000.0f)/10000.0f << " (" << std::round(fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
 
             // complete and close summary file
             summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";

@@ -4,6 +4,7 @@
 #include <pcl/features/shot_omp.h>
 #include <pcl/features/shot_lrf_omp.h>
 #include <pcl/features/normal_3d_omp.h>
+#include <pcl/features/principal_curvatures.h>
 
 void processPointCloud(
         const pcl::PointCloud<PointT>::Ptr cloud,
@@ -26,7 +27,7 @@ void processPointCloud(
 
     // compute keypoints
     pcl::PointCloud<PointT>::Ptr keypoints;
-    computeKeypoints(cloud_without_nan, keypoints);
+    computeKeypoints(cloud_without_nan, normals_cleaned, keypoints);
 
     // compute reference frames
     computeReferenceFrames(cloud_without_nan, keypoints, searchTree, keypoints_cleaned, reference_frames_cleaned);
@@ -82,7 +83,7 @@ void computeNormals(
         normalEst.setViewPoint(0,0,0);
         normalEst.compute(*normals);
     }
-    else
+    else // TODO VS: das ist nur für classification gut!
     {
         // prepare PCL normal estimation object
         pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
@@ -141,6 +142,7 @@ void filterNormals(
 
 void computeKeypoints(
         const pcl::PointCloud<PointT>::Ptr cloud,
+        const pcl::PointCloud<pcl::Normal>::Ptr normals,
         pcl::PointCloud<PointT>::Ptr &keypoints)
 {
     pcl::VoxelGrid<PointT> voxelGrid;
@@ -148,6 +150,69 @@ void computeKeypoints(
     voxelGrid.setLeafSize(fp::keypoint_sampling_radius, fp::keypoint_sampling_radius, fp::keypoint_sampling_radius);
     keypoints = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
     voxelGrid.filter(*keypoints);
+
+
+//    // select only best keypoints -- temp code
+//    float cutoff_ratio = 0.5;
+//    keypoints = pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
+//    // create cloud containing filtered cloud points and filtered normals
+//    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr points_with_normals(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
+//    pcl::concatenateFields(*cloud, *normals, *points_with_normals);
+
+//    // compute voxel grid keypoints on cloud with normals
+//    pcl::VoxelGrid<pcl::PointXYZRGBNormal> voxel_grid;
+//    voxel_grid.setInputCloud(points_with_normals);
+//    voxel_grid.setLeafSize(fp::keypoint_sampling_radius, fp::keypoint_sampling_radius, fp::keypoint_sampling_radius);
+//    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr keypoints_with_normals(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
+//    voxel_grid.filter(*keypoints_with_normals);
+
+//    // copy only point information without normals
+//    pcl::PointCloud<pcl::PointXYZRGB>::Ptr keypoints_without_normals(new pcl::PointCloud<pcl::PointXYZRGB>()); // these keypoints will be filtered here
+//    pcl::copyPointCloud(*keypoints_with_normals, *keypoints_without_normals);
+
+//    // estimate principle curvatures
+//    pcl::PrincipalCurvaturesEstimation<pcl::PointXYZRGB, pcl::Normal, pcl::PrincipalCurvatures> curv_est;
+//    curv_est.setInputCloud(keypoints_without_normals);
+//    curv_est.setSearchSurface(cloud);
+//    curv_est.setInputNormals(normals);
+//    //curv_est.setSearchMethod(search);
+//    curv_est.setRadiusSearch(fp::keypoint_sampling_radius);
+//    pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures>());
+//    curv_est.compute(*principal_curvatures);
+
+//    std::vector<float> geo_scores;
+//    for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+//    {
+//        // PCL curvature
+//        pcl::PointXYZRGBNormal &reference_point = keypoints_with_normals->at(idx);
+
+//        // gaussian curvature
+//        const pcl::PrincipalCurvatures &pc_point = principal_curvatures->at(idx);
+//        geo_scores.push_back(pc_point.pc1 * pc_point.pc2);
+//        // overwrite curvature with current method's value
+//        reference_point.curvature = pc_point.pc1 * pc_point.pc2;
+//    }
+
+//    // sort to determine cutoff threshold
+//    std::sort(geo_scores.begin(), geo_scores.end());
+
+//    unsigned cutoff_index = unsigned(cutoff_ratio * geo_scores.size());
+//    float filter_threshold_geometry = geo_scores.at(cutoff_index);
+
+//    for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+//    {
+//        bool geo_passed = true;
+//        pcl::PointXYZRGBNormal point = keypoints_with_normals->at(idx);
+//        // NOTE: curvature corresponds to chosen geometry type value
+//        if(point.curvature < filter_threshold_geometry)
+//        {
+//            geo_passed = false;
+//        }
+
+//        if(geo_passed)
+//            keypoints->push_back(keypoints_without_normals->at(idx));
+//    }
+
 }
 
 

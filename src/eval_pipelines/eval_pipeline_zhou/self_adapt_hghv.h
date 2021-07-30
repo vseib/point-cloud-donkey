@@ -17,7 +17,7 @@ class SelfAdaptHGHV
 
 public:
 
-    SelfAdaptHGHV(std::string dataset, float bin=-1, float th=-1);
+    SelfAdaptHGHV(std::string dataset, float bin=-1, float th=-1, int count = -1);
 
     virtual ~SelfAdaptHGHV()
     {
@@ -87,11 +87,11 @@ private:
     std::map<unsigned, std::string> m_instance_labels;
     std::map<unsigned, unsigned> m_instance_to_class_map;
 
-    float m_corr_threshold;
+    float m_temp_1;
+    float m_temp_2;
+    float m_temp_3;
 
-    // TODO VS check these params
-    int m_icp_max_iter;
-    float m_icp_corr_distance;
+    float m_corr_threshold;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;

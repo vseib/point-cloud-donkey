@@ -2,6 +2,8 @@
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/correspondence.h>
+#include <pcl/common/centroid.h>
+#include <pcl/common/transforms.h>
 
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
@@ -30,7 +32,7 @@
  */
 
 
-GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
+GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
@@ -66,7 +68,7 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
     {
         /// detection
         m_bin_size = bin;
-        m_corr_threshold = th;
+        m_corr_threshold = -th;
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
@@ -85,6 +87,8 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th) :
         // TODO also eval this params: NOTE set below in the pipeline!!!!
 //        m_icp_max_iter = 100; // use default
 //        m_icp_corr_distance = bin; // default was 0.05, also check 2*bin later
+
+        m_count = count; // TODO VS temp
 
         if(dataset == "dataset1")
         {
@@ -375,7 +379,8 @@ void GlobalHV::findObjects(
     // !!!
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
-    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
+    pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
+    //pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, m_features, m_flann_index));
 
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
@@ -391,16 +396,19 @@ void GlobalHV::findObjects(
     // Actual Clustering
     std::vector<pcl::Correspondences> clustered_corrs;
     std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformations;
-    bool use_distance_weight = false;
+    bool use_distance_weight = false; // only valid if hough is used
     bool recognize = true; // true for detection
     // NOTE: if hough is used, m_corr_threshold is the relative hough threshold,
     // otherwise it is the min. number of votes to form a maximum
     if(!use_hough)
     {
-        m_corr_threshold = 5;
+        m_corr_threshold *= -1; // hough uses negative value as relative threshold, here we have number of votes, must be positive
     }
 
-    // TODO VS try passing the whole scene cloud instead of only scene keypoints
+    // TODO VS ab hier weiter params suchen
+
+
+    // TODO VS try passing the whole scene cloud instead of only scene keypoints: makes it slightly worse in first try
     clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
                            scene_lrf, object_lrf, use_distance_weight, m_bin_size,
                            m_corr_threshold, fp::reference_frame_radius, use_hough,
@@ -416,11 +424,11 @@ void GlobalHV::findObjects(
     else
     {
         std::cout << "Resulting clusters: " << transformations.size() << std::endl;
+//        sleep(1);
     }
 
-    if(use_global_hv) // aldoma global hypotheses verification
-    {
-        // convert to get rid of explicit alignment
+
+        // convert to get rid of explicit Eigen alignment-type
         std::vector<Eigen::Matrix4f> transformations_temp;
         for(auto &tr : transformations)
         {
@@ -433,31 +441,97 @@ void GlobalHV::findObjects(
         // ICP
         std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
         float icp_max_iterations = 100;
-        float icp_correspondence_distance = 0.05;
+        float icp_correspondence_distance = 0.01;
         std::vector<Eigen::Matrix4f> final_transformations;
-        // TODO VS try passing the whole scene cloud instead of only scene keypoints
+        // TODO VS try passing the whole scene cloud instead of only scene keypoints: makes it very slow and worse
         alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
                            scene_keypoints, instances, registered_instances, final_transformations);
 
         std::cout << "Registered instances: " << registered_instances.size() << std::endl;
 
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2; // NOTE TODO VS debug: crashes if this is used
-        for(auto inst : registered_instances)
-        {
-            if(inst->size() > 9)
-                registered_instances2.push_back(inst);
-            std::cout << "         num points: " << inst->size() << std::endl;
-        }
+//        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2; // NOTE TODO VS debug: crashes if this is used
+//        for(auto inst : registered_instances)
+//        {
+//            if(inst->size() > 9)
+//                registered_instances2.push_back(inst);
+//            //std::cout << "         num points: " << inst->size() << std::endl;
+//        }
 
+
+    if(false) // aldoma global hypotheses verification
+    {
 
         // Hypothesis Verification
         std::vector<bool> hypotheses_mask;  // Mask Vector to identify positive hypotheses
-        float inlier_threshold = m_bin_size; // 0.01;
-        float occlusion_threshold = 0.05; // 0.02
-        float regularizer = 1.0;
-        float clutter_regularizer = 5.0;
-        float radius_clutter = 0.25; // 0.25;
-        bool detect_clutter = true;
+        // TODO VS kommentare zeigen erste ergebnisse
+        float inlier_threshold = 0.01; // 0.01;   // gut wenn, ca. hälfte von occlusion_th (z.b. 0.01 und 0.02 oder jeweils halbiert)
+        float occlusion_threshold = 0.02; // 0.02
+        float radius_clutter = 0.25; // 0.25;           // gut wenn, 0.1 oder 0.05
+        bool detect_clutter = true;                     // besser mit true
+        float regularizer = 1.0;            // besser so lassen
+        float clutter_regularizer = 5.0;    // besser so lassen
+
+//        if(m_count == 1)
+//        {
+//            inlier_threshold = 0.01;
+//            occlusion_threshold = 0.02;
+//            radius_clutter = 0.15;
+//        }
+//        if(m_count == 2)
+//        {
+//            inlier_threshold = 0.01;
+//            occlusion_threshold = 0.02;
+//            radius_clutter = 0.10;
+//        }
+//        if(m_count == 3)
+//        {
+//            inlier_threshold = 0.01;
+//            occlusion_threshold = 0.02;
+//            radius_clutter = 0.05;
+//        }
+//        if(m_count == 4)
+//        {
+//            inlier_threshold = 0.01;
+//            occlusion_threshold = 0.02;
+//            radius_clutter = 0.02;
+//        }
+//        if(m_count == 5)
+//        {
+//            inlier_threshold = 0.005;
+//            occlusion_threshold = 0.01;
+//            radius_clutter = 0.15;
+//        }
+//        if(m_count == 6)
+//        {
+//            inlier_threshold = 0.005;
+//            occlusion_threshold = 0.01;
+//            radius_clutter = 0.10;
+//        }
+//        if(m_count == 7)
+//        {
+//            inlier_threshold = 0.005;
+//            occlusion_threshold = 0.01;
+//            radius_clutter = 0.05;
+//        }
+//        if(m_count == 8)
+//        {
+//            inlier_threshold = 0.005;
+//            occlusion_threshold = 0.01;
+//            radius_clutter = 0.02;
+//        }
+//        if(m_count == 9)
+//        {
+//            inlier_threshold = 0.02;
+//            occlusion_threshold = 0.04;
+//            radius_clutter = 0.1;
+//        }
+//        if(m_count == 10)
+//        {
+//            inlier_threshold = 0.005;
+//            occlusion_threshold = 0.01;
+//            radius_clutter = 0.05;
+//        }
+
         runGlobalHV(scene_cloud, registered_instances, inlier_threshold, occlusion_threshold,
                     regularizer, clutter_regularizer, radius_clutter, detect_clutter,
                     fp::normal_radius, hypotheses_mask);
@@ -467,34 +541,32 @@ void GlobalHV::findObjects(
         {
             if(hypotheses_mask[i])
             {
-                // use aligned cloud or cluster for position
                 //std::cout << "Instance " << i << " is GOOD!" << std::endl;
-                bool use_aligned_cloud = true;
 
                 pcl::Correspondences filtered_corrs = clustered_corrs[i];
                 unsigned res_class;
                 int res_num_votes;
-                Eigen::Vector3f res_position;
-                // TODO check: am i allowed to use center vectors in aldoma method?
-                findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-                                                object_center_vectors, m_number_of_classes,
-                                                res_class, res_num_votes, res_position);
-                if(use_aligned_cloud)
+                pcl::PointCloud<PointT>::Ptr scene_points(new pcl::PointCloud<PointT>());
+                findClassAndPointsFromCorrespondences(filtered_corrs, object_features, scene_features,
+                                                      res_class, res_num_votes, scene_points);
+                // find aligned position
+                bool use_object_points = false; // use object points or the corresponding keypoints from the scene
+
+                pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
+                Eigen::Vector4f centroid;
+                if(use_object_points)
                 {
-                    // TODO VS: since i am using only keypoints, taking the centroid will be not precise
-                    // --> use final_transformations from ICP
-                    // find aligned position
-                    pcl::PointCloud<PointT>::ConstPtr reg_inst = registered_instances[i];
-                    Eigen::Vector4f centroid4f;
-                    pcl::compute3DCentroid(*reg_inst, centroid4f);
-                    results.push_back({res_class, res_num_votes});
-                    positions.emplace_back(Eigen::Vector3f(centroid4f.x(), centroid4f.y(), centroid4f.z()));
+                    pcl::transformPointCloud(*registered_instances[i], *transformed_object, final_transformations[i]);
+                    pcl::compute3DCentroid(*transformed_object, centroid);
                 }
                 else
                 {
-                    results.push_back({res_class, res_num_votes});
-                    positions.push_back(res_position);
+                    pcl::compute3DCentroid(*scene_points, centroid);
                 }
+
+                // store results
+                results.push_back({res_class, res_num_votes});
+                positions.push_back(Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z()));
             }
             else
             {
@@ -507,17 +579,49 @@ void GlobalHV::findObjects(
     //       tombari pipeline (i.e. executable "eval_pipeline_tombari_detection")
     else
     {
-        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima/clusters
-        {
-            pcl::Correspondences filtered_corrs = clustered_corrs[j];
+        // this is for tombari
+//        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima/clusters
+//        {
+//            pcl::Correspondences filtered_corrs = clustered_corrs[j];
+//            unsigned res_class;
+//            int res_num_votes;
+//            Eigen::Vector3f res_position;
+//            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
+//                                            object_center_vectors, m_number_of_classes,
+//                                            res_class, res_num_votes, res_position);
+//            results.push_back({res_class, res_num_votes});
+//            positions.push_back(res_position);
+//        }
+
+
+        // fallback without HV for paper
+       for (size_t i = 0; i < clustered_corrs.size (); ++i) // loop over all maxima/clusters
+       {
+            pcl::Correspondences filtered_corrs = clustered_corrs[i];
             unsigned res_class;
             int res_num_votes;
-            Eigen::Vector3f res_position;
-            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-                                            object_center_vectors, m_number_of_classes,
-                                            res_class, res_num_votes, res_position);
+            pcl::PointCloud<PointT>::Ptr scene_points(new pcl::PointCloud<PointT>());
+            findClassAndPointsFromCorrespondences(filtered_corrs, object_features, scene_features,
+                                                  res_class, res_num_votes, scene_points);
+            // find aligned position
+            bool use_object_points = false; // use object points or the corresponding keypoints from the scene
+
+            pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
+            Eigen::Vector4f centroid;
+            if(use_object_points)
+            {
+                pcl::transformPointCloud(*registered_instances[i], *transformed_object, final_transformations[i]);
+                pcl::compute3DCentroid(*transformed_object, centroid);
+            }
+            else
+            {
+                pcl::compute3DCentroid(*scene_points, centroid);
+            }
+
+            // store results
             results.push_back({res_class, res_num_votes});
-            positions.push_back(res_position);
+            positions.push_back(Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z()));
+
         }
     }
 }

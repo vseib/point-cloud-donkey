@@ -17,7 +17,7 @@ class GlobalHV
 
 public:
 
-    GlobalHV(std::string dataset, float bin=-1, float th=-1);
+    GlobalHV(std::string dataset, float bin=-1, float th=-1, int count=-1);
 
     virtual ~GlobalHV()
     {
@@ -90,6 +90,7 @@ private:
     std::map<unsigned, unsigned> m_instance_to_class_map;
 
     // TODO VS check these params
+    int m_count;
     float m_corr_threshold;
     float m_bin_size;
     int m_icp_max_iter;

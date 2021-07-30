@@ -39,6 +39,7 @@ void filterNormals(
 
 void computeKeypoints(
         const pcl::PointCloud<PointT>::Ptr cloud,
+        const pcl::PointCloud<pcl::Normal>::Ptr normals,
         pcl::PointCloud<PointT>::Ptr &keypoints);
 
 void computeReferenceFrames(

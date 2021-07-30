@@ -9,7 +9,7 @@
 #include <pcl/recognition/hv/hv_go.h>
 
 pcl::CorrespondencesPtr findNnCorrespondences(
-        const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
         const float matching_threshold,
         const flann::Index<flann::L2<float>> &index)
 {
@@ -46,6 +46,92 @@ pcl::CorrespondencesPtr findNnCorrespondences(
             #pragma omp critical
             {
                 model_scene_corrs->push_back(corr);
+            }
+        }
+    }
+
+    return model_scene_corrs;
+}
+
+
+// TODO VS temp code - knn rule
+pcl::CorrespondencesPtr findNnCorrespondences(
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
+        const flann::Index<flann::L2<float>> &index)
+{
+    pcl::CorrespondencesPtr model_scene_corrs(new pcl::Correspondences());
+    float m_distance_ratio_threshold = 0.9;
+
+    // loop over all features extracted from the scene
+    #pragma omp parallel for
+    for(int fe = 0; fe < scene_features->size(); fe++)
+    {
+        // insert the query point
+        ISMFeature feature = scene_features->at(fe);
+        flann::Matrix<float> query(new float[feature.descriptor.size()], 1, feature.descriptor.size());
+        for(int i = 0; i < feature.descriptor.size(); i++)
+        {
+            query[0][i] = feature.descriptor.at(i);
+        }
+
+        // prepare results
+        std::vector<std::vector<int>> indices;
+        std::vector<std::vector<float>> distances;
+        index.knnSearch(query, indices, distances, 3, flann::SearchParams(128));
+
+        delete[] query.ptr();
+
+        std::array<int, 3> class_ids = {object_features->at(indices[0][0]).classId,
+                                        object_features->at(indices[0][1]).classId,
+                                        object_features->at(indices[0][2]).classId};
+
+        if(class_ids[0] == class_ids[1] && class_ids[0] == class_ids[2])
+        {
+            // if all are same, accept match
+            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
+            #pragma omp critical
+            {
+                model_scene_corrs->push_back(corr);
+            }
+        }
+        else if(class_ids[0] == class_ids[1] && class_ids[0] != class_ids[2])
+        {
+            // if k1 and k2 are same class
+            if(distances[0][0] / distances[0][2] < m_distance_ratio_threshold)
+            {
+                // accept if valid distance ratio between k1 and k3
+                pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
+                #pragma omp critical
+                {
+                    model_scene_corrs->push_back(corr);
+                }
+            }
+        }
+//        else if(class_ids[0] != class_ids[1] && class_ids[1] == class_ids[2])
+//        {
+//            // if k2 and k3 are same, but different from k1
+//            if(distances[0][0] / distances[0][1] >= m_distance_ratio_threshold)
+//            {
+//                // accept __k2__ if distance ratio k1-k2 INvalid? (TODO VS: AND k2-k3 valid?)
+//                pcl::Correspondence corr(indices[0][1], fe, distances[0][1]);
+//                #pragma omp critical
+//                {
+//                    model_scene_corrs->push_back(corr);
+//                }
+//            }
+//        }
+        else if(class_ids[0] != class_ids[1] && class_ids[1] != class_ids[2])
+        {
+            // if all are different or k2 different from k1 and k3
+            if(distances[0][0] / distances[0][1] < m_distance_ratio_threshold)
+            {
+                // accept if valid distance ratio between k1 and k2
+                pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
+                #pragma omp critical
+                {
+                    model_scene_corrs->push_back(corr);
+                }
             }
         }
     }
@@ -282,7 +368,7 @@ void generateHypothesesWithAbsoluteOrientation(
     for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
     {
         // skip maxima with view votes, mostly FP
-        if(vote_indices[j].size() < 3)
+        if(vote_indices[j].size() < 5)
         {
             continue;
         }
@@ -653,17 +739,20 @@ void alignCloudsWithICP(
         icp.setInputTarget(scene_keypoints); // scene keypoints slightly better than scene cloud
         pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
         icp.align(*registered);
-        registered_instances.push_back(registered);
-        final_transformations.push_back(icp.getFinalTransformation());
-    //            std::cout << "Instance " << i << " ";
-    //            if (icp.hasConverged ())
-    //            {
-    //                std::cout << "Aligned!" << std::endl;
-    //            }
-    //            else
-    //            {
-    //                std::cout << "Not Aligned!" << std::endl;
-    //            }
+//        registered_instances.push_back(registered);
+//        final_transformations.push_back(icp.getFinalTransformation());
+
+//        std::cout << "Instance " << i << " ";
+        if (icp.hasConverged ())
+        {
+//                    std::cout << "Aligned!" << std::endl;
+            registered_instances.push_back(registered);
+            final_transformations.push_back(icp.getFinalTransformation());
+        }
+//                else
+//                {
+//                    std::cout << "Not Aligned!" << std::endl;
+//                }
     }
 }
 
@@ -706,6 +795,8 @@ void performSelfAdaptedHoughVoting(
         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        const bool use_distance_weight,
+        const int initial_bin_number,
         float initial_matching_threshold,
         float rel_threshold,
         std::vector<double> &maxima,
@@ -744,7 +835,7 @@ void performSelfAdaptedHoughVoting(
                                  scene_keypoints, scene_features, scene_lrf, votes, rmse_E_min_max, rmse_T_min_max);
 
         // self-adapt measure for number of bins
-        int h_n = 5; // number of bins per dimension, taken from paper
+        int h_n = initial_bin_number; // number of bins per dimension, paper says 5
         while(h_n >= 3)
         {
             std::cout << "Constructing Houghspace with " << h_n << " bins per dimension" << std::endl;
@@ -757,7 +848,8 @@ void performSelfAdaptedHoughVoting(
             Eigen::Vector3d min_coord = Eigen::Vector3d(0, 0, 0);
             Eigen::Vector3d max_coord = Eigen::Vector3d(rmse_E_min_max.second, rmse_T_min_max.second, 1);
             Eigen::Vector3d bin_size = Eigen::Vector3d(b_l,b_w,1);
-            found_bin_size = 0.5 * (b_l + b_w); // forward bin size to calling method
+            std::cout << " -------- auto bin size: " << std::endl << bin_size << std::endl;
+            found_bin_size = b_w; // forward bin size to calling method, choose b_w over b_l since it closer resembles the object extensions
             // using 3d since there is no 2d hough in pcl
             std::shared_ptr<pcl::recognition::HoughSpace3D> hough_space;
             hough_space = std::make_shared<pcl::recognition::HoughSpace3D>(min_coord, bin_size, max_coord);
@@ -771,7 +863,17 @@ void performSelfAdaptedHoughVoting(
                 Eigen::Vector3d vote(votes[vid].first, votes[vid].second, 0);
                 // voting with interpolation
                 // votes are in the same order as correspondences, vid is therefore the index in the correspondence list
-                hough_space->voteInt(vote, 1.0, vid);
+                if(use_distance_weight)
+                {
+                    float dist = object_scene_corrs->at(vid).distance;
+                    float weight = 1 - dist;
+                    weight = weight > 0 ? weight : 0;
+                    hough_space->voteInt(vote, weight, vid);
+                }
+                else
+                {
+                    hough_space->voteInt(vote, 1.0, vid);
+                }
             }
             // find maxima
             hough_space->findMaxima(rel_threshold, maxima, vote_indices);

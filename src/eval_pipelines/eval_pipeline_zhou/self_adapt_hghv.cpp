@@ -1,5 +1,5 @@
 #include <pcl/io/pcd_io.h>
-#include <pcl/correspondence.h>
+#include <pcl/correspondence.h>  // TODO VS clean up includes
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/recognition/cg/geometric_consistency.h>
 #include <pcl/registration/icp.h>
@@ -38,7 +38,7 @@
 // (also eine Kombination aus pcl transformation estimation und transformation validation)
 
 
-SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
+SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
@@ -58,7 +58,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
         fp::normal_method = 1;
         fp::feature_type = "SHOT";
     }
-    else if(dataset == "wash" || dataset == "bigbird" || dataset == "ycb")
+    else if(dataset == "washington" || dataset == "bigbird" || dataset == "ycb")
     {
         /// classification
         m_corr_threshold = -0.5; // TODO VS check param
@@ -73,16 +73,15 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th) :
     else if(dataset == "dataset1" || dataset == "dataset5")
     {
         /// detection
-        m_corr_threshold = -th;
+        m_temp_1 = bin;
+        m_temp_2 = -th;
+        m_temp_3 = count;
 
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
-
-        m_icp_max_iter = 100;
-        m_icp_corr_distance = 0.05;
 
         if(dataset == "dataset1")
         {
@@ -259,11 +258,14 @@ void SelfAdaptHGHV::classifyObject(
     std::vector<std::vector<int>> vote_indices;
     pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
     float initial_matching_threshold = 0.9; // will be incremented and therefore means "no threshold"
+    int initial_bin_number = 5;
     float rel_threshold = m_corr_threshold;
     float found_bin_size; // NOTE: unused here
+    bool use_distance_weights = false;
     performSelfAdaptedHoughVoting(object_scene_corrs, object_keypoints, object_features, object_lrf,
-                                  scene_keypoints, scene_features, scene_lrf, initial_matching_threshold,
-                                  rel_threshold, maxima, vote_indices, model_scene_corrs_filtered, found_bin_size);
+                                  scene_keypoints, scene_features, scene_lrf, use_distance_weights, initial_bin_number,
+                                  initial_matching_threshold, rel_threshold, maxima, vote_indices, model_scene_corrs_filtered,
+                                  found_bin_size);
 
     // check all maxima since highest valued maximum might still be composed of different class votes
     // therefore we need to count votes per class per maximum
@@ -332,7 +334,8 @@ void SelfAdaptHGHV::findObjects(
     // !!!
     // do not apply a threshold here, it is done during the self-adapted voting
     float matching_threshold = std::numeric_limits<float>::max();
-    pcl::CorrespondencesPtr object_scene_corrs = findNnCorrespondences(scene_features, matching_threshold, m_flann_index);
+    pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
+    //pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, m_features, m_flann_index));
 
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
@@ -356,19 +359,22 @@ void SelfAdaptHGHV::findObjects(
     std::vector<double> maxima;
     std::vector<std::vector<int>> vote_indices;
     pcl::CorrespondencesPtr model_scene_corrs_filtered(new pcl::Correspondences());
-    float initial_matching_threshold = 0.4;
-    float rel_threshold = m_corr_threshold;
+    float initial_matching_threshold = 0.9;
+    int initial_bin_number = m_temp_1;
+    float rel_threshold = m_temp_2;
     float found_bin_size;
+    bool use_distance_weight = false;
     performSelfAdaptedHoughVoting(object_scene_corrs, object_keypoints, object_features, object_lrf,
-                                  scene_keypoints, scene_features, scene_lrf, initial_matching_threshold,
-                                  rel_threshold, maxima, vote_indices, model_scene_corrs_filtered, found_bin_size);
+                                  scene_keypoints, scene_features, scene_lrf, use_distance_weight, initial_bin_number,
+                                  initial_matching_threshold, rel_threshold, maxima, vote_indices, model_scene_corrs_filtered,
+                                  found_bin_size);
 
     // generate 6DOF hypotheses with absolute orientation
     std::vector<pcl::Correspondences> clustered_corrs;
     std::vector<Eigen::Matrix4f> transformations;
-    bool refine_model = false; // helps improve the results sometimes
     float inlier_threshold = found_bin_size;
-    bool separate_voting_spaces = false;
+    bool refine_model = false;
+    bool separate_voting_spaces = true;
     // second RANSAC: filter correspondence groups by position
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                               inlier_threshold, refine_model, separate_voting_spaces, use_hv,
@@ -394,11 +400,15 @@ void SelfAdaptHGHV::findObjects(
     std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
     generateCloudsFromTransformations(clustered_corrs, transformations, object_features, instances);
 
+
+    // TODO VS: ab hier parametersuche fortsetzen!!!
+
+
     // ---------------------------- first verify ----------------------------
     // ICP
     std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
     float icp_max_iterations = 100;
-    float icp_correspondence_distance = 0.05;
+    float icp_correspondence_distance = 0.025;
     std::vector<Eigen::Matrix4f> final_transformations;
     // TODO VS try passing the whole scene cloud instead of only scene keypoints
     alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
@@ -519,17 +529,18 @@ void SelfAdaptHGHV::findObjects(
 
         // find aligned position
         bool use_complete_object = true; // use complete object instance or only the inlier points after first ICP
+        bool use_object_points = false; // use object points or the corresponding keypoints from the scene
+
         pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
-        if(use_complete_object)
+        if(use_complete_object && use_object_points)
         {
             pcl::transformPointCloud(*object, *transformed_object, verified_final_transforms[i]);
         }
-        else
+        else if(!use_complete_object && use_object_points)
         {
             pcl::transformPointCloud(*object_inlier, *transformed_object, verified_final_transforms[i]);
         }
 
-        bool use_object_points = true; // use object points or the corresponding keypoints from the scene
         Eigen::Vector4f centroid;
         if(use_object_points)
         {

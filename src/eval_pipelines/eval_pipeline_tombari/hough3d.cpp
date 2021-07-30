@@ -25,7 +25,7 @@
 // scene in testing as described by tombari in the paper
 
 
-Hough3d::Hough3d(std::string dataset, float bin, float th) :
+Hough3d::Hough3d(std::string dataset, float bin, float th, int count) :
     m_features(new pcl::PointCloud<ISMFeature>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
@@ -64,6 +64,8 @@ Hough3d::Hough3d(std::string dataset, float bin, float th) :
     }
     else if(dataset == "dataset1" || dataset == "dataset5")
     {
+        m_count = count; // TODO VS temp
+
         /// detection
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
@@ -554,6 +556,7 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
+    //pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, m_features, m_flann_index));
 
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
@@ -573,7 +576,7 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     std::vector<double> maxima;
     std::vector<std::vector<int>> vote_indices;
     float relative_threshold = m_th; // minimal weight of a maximum in percent of highest maximum to be considered a hypothesis
-    bool use_distance_weight = false; // usually worse with true
+    bool use_distance_weight = true;
     castVotesAndFindMaxima(object_scene_corrs, votelist, relative_threshold, use_distance_weight,
                            maxima, vote_indices, m_hough_space);
 
@@ -586,9 +589,9 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;
     std::vector<pcl::Correspondences> model_instances;
-    bool refine_model = true; // helps improve the results sometimes
+    bool refine_model = true;
     float inlier_threshold = m_bin_size(0);
-    bool separate_voting_spaces = false;
+    bool separate_voting_spaces = false; // TODO VS eval this param
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                               inlier_threshold, refine_model, separate_voting_spaces, use_hv,
                                               transformations, model_instances);

@@ -10,8 +10,13 @@ using namespace ism3d;
 typedef pcl::PointXYZRGB PointT;
 
 pcl::CorrespondencesPtr findNnCorrespondences(
-        const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
         const float matching_threshold,
+        const flann::Index<flann::L2<float>> &index);
+
+pcl::CorrespondencesPtr findNnCorrespondences(
+        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
+        const pcl::PointCloud<ISMFeature>::Ptr object_features,
         const flann::Index<flann::L2<float>> &index);
 
 void remapIndicesToLocalCloud(
@@ -152,6 +157,8 @@ void performSelfAdaptedHoughVoting(
         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
         const pcl::PointCloud<ISMFeature>::Ptr scene_features,
         const pcl::PointCloud<pcl::ReferenceFrame>::Ptr scene_lrf,
+        const bool use_distance_weight,
+        const int initial_bin_number,
         float initial_matching_threshold,
         float rel_threshold,
         std::vector<double> &maxima,
