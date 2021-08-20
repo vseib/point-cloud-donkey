@@ -62,8 +62,8 @@ namespace ism3d
                           pcl::search::KdTree<PointT>::Ptr& search);
 
         float estimateDensity(Eigen::Vector3f position,
-                              std::vector<float>& new_cluster_votes_weights,
-                              const std::vector<Voting::Vote>& cluster_votes);
+                              const std::vector<Voting::Vote>& votes,
+                              pcl::search::KdTree<PointT>::Ptr& search);
 
         float estimateDensity(Eigen::Vector3f,
                               int,
