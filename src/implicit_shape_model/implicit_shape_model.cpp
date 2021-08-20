@@ -231,7 +231,6 @@ void ImplicitShapeModel::train()
     }
 
     // measure the time
-    boost::timer::cpu_timer timer;
     boost::timer::cpu_timer timer_all;
 
     // contains the whole list of features for each class id and for each model
@@ -320,9 +319,7 @@ void ImplicitShapeModel::train()
 
             if(m_enable_signals)
             {
-                timer.stop();
                 m_signalBoundingBox(bounding_box);
-                timer.resume();
             }
 
             // check first normal
@@ -341,7 +338,8 @@ void ImplicitShapeModel::train()
             // compute features
             pcl::PointCloud<ISMFeature>::ConstPtr cloud_features;
             pcl::PointCloud<ISMFeature>::ConstPtr global_features;
-            std::tie(cloud_features, global_features, std::ignore, std::ignore) = computeFeatures(point_cloud, has_normals, timer, timer, true);
+            boost::timer::cpu_timer timer_dummy;
+            std::tie(cloud_features, global_features, std::ignore, std::ignore) = computeFeatures(point_cloud, has_normals, timer_dummy, timer_dummy, true);
 
             // check for NAN features
             pcl::PointCloud<ISMFeature>::Ptr cloud_features_cleaned = removeNaNFeatures(cloud_features);
@@ -361,9 +359,7 @@ void ImplicitShapeModel::train()
 
             if(m_enable_signals)
             {
-                timer.stop();
                 m_signalFeatures(cloud_features_cleaned);
-                timer.resume();
             }
 
             // concatenate features
@@ -420,9 +416,10 @@ void ImplicitShapeModel::train()
     {
         // adding the class id to codewords as workaround: need to have class access during activation
         unsigned cur_class = allFeatures_ranked->at(i).classId;
+        Eigen::Vector3f keypoint = allFeatures_ranked->at(i).getVector3fMap();
 
          // init with uniform weights // TODO VS: codeword weight is never anything else than 1.0f - remove??
-        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f, cur_class));
+        std::shared_ptr<Codeword> codeword(new Codeword(clusterCenters[i], clusters[i].size(), 1.0f, keypoint, cur_class));
         codewords.push_back(codeword);
     }
 
@@ -443,15 +440,12 @@ void ImplicitShapeModel::train()
 
     if(m_enable_signals)
     {
-        timer.stop();
         m_signalCodebook(*m_codebook);
-        timer.resume();
     }
 
     // cpu time (%t) sums up the time used by all threads, so use wall time (%w) instead to show
     // performance increase in multithreading
-    LOG_INFO("training processing time: " << timer.format(4, "%w") << " seconds");
-    LOG_INFO("total processing time: " << timer_all.format(4, "%w") << " seconds");
+    LOG_INFO("training processing time: " << timer_all.format(4, "%w") << " seconds");
 }
 
 
@@ -610,9 +604,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     if(m_enable_signals)
     {
-        timer.stop();
         m_signalFeatures(features_cleaned);
-        timer.resume();
     }
 
     boost::timer::cpu_timer timer_flann;
@@ -666,9 +658,7 @@ ImplicitShapeModel::detect(pcl::PointCloud<PointNormalT>::ConstPtr points_in, bo
 
     if(m_enable_signals)
     {
-        timer.stop();
         m_signalMaxima(positions);
-        timer.resume();
     }
 
     // cpu time (%t) sums up the time used by all threads, so use wall time (%w) instead to show
