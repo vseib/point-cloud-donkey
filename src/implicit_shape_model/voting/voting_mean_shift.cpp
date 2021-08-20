@@ -102,8 +102,27 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
             densities.push_back(std::move(d));
         }
 
-        // suppress or average neighboring maxima
-        MaximaHandler::processMaxima(m_maxima_suppression_type, cluster_centers, m_bandwidth, maximum_positions);
+        if(m_maxima_suppression_type == "Average")
+        {
+            std::vector<Eigen::Vector3f> maxima;
+            // weighted average with densities
+            MaximaHandler::averageNeighborMaxima(cluster_centers, m_bandwidth, maxima, densities);
+            // cluster centers changed, recalculated densities
+            densities.clear();
+            for (unsigned i = 0; i < maxima.size(); i++)
+            {
+                float d = estimateDensity(maxima[i], votes, search);
+                densities.push_back(std::move(d));
+            }
+            cluster_centers = std::move(maxima);
+        }
+
+        // NOTE: if "Average", subsequent "Suppress" must be executed to avoid keeping maxima closer than m_bandwidth
+        // TODO VS: this if is not necessary, since there is only "average" and "suppress"
+        if(m_maxima_suppression_type == "Average" || m_maxima_suppression_type == "Suppress")
+        {
+            MaximaHandler::suppressNeighborMaxima(cluster_centers, densities, m_bandwidth, maximum_positions);
+        }
     }
     // in single object mode we assume that the whole voting space contains only one object
     // in such case we do not need mean-shift, but solely estimate the density with differnt

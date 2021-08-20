@@ -23,89 +23,99 @@ namespace ism3d
     {
     }
 
+    // TODO VS remove this method
     void MaximaHandler::processMaxima(const std::string &type,
-                                      const std::vector<Eigen::Vector3f>& clusterCenters,
                                       const float radius,
-                                      std::vector<Eigen::Vector3f>& clusters)
+                                      const std::vector<Eigen::Vector3f> &cluster_centers,
+                                      std::vector<float> &densities,
+                                      std::vector<Eigen::Vector3f>& maxima)
     {
         // retrieve maximum points
         if(type == "Suppress")
         {
-            // TODO VS: check this! suppression is wrong, because no densities have been computed, yet!
-            suppressNeighborMaxima(clusterCenters, radius, clusters);
+            suppressNeighborMaxima(cluster_centers, densities, radius, maxima);
         }
         else if(type == "Average")
         {
             std::vector<Eigen::Vector3f> temp_clusters;
-            averageNeighborMaxima(clusterCenters, radius, temp_clusters);
-            suppressNeighborMaxima(temp_clusters, radius, clusters);
+            averageNeighborMaxima(cluster_centers, radius, temp_clusters, densities);
+            suppressNeighborMaxima(temp_clusters, densities, radius, maxima);
         }
         else if(type == "AverageShift") // TODO VS: check this
         {
             LOG_WARN("--- Maxima processing type 'AverageShift' is no longer supported - results might not be accurate! ---");
-            averageShiftNeighborMaxima(clusterCenters, radius, clusters);
+            averageShiftNeighborMaxima(cluster_centers, radius, maxima);
         }
     }
 
-    void MaximaHandler::suppressNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
+    void MaximaHandler::suppressNeighborMaxima(const std::vector<Eigen::Vector3f>& cluster_centers,
+                                               const std::vector<float> &densities,
                                                const float radius,
-                                               std::vector<Eigen::Vector3f>& clusters)
+                                               std::vector<Eigen::Vector3f>& maxima)
     {
-        std::vector<bool> duplicate(maxima.size());
-        duplicate.assign(duplicate.size(), false);
+        maxima.clear();
+        bool done = false;
+        std::vector<float> worklist(densities.size());
+        std::copy(densities.begin(), densities.end(), worklist.begin());
 
-        for (int i = 0; i < (int)maxima.size(); i++)
+        while(!done)
         {
-            const Eigen::Vector3f& pointA = maxima[i];
-
-            if (duplicate[i])
-                continue;
-
-            for (int j = i + 1; j < (int)maxima.size(); j++)
+            // find max index
+            auto max_iter = std::max_element(std::begin(worklist), std::end(worklist));
+            float max_elem = -1;
+            if(max_iter != std::end(worklist))
+                    max_elem = *max_iter;
+            if(max_elem != -1)
             {
-                const Eigen::Vector3f& pointB = maxima[j];
+                // store best maximum as results
+                unsigned max_idx = max_iter - std::begin(worklist);
+                const Eigen::Vector3f& center = cluster_centers[max_idx];
+                maxima.push_back(std::move(center));
+                worklist[max_idx] = -1;
 
-                if (duplicate[j])
-                    continue;
-
-                float distance = (pointA - pointB).norm();
-
-                if (distance < radius)
-                    duplicate[j] = true;
+                // eliminate non-max neighbors
+                for (unsigned i = 0; i < cluster_centers.size(); i++)
+                {
+                    const Eigen::Vector3f& neighbor = cluster_centers[i];
+                    float distance = (center - neighbor).norm();
+                    if (distance < radius)
+                    {
+                        worklist[i] = -1;
+                    }
+                }
+            }
+            else
+            {
+                done = true;
             }
         }
-
-        // add correct cluster centers
-        for (int i = 0; i < (int)duplicate.size(); i++) {
-            if (!duplicate[i])
-                clusters.push_back(maxima[i]);
-        }
     }
 
-    void MaximaHandler::averageNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
+    void MaximaHandler::averageNeighborMaxima(const std::vector<Eigen::Vector3f>& cluster_centers,
                                               const float radius,
-                                              std::vector<Eigen::Vector3f>& clusters)
+                                              std::vector<Eigen::Vector3f>& maxima,
+                                              std::vector<float> &densities)
     {
-        std::vector<std::vector<int>> duplicate_indices(maxima.size());
+        std::vector<std::vector<int>> duplicate_indices(cluster_centers.size());
         for(int i = 0; i < duplicate_indices.size(); i++)
         {
             // add itself for simpler averaging later
             duplicate_indices.at(i).push_back(i);
         }
 
-        std::vector<bool> duplicate(maxima.size());
+        std::vector<bool> duplicate(cluster_centers.size());
         duplicate.assign(duplicate.size(), false);
 
-        for (int k = 0; k < (int)maxima.size(); k++)
+        for (int k = 0; k < (int)cluster_centers.size(); k++)
         {
-            const Eigen::Vector3f& pointA = maxima[k];
+            const Eigen::Vector3f& pointA = cluster_centers[k];
 
             if (duplicate[k])
                 continue;
 
-            for (int j = k + 1; j < (int)maxima.size(); j++)
+            for (int j = k + 1; j < (int)cluster_centers.size(); j++)
             {
-                const Eigen::Vector3f& pointB = maxima[j];
+                const Eigen::Vector3f& pointB = cluster_centers[j];
 
                 if (duplicate[j])
                     continue;
@@ -127,24 +137,27 @@ namespace ism3d
             if(index_list.size() == 1)
             {
                 // maximum without neighbors can be added directly
-                clusters.push_back(maxima[index_list.at(0)]);
+                maxima.push_back(cluster_centers[index_list.at(0)]);
             }
             else
             {
                 // compute average of maximum and all neighbors
                 Eigen::Vector3f average(0, 0, 0);
-                for (int i = 0; i < index_list.size(); i++)
+                float sum_densities = 0;
+                for (int j = 0; j < index_list.size(); j++)
                 {
                     // update shifted position
-                    average += maxima[index_list.at(i)];
+                    average += cluster_centers[index_list.at(j)] * densities[index_list.at(j)];
+                    sum_densities += densities[index_list.at(j)];
                 }
-                average /= index_list.size();
-                clusters.push_back(average);
+                average /= sum_densities;
+                maxima.push_back(average);
             }
         }
     }
 
 
+    // TODO VS: remove this method
     void MaximaHandler::averageShiftNeighborMaxima(const std::vector<Eigen::Vector3f>& maxima,
                                                    const float radius,
                                                    std::vector<Eigen::Vector3f>& clusters)
