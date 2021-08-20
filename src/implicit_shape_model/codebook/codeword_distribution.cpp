@@ -127,6 +127,7 @@ namespace ism3d
             weight = useMatchingWeight ? weight * matching_weight : weight;
             weight = useCodewordWeight ? weight * m_codeword->getWeight() : weight;
 
+            // TODO VS: rethink this if-clause
             if(abs(dist) > 2*classSigma)
             {
                 //LOG_ERROR("------------ discarding vote due to big distance, dist: " << dist << ", sigma: " << classSigma);
@@ -138,7 +139,7 @@ namespace ism3d
 
             // cast vote into voting space
             castVote(vote, feature.referenceFrame, feature, m_boundingBoxes[i],
-                     weight, classId, instanceId, voting, m_codeword->getId());
+                     weight, classId, instanceId, voting, m_codeword);
         }
     }
 
@@ -150,7 +151,7 @@ namespace ism3d
                                         unsigned classId,
                                         unsigned instanceId,
                                         Voting& voting,
-                                        int codewordId) const
+                                        std::shared_ptr<Codeword> codeword) const
     {
         Eigen::Vector3f keyPos(feature.x, feature.y, feature.z);
 
@@ -162,7 +163,7 @@ namespace ism3d
         Utils::getRotQuaternion(refFrame, rotQuat);
         boundingBox.rotQuat = boundingBox.rotQuat * rotQuat;
 
-        voting.vote(center, weight, classId, instanceId, keyPos, boundingBox, codewordId);
+        voting.vote(center, weight, classId, instanceId, keyPos, boundingBox, codeword);
     }
 
     void CodewordDistribution::computeWeights()

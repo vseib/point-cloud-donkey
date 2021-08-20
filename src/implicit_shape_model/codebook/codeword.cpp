@@ -15,13 +15,15 @@ namespace ism3d
 {
     int Codeword::m_maxId = 0;
 
-    Codeword::Codeword(const std::vector<float>& data, int numFeatures, float weight, int class_id)
+    Codeword::Codeword(const std::vector<float>& data, int numFeatures, float weight,
+                       Eigen::Vector3f &keypoint, int class_id)
     {
         m_data = std::vector<float>(data);
         m_numFeatures = numFeatures;
         m_weight = weight;
 
         m_class_id = class_id;
+        m_keypoint = keypoint;
 
         m_id = m_maxId;
         m_maxId++;
@@ -73,6 +75,11 @@ namespace ism3d
         oa << m_weight;
         oa << m_data;
         oa << m_class_id;
+
+        oa << m_keypoint.x();
+        oa << m_keypoint.y();
+        oa << m_keypoint.z();
+
     }
 
     bool Codeword::iLoadData(boost::archive::binary_iarchive &ia)
@@ -82,6 +89,12 @@ namespace ism3d
         ia >> m_weight;
         ia >> m_data;
         ia >> m_class_id;
+
+        float x, y, z;
+        ia >> x;
+        ia >> y;
+        ia >> z;
+        m_keypoint = Eigen::Vector3f(x,y,z);
 
         return true;
     }

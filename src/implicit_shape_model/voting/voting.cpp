@@ -50,7 +50,7 @@ Voting::~Voting()
 }
 
 void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsigned instanceId,
-                  const Eigen::Vector3f& keypoint, const Utils::BoundingBox& boundingBox, int codewordId)
+                  const Eigen::Vector3f& keypoint, const Utils::BoundingBox& boundingBox, const std::shared_ptr<Codeword> &codeword)
 {
     // add the vote
     Vote newVote;
@@ -60,7 +60,9 @@ void Voting::vote(Eigen::Vector3f position, float weight, unsigned classId, unsi
     newVote.instanceId = instanceId;
     newVote.keypoint = keypoint;
     newVote.boundingBox = boundingBox;
-    newVote.codewordId = codewordId;
+    newVote.codewordId = codeword->getId();
+    // this is used for ransac in maxima filtering
+    newVote.keypoint_training = codeword->getFeaturePosition();
 
 #pragma omp critical
     {
@@ -83,19 +85,18 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // find votes for each class individually
     // iterate over map that assigns each class id with a list of votes
-    for (std::map<unsigned, std::vector<Voting::Vote> >::iterator it = m_votes.begin();
+    for (std::map<unsigned, std::vector<Voting::Vote> >::const_iterator it = m_votes.begin();
          it != m_votes.end(); it++)
     {
         unsigned classId = it->first;
-        std::vector<Voting::Vote>& votes = it->second; // all votes for this class
+        const std::vector<Voting::Vote>& votes = it->second; // all votes for this class
 
         std::vector<Eigen::Vector3f> clusters;  // positions of maxima
         std::vector<double> maximaValues;       // weights of maxima
         std::vector<std::vector<unsigned>> instanceIds; // list of instance ids for each maximum
-        std::vector<std::vector<int>> voteIndices; // list of indices of all votes for each maximum
+        std::vector<std::vector<int>> voteIndices;      // list of vote indices for each maximum
         std::vector<std::vector<float>> reweightedVotes; // reweighted votes, a list for each maximum
 
-        // TODO VS replace returning voteIndices by actual votes
         // process the algorithm to find maxima on the votes of the current class
         iFindMaxima(points, votes, clusters, maximaValues, instanceIds, voteIndices, reweightedVotes, classId);
 
@@ -113,7 +114,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                 continue;
 
             const std::vector<int>& clusterVotes = voteIndices[i];
-
             const std::vector<float>& reweightedClusterVotes = reweightedVotes[i];
 
             // TODO VS this should only be executed if secondary labels are used
@@ -152,7 +152,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             maximum.weight = maximaValues[i];
             maximum.instanceWeight = instance_weights[max_id_weights];
             maximum.position = clusters[i];
-            maximum.voteIndices = voteIndices[i]; // TODO VS: in most cases only used for .size()
+            maximum.voteIndices = voteIndices[i];
             // init global result with available data
             maximum.globalHypothesis.classId = classId;
             maximum.globalHypothesis.classWeight = maximaValues[i];

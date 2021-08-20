@@ -175,7 +175,7 @@ namespace ism3d
                       Utils::BoundingBox,
                       float weight,
                       unsigned classId, unsigned instanceId,
-                      Voting&, int codewordId) const;
+                      Voting&, std::shared_ptr<Codeword> codeword) const;
 
         // saved with the distribution
         std::shared_ptr<Codeword> m_codeword;             // the associated codeword

@@ -47,10 +47,10 @@ namespace ism3d
             float weight;
             unsigned classId;
             unsigned instanceId;
-            Eigen::Vector3f keypoint;       // associated keypoint position
+            Eigen::Vector3f keypoint;       // associated keypoint position in the scene
+            Eigen::Vector3f keypoint_training; // associated keypoint position from training
             Utils::BoundingBox boundingBox; // associated bounding box
             int codewordId;                 // codeword the vote belongs to
-            int vote_id; // TODO VS temp workaround - get rid of it
         };
 
         /**
@@ -61,13 +61,14 @@ namespace ism3d
          * @param instanceId the instance id for the vote
          * @param keypoint the keypoint position from which the vote originated
          * @param boundingBox the bounding box for the object that casted the vote
-         * @param codewordId the id of the codeword the vote belongs to
+         * @param codeword the codeword the vote belongs to
          */
         void vote(Eigen::Vector3f position,
                   float weight,
                   unsigned classId, unsigned instanceId,
                   const Eigen::Vector3f& keypoint,
-                  const Utils::BoundingBox& boundingBox, int codewordId);
+                  const Utils::BoundingBox& boundingBox,
+                  const std::shared_ptr<Codeword> &codeword);
 
         /**
          * @brief find maxima in the hough voting space in order to identify object occurrences
@@ -130,7 +131,7 @@ namespace ism3d
         Voting();
 
         virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
-                                 std::vector<Voting::Vote>&,
+                                 const std::vector<Voting::Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
                                  std::vector<std::vector<unsigned>>&,
