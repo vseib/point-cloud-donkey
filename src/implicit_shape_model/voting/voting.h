@@ -131,12 +131,11 @@ namespace ism3d
         Voting();
 
         virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
-                                 const std::vector<Voting::Vote>&,
+                                 std::vector<Voting::Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
                                  std::vector<std::vector<unsigned>>&,
                                  std::vector<std::vector<int>>&,
-                                 std::vector<std::vector<float>>&,
                                  unsigned) = 0;
 
         void iSaveData(boost::archive::binary_oarchive &oa) const;

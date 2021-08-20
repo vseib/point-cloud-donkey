@@ -40,12 +40,11 @@ namespace ism3d
 
     protected:
         void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                         const std::vector<Voting::Vote>&,
+                         std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<unsigned>> &,
                          std::vector<std::vector<int>>&,
-                         std::vector<std::vector<float>>&,
                          unsigned);
         float iGetSeedsRange() const;
 
@@ -66,9 +65,9 @@ namespace ism3d
                               pcl::search::KdTree<PointT>::Ptr& search);
 
         float estimateDensity(Eigen::Vector3f,
-                              int,
-                              std::vector<float>&,
-                              const std::vector<Voting::Vote>&,
+                              int cluster_index,
+                              std::vector<float>& newVoteWeights,
+                              std::vector<Voting::Vote>& votes,
                               std::vector<Voting::Vote>& cluster_votes,
                               pcl::search::KdTree<PointT>::Ptr& search);
 
