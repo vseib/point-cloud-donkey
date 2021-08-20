@@ -77,9 +77,6 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
     search->setInputCloud(dataset);
 
-    // TODO VS move declaration to where it is used
-
-
     // default behavior:
     // 1) not single object mode, max type doesn't matter --> perform mean-shift to find maxima
     // 2) single object mode only with default max type   --> perform mean-shift to find maxima
@@ -250,8 +247,6 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
 
     // estimate densities at cluster center locations (i.e. maxima)
     maximum_weights.resize(maximum_positions.size());
-    std::vector<float> newVoteWeights;
-    newVoteWeights.resize(votes.size());
 
     std::vector<std::vector<Voting::Vote>> all_cluster_votes;
     all_cluster_votes.resize(maximum_positions.size());
@@ -260,6 +255,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     for (int i = 0; i < (int)maximum_positions.size(); i++)
     {
         // assigned clusters indices are changed
+        std::vector<float> newVoteWeights;// TODO VS: unused -> remove
         std::vector<Voting::Vote> cluster_votes;
         maximum_weights[i] = estimateDensity(maximum_positions[i], i, newVoteWeights,
                                             votes, cluster_votes, search);
@@ -430,7 +426,6 @@ float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
         //if(m_clusterIndices[indices[i]] == -1 || newVoteWeights[indices[i]] < weight)
         {
             m_clusterIndices[indices[i]] = clusterIndex;
-            newVoteWeights[indices[i]] = weight;
         }
         vote.weight = weight;
         cluster_votes.push_back(vote);
