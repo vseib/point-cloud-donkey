@@ -40,7 +40,7 @@ namespace ism3d
 
     protected:
         void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                         std::vector<Voting::Vote>&,
+                         const std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<unsigned>> &,
@@ -53,29 +53,28 @@ namespace ism3d
                 const pcl::search::KdTree<PointT>::Ptr search,
                 const PointT query,
                 const float radius,
-                std::vector<Voting::Vote> votes);
+                std::vector<Voting::Vote> &votes);
 
         void iDoMeanShift(const std::vector<Voting::Vote>&,
                           const std::vector<Voting::Vote>&,
                           std::vector<Eigen::Vector3f>&,
-                          std::vector<std::vector<Voting::Vote>> &cluster_votes,
-                          std::vector<std::vector<Eigen::Vector3f> >&,
+                          std::vector<std::vector<Eigen::Vector3f> >& trajectories,
                           pcl::search::KdTree<PointT>::Ptr& search);
 
         float estimateDensity(Eigen::Vector3f position,
                               std::vector<float>& new_cluster_votes_weights,
                               const std::vector<Voting::Vote>& cluster_votes);
 
-//        float estimateDensity(Eigen::Vector3f,
-//                              int,
-//                              std::vector<float>&,
-//                              const std::vector<Voting::Vote>&,
-//                              pcl::search::KdTree<PointT>::Ptr& search);
+        float estimateDensity(Eigen::Vector3f,
+                              int,
+                              std::vector<float>&,
+                              const std::vector<Voting::Vote>&,
+                              std::vector<Voting::Vote>& cluster_votes,
+                              pcl::search::KdTree<PointT>::Ptr& search);
 
     private:
         bool computeMeanShift(const std::vector<Voting::Vote>&,
                               const Eigen::Vector3f& center,
-                              std::vector<Voting::Vote> &current_votes,
                               Eigen::Vector3f& newCenter,
                               pcl::search::KdTree<PointT>::Ptr& search) const;
 
@@ -99,6 +98,12 @@ namespace ism3d
         float m_threshold;  // termination threshold
         int m_maxIter;      // maximum number of iterations until termination
         std::string m_maxima_suppression_type;
+
+        bool m_vote_filtering_with_ransac;
+        bool m_refine_model;
+        float m_inlier_threshold;
+
+        std::vector<int> m_clusterIndices;
     };
 }
 

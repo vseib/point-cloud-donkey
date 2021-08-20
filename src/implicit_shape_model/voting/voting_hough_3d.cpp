@@ -31,7 +31,7 @@ namespace ism3d
     }
 
     void VotingHough3D::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                                    std::vector<Voting::Vote>& votes,
+                                    const std::vector<Voting::Vote>& votes,
                                     std::vector<Eigen::Vector3f>& clusters,
                                     std::vector<double>& maxima,
                                     std::vector<std::vector<unsigned>>& instanceIds,

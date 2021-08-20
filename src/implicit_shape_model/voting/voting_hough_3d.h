@@ -32,7 +32,7 @@ namespace ism3d
 
     protected:
         void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &,
-                         std::vector<Voting::Vote>&,
+                         const std::vector<Voting::Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<unsigned>>&,
