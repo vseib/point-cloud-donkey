@@ -586,9 +586,11 @@ int main(int argc, char **argv)
                     mAP /= ap_per_class.size();
                     mPrec /= ap_per_class.size();
                     mRec /= ap_per_class.size();
+                    float fscore = 2*mPrec*mRec / (mPrec+mRec);
                     global_mAP /= ap_per_class.size();
                     global_mPrec /= ap_per_class.size();
                     global_mRec /= ap_per_class.size();
+                    float global_fscore = 2*global_mPrec*global_mRec / (global_mPrec+global_mRec);
 
                     if(report_global_metrics)
                     {
@@ -597,12 +599,14 @@ int main(int argc, char **argv)
                         summaryFile << "global mAP:            " << std::setw(7) << std::round(global_mAP*10000.0f)/10000.0f    << " (" << std::round(global_mAP*10000.0f)/100.0f   << " %)" << std::endl;
                         summaryFile << "global mean precision: " << std::setw(7) << std::round(global_mPrec*10000.0f)/10000.0f  << " (" << std::round(global_mPrec*10000.0f)/100.0f << " %)" << std::endl;
                         summaryFile << "global mean recall:    " << std::setw(7) << std::round(global_mRec*10000.0f)/10000.0f   << " (" << std::round(global_mRec*10000.0f)/100.0f  << " %)" << std::endl;
+                        summaryFile << "global f-score:        " << std::setw(7) << std::round(global_fscore*10000.0f)/10000.0f << " (" << std::round(global_fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
                     }
                     summaryFile << std::endl << std::endl;
                     summaryFile << "main metrics:" << std::endl;
                     summaryFile << "       mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
                     summaryFile << "       mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
-                    summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl << std::endl;
+                    summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl;
+                    summaryFile << "       f-score:        " << std::setw(7) << std::round(fscore*10000.0f)/10000.0f << " (" << std::round(fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
 
                     // complete and close summary file
                     summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
