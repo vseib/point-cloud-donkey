@@ -43,8 +43,8 @@ float VotingMeanShift::iGetSeedsRange() const
 
 void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                   const std::vector<Voting::Vote>& votes, // all votes in the voting space for this class ID
-                                  std::vector<Eigen::Vector3f>& clusters, // maxima positions
-                                  std::vector<double>& maxima_weights, // weights for all maxima
+                                  std::vector<Eigen::Vector3f>& maximum_positions, // maxima positions
+                                  std::vector<double>& maximum_weights, // weights for all maxima
                                   std::vector<std::vector<unsigned>>& instanceIdsPerCluster, // list of instance ids that belong to each maximum index
                                   std::vector<std::vector<int>>& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
                                   std::vector<std::vector<float>>& newVoteWeightsPerCluster, // holds a list of reweighted vote weights per cluster
@@ -91,8 +91,11 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         std::vector<Eigen::Vector3f> clusterCenters;
         iDoMeanShift(seeds, votes, clusterCenters, m_trajectories[classId], search);
 
+
+
+
         // suppress or average neighboring maxima (or average shift multiple times)
-        MaximaHandler::processMaxima(m_maxima_suppression_type, clusterCenters, m_bandwidth, clusters);
+        MaximaHandler::processMaxima(m_maxima_suppression_type, clusterCenters, m_bandwidth, maximum_positions);
     }
     // in single object mode we assume that the whole voting space contains only one object
     // in such case we do not need mean-shift, but solely estimate the density with differnt
@@ -124,15 +127,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         }
 
         // single object mode has only one cluster
-        clusters.clear();
-        clusters.push_back(query.getVector3fMap());
+        maximum_positions.clear();
+        maximum_positions.push_back(query.getVector3fMap());
     }
 
-    instanceIdsPerCluster.resize(clusters.size());
-    voteIndicesPerCluster.resize(clusters.size());
-    newVoteWeightsPerCluster.resize(clusters.size());
-    maxima_weights.resize(clusters.size());
-    maxima_weights.assign(maxima_weights.size(), 0);
+    instanceIdsPerCluster.resize(maximum_positions.size());
+    voteIndicesPerCluster.resize(maximum_positions.size());
+    newVoteWeightsPerCluster.resize(maximum_positions.size());
+    maximum_weights.resize(maximum_positions.size());
+    maximum_weights.assign(maximum_weights.size(), 0);
 
 
     // TODO VS: rethink position of these code
@@ -229,14 +232,14 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
 
     // keeps a list of votes per cluster
     std::vector<std::vector<Voting::Vote>> all_cluster_votes;
-    all_cluster_votes.resize(clusters.size());
+    all_cluster_votes.resize(maximum_positions.size());
 
     // estimate densities for cluster positions and reweight votes by the kernel value
-    for (int i = 0; i < (int)clusters.size(); i++)
+    for (int i = 0; i < (int)maximum_positions.size(); i++)
     {
         // assigned clusters indices are changed
         std::vector<Voting::Vote> cluster_votes;
-        maxima_weights[i] = estimateDensity(clusters[i], i, newVoteWeights,
+        maximum_weights[i] = estimateDensity(maximum_positions[i], i, newVoteWeights,
                                             votes, cluster_votes, search);
         all_cluster_votes[i] = std::move(cluster_votes);
     }
