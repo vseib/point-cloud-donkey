@@ -42,6 +42,11 @@ Voting::Voting()
     addParameter(m_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
     addParameter(m_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_weight_factor, "GlobalParamWeightFactor", 1.5f);
+
+    // TODO VS: use these params for later when adding ransac filtering
+    addParameter(m_vote_filtering_with_ransac, "RansacVoteFiltering", false);
+    addParameter(m_refine_model, "RansacRefineModel", false);
+    addParameter(m_inlier_threshold, "RansacInlierThreshold", 0.1f);
 }
 
 Voting::~Voting()
@@ -92,7 +97,8 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 //        unsigned classId = it->first;
 //        std::vector<Vote> votes = it->second; // all votes for this class
 
-        std::vector<Eigen::Vector3f> clusters;  // positions of maxima
+        std::vector<Eigen::Vector3f> clusters;  // positions of maxima for current class id
+        // NOTE: maximaValues can be removed, since it is not used before filtering and needs to be recomputed after filtering!
         std::vector<double> maximaValues;       // weights of maxima
         std::vector<std::vector<unsigned>> instanceIds; // list of instance ids for each maximum
         std::vector<std::vector<Vote>> cluster_votes;      // list of votes for each maximum
@@ -104,8 +110,85 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         LOG_ASSERT(clusters.size() == maximaValues.size());
         LOG_ASSERT(clusters.size() == cluster_votes.size());
 
-        // TODO VS: look here for bounding box filtering (i.e. remove outliers) (to determine an orientation during detection)
-        // also use m_id_bb_dimensions_map and m_id_bb_variances_map
+
+
+        // TODO VS move to own method after agreed on an interface
+        if(m_vote_filtering_with_ransac)
+        {
+            pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
+            corr_rejector.setMaximumIterations(10000);
+            // TODO VS params!!!
+            // for classification: around 0.05 to 0.1 ? // for detection: around 0.01 ?
+            corr_rejector.setInlierThreshold(m_inlier_threshold);
+            corr_rejector.setRefineModel(m_refine_model);
+
+            std::vector<Eigen::Matrix4f> transformations(clusters.size());
+            std::vector<pcl::Correspondences> model_instances(clusters.size());
+            std::vector<Eigen::Vector3f> clusters_filtered(clusters.size());
+            std::vector<std::vector<Vote>> cluster_votes_filtered(clusters.size());
+
+            #pragma omp parallel for
+            for(unsigned j = 0; j < cluster_votes.size(); j++)
+            {
+                if (cluster_votes[j].size() < m_minVotesThreshold || cluster_votes[j].size() == 0) // catch an accidental threshold of 0
+                    continue;
+
+                const std::vector<Vote>& vote_list = cluster_votes[j];
+
+                // get corresponding keypoints
+                pcl::PointCloud<PointT>::Ptr scene_keypoints(new pcl::PointCloud<PointT>());
+                pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
+                pcl::Correspondences initial_corrs, filtered_corrs;
+                for(unsigned i = 0; i < vote_list.size(); i++)
+                {
+                    const Vote &v = vote_list.at(i);
+                    scene_keypoints->push_back(PointT(v.keypoint.x(), v.keypoint.y(), v.keypoint.z()));
+                    object_keypoints->push_back(PointT(v.keypoint_training.x(), v.keypoint_training.y(), v.keypoint_training.z()));
+                    initial_corrs.emplace_back(pcl::Correspondence(i, i, 1)); // TODO VS: check if distance is used!
+                }
+
+                // correspondence rejection with ransac
+                corr_rejector.setInputSource(object_keypoints);
+                corr_rejector.setInputTarget(scene_keypoints);
+                corr_rejector.setSaveInliers(true);
+                corr_rejector.getRemainingCorrespondences(initial_corrs, filtered_corrs);
+                std::vector<int> inlier_indices;
+                corr_rejector.getInliersIndices(inlier_indices);
+
+                Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
+                // save transformations for recognition if RANSAC was run successfully
+                if(!best_transform.isIdentity(0.0001))
+                {
+                    // keep good clusters
+                    clusters_filtered[j] = clusters[j];
+
+                    // keep only inlier votes of cluster
+                    std::vector<Vote> inlier_votes;
+                    for(int inlier_idx : inlier_indices)
+                    {
+                        inlier_votes.push_back(vote_list[inlier_idx]);
+                    }
+                    cluster_votes_filtered[j] = inlier_votes;
+
+                    // keep transformation and correspondences
+                    transformations[j] = best_transform;
+                    model_instances[j] = filtered_corrs;
+                }
+                else
+                {
+                    // insert dummy values
+                    clusters_filtered[j] = Eigen::Vector3f(0,0,0);
+                    cluster_votes_filtered[j] = {};
+                    transformations[j] = Eigen::Matrix4f::Identity();
+                    model_instances[j] = {};
+                }
+            }
+
+            cluster_votes = cluster_votes_filtered;
+            clusters = clusters_filtered;
+        }
+
+
 
         // iterate through all found maxima for current class ID
         #pragma omp parallel for
@@ -150,13 +233,11 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             VotingMaximum maximum;
             maximum.classId = classId;
             maximum.instanceId = max_id_weights;
-            maximum.weight = maximaValues[i];
             maximum.instanceWeight = instance_weights[max_id_weights];
             maximum.position = clusters[i];
             maximum.votes = cluster_votes[i];
             // init global result with available data
             maximum.globalHypothesis.classId = classId;
-            maximum.globalHypothesis.classWeight = maximaValues[i];
             maximum.globalHypothesis.instanceId = max_id_weights;
             maximum.globalHypothesis.instanceWeight = instance_weights[max_id_weights];
 
@@ -178,6 +259,9 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                 maximum.boundingBox.size += newWeight * vote.boundingBox.size;
                 maxWeight += newWeight;
             }
+            maximum.weight = maxWeight;
+            maximum.globalHypothesis.classWeight = maxWeight;
+
 
             // weights should sum up to one
             for (int j = 0; j < (int)weights.size(); j++)
@@ -260,12 +344,21 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 //    softmaxWeights(maxima);
 
     // filter low weight maxima
+    // NOTE: if m_minThreshold is positive: filter absolute values
+    //       if m_minThreshold is negative: filter relative to highest maximum
+    if(m_minThreshold < 0)
+    {
+        float max_weight = maxima.size() > 0 ? maxima.front().weight : 0;
+        m_minThreshold = -m_minThreshold * max_weight;
+    }
+
     filtered_maxima.clear();
     for (int i = 0; i < (int)maxima.size(); i++)
     {
-        if(maxima[i].weight < m_minThreshold)
-            continue;
-        filtered_maxima.push_back(maxima[i]);
+        if(maxima[i].weight >= m_minThreshold)
+        {
+            filtered_maxima.push_back(maxima[i]);
+        }
     }
     maxima = filtered_maxima;
 

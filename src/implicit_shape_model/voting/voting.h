@@ -171,7 +171,11 @@ namespace ism3d
         std::map<unsigned, std::pair<float, float>> m_dimensions_map;
         std::map<unsigned, std::pair<float, float>> m_variance_map;
 
-        // NOTE: only for debug
+        bool m_vote_filtering_with_ransac;
+        bool m_refine_model;
+        float m_inlier_threshold;
+
+        // NOTE: only for debug // not used anymore?
         static float state_gt;
         static float state_true;
         static float state_false;

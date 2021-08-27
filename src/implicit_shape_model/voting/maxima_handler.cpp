@@ -229,10 +229,12 @@ namespace ism3d
     {
         if(filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight, dont't merge
         {
+            // NOTE: sounds like non-max suppression across different classes
             return mergeAndFilterMaxima(maxima, false);
         }
         else if(filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
         {
+            // NOTE: description sounds like non-maximum suppression of same class -- unnecessary since it was done before - TODO VS: remove
             return mergeAndFilterMaxima(maxima, true);
         }
         else if(filter_type == "None")  // do nothing

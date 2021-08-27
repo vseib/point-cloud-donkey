@@ -24,11 +24,6 @@ VotingMeanShift::VotingMeanShift()
     addParameter(m_maxIter, "MaxIter", 1000);
     addParameter(m_kernel, "Kernel", std::string("Gaussian"));
     addParameter(m_maxima_suppression_type, "MaximaSuppression", std::string("Average"));
-
-    // TODO VS: use these params for later when adding ransac filtering
-    addParameter(m_vote_filtering_with_ransac, "RansacVoteFiltering", false);
-    addParameter(m_refine_model, "RansacRefineModel", false);
-    addParameter(m_inlier_threshold, "RansacInlierThreshold", 0.1f);
 }
 
 VotingMeanShift::~VotingMeanShift()
@@ -160,7 +155,6 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         maximum_positions.push_back(query.getVector3fMap());
     }
 
-
     // estimate densities for cluster positions and reweight votes by the kernel value
     votes_per_cluster.clear();
     maximum_weights.clear();
@@ -175,98 +169,16 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     }
 
 
+    // TODO VS: get rid of this when refactoring
     instanceIdsPerCluster.resize(maximum_positions.size());
     for(unsigned cl_idx = 0; cl_idx < maximum_positions.size(); cl_idx++)
     {
         const std::vector<Vote>& cluster_votes = votes_per_cluster[cl_idx];
         for(unsigned vote_idx = 0; vote_idx < cluster_votes.size(); vote_idx++)
         {
-            instanceIdsPerCluster[cl_idx].push_back(cluster_votes[vote_idx].instanceId); // TODO VS: try to get rid of this
+            instanceIdsPerCluster[cl_idx].push_back(cluster_votes[vote_idx].instanceId);
         }
     }
-
-    // TODO VS: rethink position of these code
-    ///////////////////////////////////////////////////
-    ///////////////////////////////////////////////////
-    ///////////////////////////////////////////////////
-/*
-    std::vector<Eigen::Matrix4f> transformations;
-    std::vector<pcl::Correspondences> model_instances;
-
-
-    std::vector<std::vector<Vote>> cluster_votes_filtered;
-    std::vector<Eigen::Vector3f> clusters_filtered;
-
-    if(m_vote_filtering_with_ransac)
-    {
-        pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
-        corr_rejector.setMaximumIterations(10000);
-        // TODO VS params!!!
-        corr_rejector.setInlierThreshold(m_inlier_threshold); // for classification: around 0.05 to 0.1 ? // for detection: around 0.01 ?
-        corr_rejector.setRefineModel(m_refine_model);
-
-        // correspondences were grouped by hough voting
-        for(unsigned j = 0; j < cluster_votes.size(); j++)
-        {
-            const std::vector<Vote> &vote_list = cluster_votes[j];
-            // skip maxima with view votes, mostly FP
-            if(vote_list.size() < m_minVotesThreshold)
-            {
-                continue;
-            }
-
-            // get corresponding keypoints
-            pcl::PointCloud<PointT>::Ptr scene_keypoints(new pcl::PointCloud<PointT>());
-            pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
-            pcl::Correspondences initial_corrs, filtered_corrs;
-            for(unsigned i = 0; i < vote_list.size(); i++)
-            {
-                Vote v = vote_list.at(i);
-                scene_keypoints->push_back(PointT(v.keypoint.x(), v.keypoint.y(), v.keypoint.z()));
-                object_keypoints->push_back(PointT(v.keypoint_training.x(), v.keypoint_training.y(), v.keypoint_training.z()));
-                initial_corrs.emplace_back(pcl::Correspondence(i, i, 1)); // TODO VS: check if distance is used!
-            }
-
-            // correspondence rejection with ransac
-            corr_rejector.setInputSource(object_keypoints);
-            corr_rejector.setInputTarget(scene_keypoints);
-            corr_rejector.setSaveInliers(true);
-            corr_rejector.getRemainingCorrespondences(initial_corrs, filtered_corrs);
-            std::vector<int> inlier_indices;
-            corr_rejector.getInliersIndices(inlier_indices);
-
-            Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
-            // save transformations for recognition if RANSAC was run successfully
-            if(!best_transform.isIdentity(0.0001))
-            {
-                // keep good clusters
-                clusters_filtered.push_back(clusters[j]);
-
-                // keep only inlier votes of cluster
-                std::vector<Vote> inlier_votes;
-                for(int inlier_idx : inlier_indices)
-                {
-                    inlier_votes.push_back(cluster_votes[j][inlier_idx]);
-                }
-                cluster_votes_filtered.push_back(inlier_votes);
-                //cluster_votes_filtered.push_back(cluster_votes[j]);
-
-                // keep transformation and correspondences
-                transformations.push_back(best_transform);
-                model_instances.push_back(filtered_corrs);
-            }
-        }
-    }
-    else
-    {
-        cluster_votes_filtered = cluster_votes;
-        clusters_filtered = clusters;
-    }
-*/
-    ///////////////////////////////////////////////////
-    ///////////////////////////////////////////////////
-    ///////////////////////////////////////////////////
-
 }
 
 // TODO VS: check if this method is still needed

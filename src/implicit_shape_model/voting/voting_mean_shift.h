@@ -97,10 +97,6 @@ namespace ism3d
         float m_threshold;  // termination threshold
         int m_maxIter;      // maximum number of iterations until termination
         std::string m_maxima_suppression_type;
-
-        bool m_vote_filtering_with_ransac;
-        bool m_refine_model;
-        float m_inlier_threshold;
     };
 }
 
