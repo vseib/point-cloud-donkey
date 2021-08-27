@@ -113,6 +113,10 @@ namespace ism3d
                                                const float radius,
                                                std::vector<Eigen::Vector3f>&);
 
+        static void suppressNeighborMaxima2(const std::vector<VotingMaximum> &input_maxima,
+                                     const float radius,
+                                     std::vector<VotingMaximum>& maxima);
+
 
     private:
 

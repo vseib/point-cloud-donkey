@@ -225,12 +225,59 @@ namespace ism3d
     }
 
 
+    void MaximaHandler::suppressNeighborMaxima2(const std::vector<VotingMaximum> &input_maxima,
+                                                const float radius,
+                                                std::vector<VotingMaximum>& maxima)
+    {
+        maxima.clear();
+        bool done = false;
+        std::vector<VotingMaximum> worklist(input_maxima.size());
+        std::copy(input_maxima.begin(), input_maxima.end(), worklist.begin());
+
+        while(!done)
+        {
+            // find max index
+            auto max_iter = std::max_element(std::begin(worklist), std::end(worklist));
+            VotingMaximum max_elem;
+            max_elem.weight = -1;
+            if(max_iter != std::end(worklist))
+                    max_elem = *max_iter;
+            if(max_elem.weight != -1)
+            {
+                // store best maximum as results
+                unsigned max_idx = max_iter - std::begin(worklist);
+                const Eigen::Vector3f& center = input_maxima[max_idx].position;
+                maxima.push_back(input_maxima[max_idx]);
+                worklist[max_idx].weight = -1;
+
+                // eliminate non-max neighbors
+                for (unsigned i = 0; i < input_maxima.size(); i++)
+                {
+                    const Eigen::Vector3f& neighbor = input_maxima[i].position;
+                    float distance = (center - neighbor).norm();
+                    if (distance < radius)
+                    {
+                        worklist[i].weight = -1;
+                    }
+                }
+            }
+            else
+            {
+                done = true;
+            }
+        }
+    }
+
+
     std::vector<VotingMaximum> MaximaHandler::filterMaxima(const std::string filter_type, const std::vector<VotingMaximum> &maxima)
     {
-        if(filter_type == "Simple") // search in bandwith radius and keep only maximum with the highest weight, dont't merge
+        if(filter_type == "Simple") // search in bandwidth radius and keep only maximum with the highest weight, dont't merge
         {
             // NOTE: sounds like non-max suppression across different classes
-            return mergeAndFilterMaxima(maxima, false);
+            //return mergeAndFilterMaxima(maxima, false); // TODO VS: remove old method
+            std::vector<VotingMaximum> resulting_maxima;
+            suppressNeighborMaxima2(maxima, m_radius, resulting_maxima); // TODO VS: unify both methods
+            return std::move(resulting_maxima);
         }
         else if(filter_type == "Merge")  // search in bandwith radius, merge maxima of same class and keep only maximum with the highest weight
         {

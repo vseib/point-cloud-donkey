@@ -33,11 +33,11 @@ namespace ism3d
         Utils::BoundingBox boundingBox; // associated bounding box
         int codewordId;                 // codeword the vote belongs to
 
-        bool operator==(const ism3d::Vote &rhs) const
+        bool operator==(const ism3d::Vote &other) const
         {
-            return position.x() == rhs.position.x() &&
-                   position.y() == rhs.position.y() &&
-                   position.z() == rhs.position.z();
+            return position.x() == other.position.x() &&
+                   position.y() == other.position.y() &&
+                   position.z() == other.position.z();
         }
     };
 
@@ -78,6 +78,11 @@ namespace ism3d
             unsigned instanceId;
             float instanceWeight;
         };
+
+        bool operator<(const ism3d::VotingMaximum &other) const
+        {
+            return weight < other.weight;
+        }
 
         GlobalHypothesis globalHypothesis;
     };

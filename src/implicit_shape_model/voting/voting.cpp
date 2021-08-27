@@ -270,7 +270,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     //       if m_minThreshold is negative: filter relative to highest maximum
     if(m_minThreshold < 0)
     {
-        float max_weight = maxima.size() > 0 ? maxima.front().weight : 0;
+        float max_weight = maxima.size() > 0 ? maxima.front().weight : 0.0f;
         m_minThreshold = -m_minThreshold * max_weight;
     }
 
@@ -379,7 +379,7 @@ std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> Voting:
     return std::make_tuple(clusters_filtered, cluster_votes_filtered);
 }
 
-
+// TODO VS: check if this is still needed
 bool Voting::sortMaxima(const VotingMaximum& maxA, const VotingMaximum& maxB)
 {
     return maxA.weight > maxB.weight;
