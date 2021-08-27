@@ -137,6 +137,10 @@ namespace ism3d
 
     private:
 
+        std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> filterVotesWithRansac(
+                const std::vector<Eigen::Vector3f> &clusters,
+                const std::vector<std::vector<Vote>> &cluster_votes) const;
+
         static bool sortMaxima(const VotingMaximum&, const VotingMaximum&);
 
         void normalizeWeights(std::vector<VotingMaximum> &maxima);
