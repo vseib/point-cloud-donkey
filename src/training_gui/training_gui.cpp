@@ -845,7 +845,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 {
     m_renderView->lock();
 
-    const std::map<unsigned, std::vector<ism3d::Voting::Vote> >& votes = m_ism->getVoting()->getVotes();
+    const std::map<unsigned, std::vector<ism3d::Vote> >& votes = m_ism->getVoting()->getVotes();
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 
     // Setup colors
@@ -856,22 +856,22 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
     if(m_chkShowVotes->isChecked())
     {
         // save vote indices
-        std::map<unsigned, std::vector<int> > voteIndices;
+        std::map<unsigned, std::vector<ism3d::Vote> > allVotes;
         for (int i = 0; i < (int)maxima.size(); i++)
         {
-            const std::vector<int> indices = maxima[i].voteIndices;
-            std::vector<int>& mapEntry = voteIndices[maxima[i].classId];
-            mapEntry.insert(mapEntry.end(), indices.begin(), indices.end());
+            const std::vector<ism3d::Vote> cur_max_votes = maxima[i].votes;
+            std::vector<ism3d::Vote>& mapEntry = allVotes[maxima[i].classId];
+            mapEntry.insert(mapEntry.end(), cur_max_votes.begin(), cur_max_votes.end());
         }
 
-        for (std::map<unsigned, std::vector<ism3d::Voting::Vote> >::const_iterator it = votes.begin();
+        for (std::map<unsigned, std::vector<ism3d::Vote> >::const_iterator it = votes.begin();
              it != votes.end(); it++)
         {
             unsigned classId = it->first;
-            const std::vector<ism3d::Voting::Vote>& classVotes = it->second;
+            const std::vector<ism3d::Vote>& classVotes = it->second;
 
             for (int i = 0; i < (int)classVotes.size(); i++) {
-                ism3d::Voting::Vote vote = classVotes[i];
+                ism3d::Vote vote = classVotes[i];
 
                 double classColor[3];
                 getColor(classId, classColor[0], classColor[1], classColor[2]);
@@ -881,14 +881,15 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
                 float alpha = 1.0f;
 
                 bool isMaximumVote = true;
-                std::map<unsigned, std::vector<int> >::const_iterator it = voteIndices.find(classId);
-                if (it == voteIndices.end()) {
+                const auto it = allVotes.find(classId);
+                if (it == allVotes.end()) {
                     alpha = 0.3f;
                     isMaximumVote = false;
                 }
                 else {
-                    const std::vector<int>& indices = it->second;
-                    if (std::find(indices.begin(), indices.end(), i) == indices.end()) {
+                    const std::vector<ism3d::Vote>& cur_votes = it->second;
+                    // TODO VS: if something is wrong with vote colors, check this
+                    if (std::find(cur_votes.begin(), cur_votes.end(), vote) == cur_votes.end()) {
                         alpha = 0.3f;
                         isMaximumVote = false;
                     }
@@ -1025,7 +1026,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
                 m_maxima_classes.at(max.classId) = true; // mark this class as shown
             }
 
-            if(max.voteIndices.size() < min_votes) // only report maxima with at least X votes
+            if(max.votes.size() < min_votes) // only report maxima with at least X votes
                 continue;
 
             // add a sphere

@@ -85,23 +85,24 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // find votes for each class individually
     // iterate over map that assigns each class id with a list of votes
-//    for (std::map<unsigned, std::vector<Voting::Vote> >::const_iterator it = m_votes.begin();
+//    for (std::map<unsigned, std::vector<Vote> >::const_iterator it = m_votes.begin();
 //         it != m_votes.end(); it++)
     for(auto[classId, votes] : m_votes)
     {
 //        unsigned classId = it->first;
-//        std::vector<Voting::Vote> votes = it->second; // all votes for this class
+//        std::vector<Vote> votes = it->second; // all votes for this class
 
         std::vector<Eigen::Vector3f> clusters;  // positions of maxima
         std::vector<double> maximaValues;       // weights of maxima
         std::vector<std::vector<unsigned>> instanceIds; // list of instance ids for each maximum
-        std::vector<std::vector<int>> voteIndices;      // list of vote indices for each maximum
+        std::vector<std::vector<Vote>> cluster_votes;      // list of votes for each maximum
 
         // process the algorithm to find maxima on the votes of the current class
-        iFindMaxima(points, votes, clusters, maximaValues, instanceIds, voteIndices, classId);
+        // TODO VS: add openmp inside find maxima!
+        iFindMaxima(points, votes, clusters, maximaValues, instanceIds, cluster_votes, classId);
 
         LOG_ASSERT(clusters.size() == maximaValues.size());
-        LOG_ASSERT(clusters.size() == voteIndices.size());
+        LOG_ASSERT(clusters.size() == cluster_votes.size());
 
         // TODO VS: look here for bounding box filtering (i.e. remove outliers) (to determine an orientation during detection)
         // also use m_id_bb_dimensions_map and m_id_bb_variances_map
@@ -110,17 +111,17 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         #pragma omp parallel for
         for (int i = 0; i < (int)clusters.size(); i++)
         {
-            if (voteIndices[i].size() < m_minVotesThreshold || voteIndices[i].size() == 0) // catch an accidental threshold of 0
+            if (cluster_votes[i].size() < m_minVotesThreshold || cluster_votes[i].size() == 0) // catch an accidental threshold of 0
                 continue;
 
-            const std::vector<int>& clusterVotes = voteIndices[i];
+            const std::vector<Vote>& current_votes = cluster_votes[i];
 
             // TODO VS this should only be executed if secondary labels are used
             // determine instance id based on all ids and corresponding vote weights
             std::map<unsigned, float> instance_weights;
-            for(unsigned idx = 0; idx < clusterVotes.size(); idx++)
+            for(unsigned idx = 0; idx < current_votes.size(); idx++)
             {
-                float weight = votes[clusterVotes[idx]].weight;
+                float weight = current_votes[idx].weight;
                 unsigned instance_id = instanceIds[i][idx];
 
                 if(instance_weights.find(instance_id) != instance_weights.end())
@@ -132,6 +133,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                     instance_weights.insert({instance_id, weight});
                 }
             }
+
             // find max value
             unsigned max_id_weights;
             float best_weight = 0;
@@ -151,7 +153,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             maximum.weight = maximaValues[i];
             maximum.instanceWeight = instance_weights[max_id_weights];
             maximum.position = clusters[i];
-            maximum.voteIndices = voteIndices[i];
+            maximum.votes = cluster_votes[i];
             // init global result with available data
             maximum.globalHypothesis.classId = classId;
             maximum.globalHypothesis.classWeight = maximaValues[i];
@@ -164,11 +166,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
             // compute weighted maximum values
             float maxWeight = 0;
             maximum.boundingBox.size = Eigen::Vector3f(0, 0, 0);
-            for (int j = 0; j < (int)clusterVotes.size(); j++)
+            for (unsigned j = 0; j < current_votes.size(); j++)
             {
-                int id = clusterVotes[j];
-                const Voting::Vote& vote = votes[id];
-                float newWeight = vote.weight; // reweightedClusterVotes[j];
+                const Vote& vote = current_votes[j];
+                float newWeight = vote.weight;
 
                 boost::math::quaternion<float> rotQuat = vote.boundingBox.rotQuat;
                 quats.push_back(rotQuat);
@@ -282,14 +283,14 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                      ", weight: " << max.weight <<
                      ", instance: " << max.instanceId << " (" << max.instanceWeight << ")" <<
                      ", glob: (" << max.globalHypothesis.classId << ", " << max.globalHypothesis.classWeight << ")" <<
-                     ", num votes: " << max.voteIndices.size());
+                     ", num votes: " << max.votes.size());
         }
         else
         {
             LOG_INFO("maximum " << i << ", class: " << max.classId <<
                      ", weight: " << max.weight <<
                      ", instance: " << max.instanceId << " (" << max.instanceWeight << ")" <<
-                     ", num votes: " << max.voteIndices.size());
+                     ", num votes: " << max.votes.size());
         }
     }
     return maxima;
@@ -347,7 +348,7 @@ void Voting::softmaxWeights(std::vector<VotingMaximum> &maxima)
     }
 }
 
-const std::map<unsigned, std::vector<Voting::Vote> >& Voting::getVotes() const
+const std::map<unsigned, std::vector<Vote> >& Voting::getVotes() const
 {
     return m_votes;
 }

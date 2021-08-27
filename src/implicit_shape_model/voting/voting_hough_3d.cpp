@@ -31,11 +31,11 @@ namespace ism3d
     }
 
     void VotingHough3D::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                                    std::vector<Voting::Vote>& votes,
+                                    std::vector<Vote>& votes,
                                     std::vector<Eigen::Vector3f>& clusters,
                                     std::vector<double>& maxima,
                                     std::vector<std::vector<unsigned>>& instanceIds,
-                                    std::vector<std::vector<int>>& voteIndices,
+                                    std::vector<std::vector<Vote>>& cluster_votes,
                                     unsigned classId)
     {
 
@@ -52,7 +52,7 @@ namespace ism3d
 
         for (int i = 0; i < (int)votes.size(); i++)
         {
-            const Voting::Vote& vote = votes[i];
+            const Vote& vote = votes[i];
             if (m_useInterpolation) {
                 m_houghSpace->voteInt(Eigen::Vector3d(vote.position[0], vote.position[1], vote.position[2]),
                         vote.weight, i);
@@ -64,24 +64,28 @@ namespace ism3d
         }
 
         // find maxima
+        std::vector<std::vector<int>> voteIndices;
         m_houghSpace->findMaxima(-m_relThreshold, maxima, voteIndices);
+
+        cluster_votes.resize(maxima.size());
 
         // iterate through all found maxima and create a weighted cluster center
         for (int i = 0; i < (int)voteIndices.size(); i++)
         {
-            const std::vector<int>& clusterVotes = voteIndices[i];
+            const std::vector<int>& clusterVoteIndices = voteIndices[i];
             std::vector<unsigned>& clusterInstances = instanceIds[i];
-            clusterInstances.resize(clusterVotes.size());
+            clusterInstances.resize(clusterVoteIndices.size());
 
             Eigen::Vector3f clusterCenter(0, 0, 0);
             float weight = 0;
-            for (int j = 0; j < (int)clusterVotes.size(); j++)
+            for (int j = 0; j < (int)clusterVoteIndices.size(); j++)
             {
-                int ind = clusterVotes[j];
+                int ind = clusterVoteIndices[j];
                 const Vote& vote = votes[ind];
                 clusterInstances[j] = vote.instanceId;
                 clusterCenter += (vote.position * vote.weight);
                 weight += vote.weight;
+                cluster_votes[i].push_back(std::move(vote));
             }
 
             clusterCenter /= weight;

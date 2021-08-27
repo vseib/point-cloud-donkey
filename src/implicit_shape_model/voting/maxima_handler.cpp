@@ -355,7 +355,7 @@ namespace ism3d
 
             result.classId = m.classId;
             result.weight += m.weight;
-            result.voteIndices.insert(result.voteIndices.end(), m.voteIndices.begin(), m.voteIndices.end());
+            result.votes.insert(result.votes.end(), m.votes.begin(), m.votes.end());
 
             if(instance_weights.find(m.instanceId) != instance_weights.end())
             {

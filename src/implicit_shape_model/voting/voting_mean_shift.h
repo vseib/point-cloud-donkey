@@ -40,46 +40,46 @@ namespace ism3d
 
     protected:
         void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                         std::vector<Voting::Vote>&,
+                         std::vector<Vote>&,
                          std::vector<Eigen::Vector3f>&,
                          std::vector<double>&,
                          std::vector<std::vector<unsigned>> &,
-                         std::vector<std::vector<int>>&,
+                         std::vector<std::vector<Vote>>& votes_per_cluster,
                          unsigned);
         float iGetSeedsRange() const;
 
-        std::vector<Voting::Vote> getVotesInRadius(
+        std::vector<Vote> getVotesInRadius(
                 const pcl::search::KdTree<PointT>::Ptr search,
                 const PointT query,
                 const float radius,
-                std::vector<Voting::Vote> &votes);
+                std::vector<Vote> &votes);
 
-        void iDoMeanShift(const std::vector<Voting::Vote>&,
-                          const std::vector<Voting::Vote>&,
+        void iDoMeanShift(const std::vector<Vote>&,
+                          const std::vector<Vote>&,
                           std::vector<Eigen::Vector3f>&,
                           std::vector<std::vector<Eigen::Vector3f> >& trajectories,
                           pcl::search::KdTree<PointT>::Ptr& search);
 
+        // TODO VS: unify both methods with additional bool to enable / disable reweighting
         float estimateDensity(Eigen::Vector3f position,
-                              const std::vector<Voting::Vote>& votes,
+                              const std::vector<Vote>& votes,
+                              std::vector<Vote> &cluster_votes,
                               pcl::search::KdTree<PointT>::Ptr& search);
 
-        float estimateDensity(Eigen::Vector3f,
-                              int cluster_index,
-                              std::vector<float>& newVoteWeights,
-                              std::vector<Voting::Vote>& votes,
-                              std::vector<Voting::Vote>& cluster_votes,
+        float estimateDensityAndReweightVotes(Eigen::Vector3f,
+                              std::vector<Vote>& votes,
+                              std::vector<Vote>& cluster_votes,
                               pcl::search::KdTree<PointT>::Ptr& search);
 
     private:
-        bool computeMeanShift(const std::vector<Voting::Vote>&,
+        bool computeMeanShift(const std::vector<Vote>&,
                               const Eigen::Vector3f& center,
                               Eigen::Vector3f& newCenter,
                               pcl::search::KdTree<PointT>::Ptr& search) const;
 
 
         static bool mapCompareVector(const Eigen::Vector3i&, const Eigen::Vector3i&);
-        std::vector<Vote> createSeeds(const std::vector<Voting::Vote>&, float);
+        std::vector<Vote> createSeeds(const std::vector<Vote>&, float);
 
         float kernel(float) const;
         float kernelDerivative(float) const;
@@ -101,8 +101,6 @@ namespace ism3d
         bool m_vote_filtering_with_ransac;
         bool m_refine_model;
         float m_inlier_threshold;
-
-        std::vector<int> m_clusterIndices;
     };
 }
 

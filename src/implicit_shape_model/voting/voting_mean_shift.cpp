@@ -42,11 +42,11 @@ float VotingMeanShift::iGetSeedsRange() const
 }
 
 void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
-                                  std::vector<Voting::Vote>& votes, // all votes in the voting space for this class ID
+                                  std::vector<Vote>& votes, // all votes in the voting space for this class ID
                                   std::vector<Eigen::Vector3f>& maximum_positions, // maxima positions
                                   std::vector<double>& maximum_weights, // weights for all maxima
                                   std::vector<std::vector<unsigned>>& instanceIdsPerCluster, // list of instance ids that belong to each maximum index
-                                  std::vector<std::vector<int>>& voteIndicesPerCluster, // holds a list of vote indices that belong to each maximum index
+                                  std::vector<std::vector<Vote>>& votes_per_cluster, // holds a list of votes that belong to each maximum index
                                   unsigned classId)
 {
     // determine bandwidth based on config
@@ -62,7 +62,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     dataset->resize(votes.size());
     for (int i = 0; i < (int)votes.size(); i++)
     {
-        const Voting::Vote& vote = votes[i];
+        const Vote& vote = votes[i];
         PointT votePoint;
         votePoint.x = vote.position[0];
         votePoint.y = vote.position[1];
@@ -77,6 +77,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     pcl::search::KdTree<PointT>::Ptr search(new pcl::search::KdTree<PointT>());
     search->setInputCloud(dataset);
 
+
     // default behavior:
     // 1) not single object mode, max type doesn't matter --> perform mean-shift to find maxima
     // 2) single object mode only with default max type   --> perform mean-shift to find maxima
@@ -84,7 +85,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     if(!m_single_object_mode || (m_single_object_mode && MaximaHandler::m_max_type == SingleObjectMaxType::DEFAULT))
     {
         // create seed points using binning strategy
-        std::vector<Voting::Vote> seeds = createSeeds(votes, iGetSeedsRange());
+        std::vector<Vote> seeds = createSeeds(votes, iGetSeedsRange());
 
         // perform mean shift
         std::vector<Eigen::Vector3f> cluster_centers;
@@ -94,8 +95,10 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         std::vector<float> densities;
         for (unsigned i = 0; i < cluster_centers.size(); i++)
         {
-            float d = estimateDensity(cluster_centers[i], votes, search);
+            std::vector<Vote> cluster_votes;
+            float d = estimateDensity(cluster_centers[i], votes, cluster_votes, search);
             densities.push_back(std::move(d));
+            votes_per_cluster.push_back(std::move(cluster_votes));
         }
 
         if(m_maxima_suppression_type == "Average")
@@ -105,10 +108,13 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
             MaximaHandler::averageNeighborMaxima(cluster_centers, m_bandwidth, maxima, densities);
             // cluster centers changed, recalculated densities
             densities.clear();
+            votes_per_cluster.clear();
             for (unsigned i = 0; i < maxima.size(); i++)
             {
-                float d = estimateDensity(maxima[i], votes, search);
+                std::vector<Vote> cluster_votes;
+                float d = estimateDensity(maxima[i], votes, cluster_votes, search);
                 densities.push_back(std::move(d));
+                votes_per_cluster.push_back(std::move(cluster_votes));
             }
             cluster_centers = std::move(maxima);
         }
@@ -154,9 +160,30 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         maximum_positions.push_back(query.getVector3fMap());
     }
 
-    instanceIdsPerCluster.resize(maximum_positions.size());
-    voteIndicesPerCluster.resize(maximum_positions.size());
 
+    // estimate densities for cluster positions and reweight votes by the kernel value
+    votes_per_cluster.clear();
+    maximum_weights.clear();
+    for (unsigned i = 0; i < maximum_positions.size(); i++)
+    {
+        // assigned clusters indices are changed
+        std::vector<Vote> cluster_votes;
+        float density = estimateDensityAndReweightVotes(maximum_positions[i], votes, cluster_votes, search);
+
+        votes_per_cluster.push_back(std::move(cluster_votes));
+        maximum_weights.push_back(std::move(density));
+    }
+
+
+    instanceIdsPerCluster.resize(maximum_positions.size());
+    for(unsigned cl_idx = 0; cl_idx < maximum_positions.size(); cl_idx++)
+    {
+        const std::vector<Vote>& cluster_votes = votes_per_cluster[cl_idx];
+        for(unsigned vote_idx = 0; vote_idx < cluster_votes.size(); vote_idx++)
+        {
+            instanceIdsPerCluster[cl_idx].push_back(cluster_votes[vote_idx].instanceId); // TODO VS: try to get rid of this
+        }
+    }
 
     // TODO VS: rethink position of these code
     ///////////////////////////////////////////////////
@@ -167,7 +194,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     std::vector<pcl::Correspondences> model_instances;
 
 
-    std::vector<std::vector<Voting::Vote>> cluster_votes_filtered;
+    std::vector<std::vector<Vote>> cluster_votes_filtered;
     std::vector<Eigen::Vector3f> clusters_filtered;
 
     if(m_vote_filtering_with_ransac)
@@ -181,7 +208,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         // correspondences were grouped by hough voting
         for(unsigned j = 0; j < cluster_votes.size(); j++)
         {
-            const std::vector<Voting::Vote> &vote_list = cluster_votes[j];
+            const std::vector<Vote> &vote_list = cluster_votes[j];
             // skip maxima with view votes, mostly FP
             if(vote_list.size() < m_minVotesThreshold)
             {
@@ -194,7 +221,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
             pcl::Correspondences initial_corrs, filtered_corrs;
             for(unsigned i = 0; i < vote_list.size(); i++)
             {
-                Voting::Vote v = vote_list.at(i);
+                Vote v = vote_list.at(i);
                 scene_keypoints->push_back(PointT(v.keypoint.x(), v.keypoint.y(), v.keypoint.z()));
                 object_keypoints->push_back(PointT(v.keypoint_training.x(), v.keypoint_training.y(), v.keypoint_training.z()));
                 initial_corrs.emplace_back(pcl::Correspondence(i, i, 1)); // TODO VS: check if distance is used!
@@ -216,7 +243,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                 clusters_filtered.push_back(clusters[j]);
 
                 // keep only inlier votes of cluster
-                std::vector<Voting::Vote> inlier_votes;
+                std::vector<Vote> inlier_votes;
                 for(int inlier_idx : inlier_indices)
                 {
                     inlier_votes.push_back(cluster_votes[j][inlier_idx]);
@@ -240,47 +267,10 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
     ///////////////////////////////////////////////////
     ///////////////////////////////////////////////////
 
-
-    // assign all cluster indices to -1 initially
-    m_clusterIndices.resize(votes.size());
-    m_clusterIndices.assign(m_clusterIndices.size(), -1);
-
-    // estimate densities at cluster center locations (i.e. maxima)
-    maximum_weights.resize(maximum_positions.size());
-
-    std::vector<std::vector<Voting::Vote>> all_cluster_votes;
-    all_cluster_votes.resize(maximum_positions.size());
-
-    // estimate densities for cluster positions and reweight votes by the kernel value
-    for (int i = 0; i < (int)maximum_positions.size(); i++)
-    {
-        // assigned clusters indices are changed
-        std::vector<float> newVoteWeights;// TODO VS: unused -> remove
-        std::vector<Voting::Vote> cluster_votes;
-        maximum_weights[i] = estimateDensity(maximum_positions[i], i, newVoteWeights,
-                                            votes, cluster_votes, search);
-        all_cluster_votes[i] = std::move(cluster_votes);
-    }
-
-    for (int vote_id = 0; vote_id < (int)m_clusterIndices.size(); vote_id++)
-    {
-        int clusterIndex = m_clusterIndices[vote_id];
-        // if clusterIndex == -1, the vote does not belong to a cluster (i.e. its distance to the cluster is too high)
-        if (clusterIndex >= 0)
-        {
-            instanceIdsPerCluster[clusterIndex].push_back(votes[vote_id].instanceId);
-            voteIndicesPerCluster[clusterIndex].push_back(vote_id);
-        }
-    }
-
-//    for(int i = 0; i < clusters.size(); i++)
-//    {
-//        std::cout<< "new: " << all_cluster_votes[i].size() << "   old: " << voteIndicesPerCluster[i].size() << std::endl;
-//    }
 }
 
 // TODO VS: check if this method is still needed
-std::vector<Voting::Vote> VotingMeanShift::getVotesInRadius(const pcl::search::KdTree<PointT>::Ptr search,
+std::vector<Vote> VotingMeanShift::getVotesInRadius(const pcl::search::KdTree<PointT>::Ptr search,
         const PointT query,
         const float radius,
         std::vector<Vote> &votes)
@@ -289,20 +279,20 @@ std::vector<Voting::Vote> VotingMeanShift::getVotesInRadius(const pcl::search::K
     std::vector<int> indices;
     std::vector<float> distances;
 
-    std::vector<Voting::Vote> resulting_votes;
+    std::vector<Vote> resulting_votes;
 
     search->radiusSearch(query, radius, indices, distances);
     for (int i = 0; i < (int)indices.size(); i++)
     {
-        const Voting::Vote& vote = votes[indices[i]];
+        const Vote& vote = votes[indices[i]];
         resulting_votes.push_back(vote);
     }
     return resulting_votes;
 }
 
 
-void VotingMeanShift::iDoMeanShift(const std::vector<Voting::Vote>& seeds,
-                                   const std::vector<Voting::Vote>& votes,
+void VotingMeanShift::iDoMeanShift(const std::vector<Vote>& seeds,
+                                   const std::vector<Vote>& votes,
                                    std::vector<Eigen::Vector3f>& clusterCenters,
                                    std::vector<std::vector<Eigen::Vector3f> >& trajectories,
                                    pcl::search::KdTree<PointT>::Ptr& search)
@@ -312,7 +302,7 @@ void VotingMeanShift::iDoMeanShift(const std::vector<Voting::Vote>& seeds,
     //#pragma omp parallel for shared(seeds, trajectories, clusterCenters)
     for (int i = 0; i < (int)seeds.size(); i++)
     {
-        const Voting::Vote& seed = seeds[i];
+        const Vote& seed = seeds[i];
 
         Eigen::Vector3f currentCenter = seed.position;
 
@@ -348,7 +338,50 @@ void VotingMeanShift::iDoMeanShift(const std::vector<Voting::Vote>& seeds,
 
 
 float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
-                                       const std::vector<Voting::Vote>& votes,
+                                       const std::vector<Vote> &votes,
+                                       std::vector<Vote> &cluster_votes,
+                                       pcl::search::KdTree<PointT>::Ptr &search)
+{
+    // find nearest points within search window
+    PointT query;
+    query.x = position[0];
+    query.y = position[1];
+    query.z = position[2];
+    std::vector<int> indices;
+    std::vector<float> distances;
+
+    search->radiusSearch(query, m_bandwidth, indices, distances);
+
+    // shouldn't happen
+    if (indices.size() == 0 || distances.size() == 0)
+        return 0;
+
+    float density = 0;
+    for (unsigned i = 0; i < indices.size(); i++)
+    {
+        const Vote& vote = votes[indices[i]];
+
+        // get euclidean distance between current center and nearest neighbor
+        float distanceSqr = distances[i];
+
+        // compute a normalized distance in {0, 1}
+        float u = distanceSqr / (m_bandwidth * m_bandwidth);
+
+        // compute weights
+        float weight = kernel(u) * vote.weight;
+
+        cluster_votes.push_back(std::move(vote));
+
+        density += weight;
+    }
+    return density;
+}
+
+
+
+float VotingMeanShift::estimateDensityAndReweightVotes(Eigen::Vector3f position,
+                                       std::vector<Vote>& votes,
+                                       std::vector<Vote>& cluster_votes,
                                        pcl::search::KdTree<PointT>::Ptr& search)
 {
     // find nearest points within search window
@@ -368,7 +401,7 @@ float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
     float density = 0;
     for (unsigned i = 0; i < indices.size(); i++)
     {
-        const Voting::Vote& vote = votes[indices[i]];
+        Vote& vote = votes[indices[i]];
 
         // get euclidean distance between current center and nearest neighbor
         float distanceSqr = distances[i];
@@ -379,54 +412,6 @@ float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
         // compute weights
         float weight = kernel(u) * vote.weight;
 
-        density += weight;
-    }
-    return density;
-}
-
-
-
-float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
-                                       int clusterIndex,
-                                       std::vector<float>& newVoteWeights,
-                                       std::vector<Voting::Vote>& votes,
-                                       std::vector<Voting::Vote>& cluster_votes,
-                                       pcl::search::KdTree<PointT>::Ptr& search)
-{
-    // find nearest points within search window
-    PointT query;
-    query.x = position[0];
-    query.y = position[1];
-    query.z = position[2];
-    std::vector<int> indices;
-    std::vector<float> distances;
-
-    search->radiusSearch(query, m_bandwidth, indices, distances);
-
-    // shouldn't happen
-    if (indices.size() == 0 || distances.size() == 0)
-        return 0;
-
-    float density = 0;
-    for (int i = 0; i < (int)indices.size(); i++)
-    {
-        Voting::Vote& vote = votes[indices[i]];
-
-        // get euclidean distance between current center and nearest neighbor
-        float distanceSqr = distances[i];
-
-        // compute a normalized distance in {0, 1}
-        float u = distanceSqr / (m_bandwidth * m_bandwidth);
-
-        // compute weights
-        float weight = kernel(u) * vote.weight;
-
-        // NOTE: can it happen that a votes 'should' be assigned to more than 1 cluster?
-        // yes - and it does!
-        //if(m_clusterIndices[indices[i]] == -1 || newVoteWeights[indices[i]] < weight)
-        {
-            m_clusterIndices[indices[i]] = clusterIndex;
-        }
         vote.weight = weight;
         cluster_votes.push_back(vote);
 
@@ -436,7 +421,7 @@ float VotingMeanShift::estimateDensity(Eigen::Vector3f position,
 }
 
 
-bool VotingMeanShift::computeMeanShift(const std::vector<Voting::Vote>& votes,
+bool VotingMeanShift::computeMeanShift(const std::vector<Vote>& votes,
                                        const Eigen::Vector3f& center,
                                        Eigen::Vector3f& newCenter,
                                        pcl::search::KdTree<PointT>::Ptr& search) const
@@ -458,7 +443,7 @@ bool VotingMeanShift::computeMeanShift(const std::vector<Voting::Vote>& votes,
     double totalWeight = 0;
     for (int i = 0; i < (int)indices.size(); i++)
     {
-        const Voting::Vote& vote = votes[indices[i]];
+        const Vote& vote = votes[indices[i]];
 
         // get euclidean distance between current center and nearest neighbor
         float distanceSqr = distances[i];
@@ -536,7 +521,7 @@ bool VotingMeanShift::mapCompareVector(const Eigen::Vector3i& vec1, const Eigen:
     return false;
 }
 
-std::vector<Voting::Vote> VotingMeanShift::createSeeds(const std::vector<Voting::Vote>& votes,
+std::vector<Vote> VotingMeanShift::createSeeds(const std::vector<Vote>& votes,
                                                        float binSize)
 {
     if (binSize == 0)
@@ -569,13 +554,13 @@ std::vector<Voting::Vote> VotingMeanShift::createSeeds(const std::vector<Voting:
 
         // create seeds for bins which contain more than one point
         // alternatively: create seeds for bins which have a weight above a threshold
-        std::vector<Voting::Vote> seeds;
+        std::vector<Vote> seeds;
 
         for (std::map<Eigen::Vector3i, std::pair<int, float> >::const_iterator it = map.begin();
              it != map.end(); it++)
         {
             if (it->second.first >= minBin) {
-                Voting::Vote newVote;
+                Vote newVote;
                 newVote.position = Eigen::Vector3f(it->first[0] * binSize,
                         it->first[1] * binSize,
                         it->first[2] * binSize);
@@ -590,7 +575,6 @@ std::vector<Voting::Vote> VotingMeanShift::createSeeds(const std::vector<Voting:
 
 void VotingMeanShift::clear()
 {
-    m_clusterIndices.clear();
     m_trajectories.clear();
     Voting::clear();
 }

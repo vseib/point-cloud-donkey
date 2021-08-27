@@ -25,14 +25,14 @@ namespace ism3d
         return model_radius;
     }
 
-    float SingleObjectHelper::getVotingSpaceSize(const std::vector<Voting::Vote>& votes,
+    float SingleObjectHelper::getVotingSpaceSize(const std::vector<Vote>& votes,
                                                      const PointT &query)
     {
         float max_dist = 0;
         Eigen::Vector3f query_vec = query.getArray3fMap();
         for(int i = 0; i < votes.size(); i++)
         {
-            Voting::Vote v = votes.at(i);
+            Vote v = votes.at(i);
             float dist = (v.position - query_vec).squaredNorm();
             max_dist = max_dist > dist ? max_dist : dist;
         }

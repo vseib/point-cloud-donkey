@@ -15,6 +15,8 @@
 #include <map>
 #include <Eigen/Core>
 
+#include "voting_maximum.h"
+
 #include "../features/features.h"
 #include "../utils/utils.h"
 #include "../utils/json_object.h"
@@ -37,21 +39,6 @@ namespace ism3d
     public:
         virtual ~Voting();
 
-        /**
-         * @brief The Vote struct
-         * The internal vote representation
-         */
-        struct Vote
-        {
-            Eigen::Vector3f position;
-            float weight;
-            unsigned classId;
-            unsigned instanceId;
-            Eigen::Vector3f keypoint;       // associated keypoint position in the scene
-            Eigen::Vector3f keypoint_training; // associated keypoint position from training
-            Utils::BoundingBox boundingBox; // associated bounding box
-            int codewordId;                 // codeword the vote belongs to
-        };
 
         /**
          * @brief cast a vote into the hough space
@@ -82,7 +69,7 @@ namespace ism3d
          * @brief get all votes
          * @return a map of votes, the key represents the class id
          */
-        const std::map<unsigned, std::vector<Voting::Vote> >& getVotes() const;
+        const std::map<unsigned, std::vector<Vote> >& getVotes() const;
 
         /**
          * @brief calculate average bounding box dimensions during training to be used as hints for bin size and bandwidth during recognition
@@ -131,11 +118,11 @@ namespace ism3d
         Voting();
 
         virtual void iFindMaxima(pcl::PointCloud<PointT>::ConstPtr&,
-                                 std::vector<Voting::Vote>&,
+                                 std::vector<Vote>&,
                                  std::vector<Eigen::Vector3f>&,
                                  std::vector<double>&,
                                  std::vector<std::vector<unsigned>>&,
-                                 std::vector<std::vector<int>>&,
+                                 std::vector<std::vector<Vote>>& votes_per_cluster,
                                  unsigned) = 0;
 
         void iSaveData(boost::archive::binary_oarchive &oa) const;

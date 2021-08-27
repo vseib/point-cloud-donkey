@@ -406,7 +406,7 @@ int main(int argc, char **argv)
                                         file << maximum.weight << ", ";
                                         file << maximum.instanceId << ", ";
                                         file << maximum.instanceWeight << ", ";
-                                        file << maximum.voteIndices.size() << ", ";
+                                        file << maximum.votes.size() << ", ";
                                         file << maximum.position[0] << ", ";
                                         file << maximum.position[1] << ", ";
                                         file << maximum.position[2] << ", ";

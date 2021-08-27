@@ -22,7 +22,7 @@ namespace ism3d
         static float getModelRadius(pcl::PointCloud<PointT>::ConstPtr &points,
                                     const PointT &query);
 
-        static float getVotingSpaceSize(const std::vector<Voting::Vote>& votes,
+        static float getVotingSpaceSize(const std::vector<Vote>& votes,
                                         const PointT &query);
 
     private:

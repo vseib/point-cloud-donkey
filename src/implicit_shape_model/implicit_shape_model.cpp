@@ -1594,13 +1594,13 @@ void ImplicitShapeModel::readFeaturesFromDisk(std::string file_name,
 // DEBUG
 
 std::map<unsigned, pcl::PointCloud<PointT>::Ptr > ImplicitShapeModel::analyzeVotingSpacesForDebug
-(const std::map<unsigned, std::vector<Voting::Vote> > &all_votes, pcl::PointCloud<PointNormalT>::Ptr points)
+(const std::map<unsigned, std::vector<Vote> > &all_votes, pcl::PointCloud<PointNormalT>::Ptr points)
 {
     std::map<unsigned, pcl::PointCloud<PointT>::Ptr > all_votings;
     for (auto it : all_votes)
     {
         unsigned classId = it.first;
-        const std::vector<Voting::Vote>& votes = it.second; // all votes for this class
+        const std::vector<Vote>& votes = it.second; // all votes for this class
 
         pcl::PointCloud<PointT>::Ptr dataset(new pcl::PointCloud<PointT>());
 
@@ -1634,7 +1634,7 @@ std::map<unsigned, pcl::PointCloud<PointT>::Ptr > ImplicitShapeModel::analyzeVot
         // build dataset of votes
         for (int i = 0; i < (int)votes.size(); i++)
         {
-            const Voting::Vote& vote = votes[i];
+            const Vote& vote = votes[i];
             PointT votePoint;
             votePoint.x = vote.position[0];
             votePoint.y = vote.position[1];

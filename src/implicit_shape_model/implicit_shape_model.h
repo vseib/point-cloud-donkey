@@ -260,7 +260,7 @@ namespace ism3d
         pcl::PointCloud<ISMFeature>::Ptr removeNaNFeatures(pcl::PointCloud<ISMFeature>::ConstPtr modelFeatures);
 
         std::map<unsigned, pcl::PointCloud<PointT>::Ptr > analyzeVotingSpacesForDebug
-                            (const std::map<unsigned, std::vector<Voting::Vote>> &all_votes,
+                            (const std::map<unsigned, std::vector<Vote>> &all_votes,
                              pcl::PointCloud<PointNormalT>::Ptr points);
 
         void addMaximaForDebug(std::map<unsigned, pcl::PointCloud<PointT>::Ptr> &all_votings, std::vector<VotingMaximum> &positions);

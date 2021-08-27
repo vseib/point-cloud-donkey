@@ -19,6 +19,29 @@
 namespace ism3d
 {
     /**
+     * @brief The Vote struct
+     * The internal vote representation
+     */
+    struct Vote
+    {
+        Eigen::Vector3f position;
+        float weight;
+        unsigned classId;
+        unsigned instanceId;
+        Eigen::Vector3f keypoint;       // associated keypoint position in the scene
+        Eigen::Vector3f keypoint_training; // associated keypoint position from training
+        Utils::BoundingBox boundingBox; // associated bounding box
+        int codewordId;                 // codeword the vote belongs to
+
+        bool operator==(const ism3d::Vote &rhs) const
+        {
+            return position.x() == rhs.position.x() &&
+                   position.y() == rhs.position.y() &&
+                   position.z() == rhs.position.z();
+        }
+    };
+
+    /**
      * @brief The VotingMaximum struct
      * A voting maximum represents a found object occurrence and is characterized
      * by a position and a bounding box. The weight defines the certainty of the
@@ -46,7 +69,7 @@ namespace ism3d
         float instanceWeight;
 
         Utils::BoundingBox boundingBox;
-        std::vector<int> voteIndices;
+        std::vector<Vote> votes;
 
         struct GlobalHypothesis
         {
