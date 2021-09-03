@@ -110,6 +110,7 @@ add_library(implicit_shape_model
     feature_ranking/ranking_naive_bayes.cpp
     feature_ranking/ranking_incremental.cpp
     feature_ranking/ranking_knn_activation.cpp
+    feature_ranking/ranking_similarity.cpp
     feature_ranking/ranking_strangeness.cpp
     implicit_shape_model.cpp
     keypoints/keypoints.cpp
