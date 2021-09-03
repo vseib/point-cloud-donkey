@@ -31,6 +31,8 @@ FeatureRanking::~FeatureRanking()
 {
 }
 
+// TODO VS: in all subclasses: whenever flann::<distance-type> is used, make it automatically the same as in config (either L2 or Chi-Squared)
+
 std::tuple<std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>>, pcl::PointCloud<ISMFeature>::Ptr>
 FeatureRanking::operator()(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features, int num_kd_trees, bool flann_exact_match)
 {
@@ -309,7 +311,7 @@ flann::Matrix<float> FeatureRanking::createFlannDataset(pcl::PointCloud<ISMFeatu
 }
 
 
-std::vector<float> FeatureRanking::findNeighborsDistances(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query)
+std::vector<float> FeatureRanking::findNeighborsDistances(flann::Index<flann::ChiSquareDistance<float> > &index, flann::Matrix<float> &query)
 {
     std::vector<std::vector<int> > indices;
     std::vector<std::vector<float> > distances;
@@ -319,7 +321,7 @@ std::vector<float> FeatureRanking::findNeighborsDistances(flann::Index<flann::L2
 }
 
 
-std::vector<int> FeatureRanking::findSimilarFeaturesFlann(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query)
+std::vector<int> FeatureRanking::findSimilarFeaturesFlann(flann::Index<flann::ChiSquareDistance<float> > &index, flann::Matrix<float> &query)
 {
     std::vector<std::vector<int> > indices;
     std::vector<std::vector<float> > distances;

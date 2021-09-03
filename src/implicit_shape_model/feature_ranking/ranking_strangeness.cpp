@@ -42,14 +42,14 @@ std::map<unsigned, std::vector<float> > RankingStrangeness::iComputeScores(
 
     // create a separate flann index for each class
     std::vector<flann::Matrix<float>> datasets;
-    std::vector<flann::Index<flann::L2<float>>> flann_indices;
+    std::vector<flann::Index<flann::ChiSquareDistance<float>>> flann_indices;
     for(int i = 0; i < features.size(); i++)
     {
         pcl::PointCloud<ISMFeature>::Ptr current_class_features = createCloudWithClassIds(features, true, i, false);
 
         flann::Matrix<float> dataset_current = createFlannDataset(current_class_features);
         datasets.push_back(dataset_current);
-        flann::Index<flann::L2<float> > index_current(dataset_current, flann::KDTreeIndexParams(m_num_kd_trees));
+        flann::Index<flann::ChiSquareDistance<float> > index_current(dataset_current, flann::KDTreeIndexParams(m_num_kd_trees));
         index_current.buildIndex();
         flann_indices.push_back(index_current);
     }

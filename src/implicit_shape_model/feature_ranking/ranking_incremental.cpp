@@ -44,7 +44,7 @@ std::map<unsigned, std::vector<float> > RankingIncremental::iComputeScores(
 
     // create flann index
     flann::Matrix<float> dataset = createFlannDataset(all_features);
-    flann::Index<flann::L2<float> > index(dataset, flann::KDTreeIndexParams(m_num_kd_trees));
+    flann::Index<flann::ChiSquareDistance<float> > index(dataset, flann::KDTreeIndexParams(m_num_kd_trees));
     index.buildIndex();
 
     // find activated features

@@ -34,10 +34,10 @@ std::map<unsigned, std::vector<float> > RankingNaiveBayes::iComputeScores(const 
 
         // create flann indices for current class and the rest
         flann::Matrix<float> dataset_current = createFlannDataset(current_class_features);
-        flann::Index<flann::L2<float> > index_current(dataset_current, flann::KDTreeIndexParams(m_num_kd_trees));
+        flann::Index<flann::ChiSquareDistance<float> > index_current(dataset_current, flann::KDTreeIndexParams(m_num_kd_trees));
         index_current.buildIndex();
         flann::Matrix<float> dataset_other = createFlannDataset(other_classes_features);
-        flann::Index<flann::L2<float> > index_other(dataset_other, flann::KDTreeIndexParams(m_num_kd_trees));
+        flann::Index<flann::ChiSquareDistance<float> > index_other(dataset_other, flann::KDTreeIndexParams(m_num_kd_trees));
         index_other.buildIndex();
 
 //        // create kd trees for current class and the rest

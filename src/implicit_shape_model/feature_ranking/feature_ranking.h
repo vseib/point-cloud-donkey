@@ -87,9 +87,9 @@ namespace ism3d
 
         flann::Matrix<float> createFlannDataset(pcl::PointCloud<ISMFeature>::Ptr &class_features);
 
-        std::vector<float> findNeighborsDistances(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query);
+        std::vector<float> findNeighborsDistances(flann::Index<flann::ChiSquareDistance<float> > &index, flann::Matrix<float> &query);
 
-        std::vector<int> findSimilarFeaturesFlann(flann::Index<flann::L2<float> > &index, flann::Matrix<float> &query);
+        std::vector<int> findSimilarFeaturesFlann(flann::Index<flann::ChiSquareDistance<float> > &index, flann::Matrix<float> &query);
 
         std::vector<int> findSimilarFeatures(pcl::KdTreeFLANN<ISMFeature> &kdtree, ISMFeature &feature);
 
