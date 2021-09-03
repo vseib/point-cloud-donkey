@@ -95,6 +95,7 @@ std::map<unsigned, std::vector<float> > RankingKnnActivation::iComputeScores(
                 }
 
                 // update depending on increment type
+                // accessing feature at idx - offset, since flann index contains all classes
                 if(m_score_increment_type == 1)
                     temp_scores.at(class_id).at(feat_idx - offset) += score_dist_rate; // just count
                 else if(m_score_increment_type == 2)

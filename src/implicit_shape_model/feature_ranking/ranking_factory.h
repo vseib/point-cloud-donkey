@@ -17,6 +17,7 @@
 #include "ranking_incremental.h"
 #include "ranking_knn_activation.h"
 #include "ranking_strangeness.h"
+#include "ranking_similarity.h"
 
 namespace ism3d
 {
@@ -33,6 +34,8 @@ namespace ism3d
             return new RankingKnnActivation();
         else if (type == RankingStrangeness::getTypeStatic())
             return new RankingStrangeness();
+        else if (type == RankingSimilarity::getTypeStatic())
+            return new RankingSimilarity();
         else
             return 0;
     }
