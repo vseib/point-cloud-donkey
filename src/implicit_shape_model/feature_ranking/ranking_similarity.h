@@ -36,6 +36,11 @@ namespace ism3d
                 const std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr> > &features);
 
     private:
+
+        std::string m_update_type;
+        std::string m_inter_pos;
+        std::string m_intra_pos;
+
         float getScore(float distance, bool as_penalty = false);
     };
 }
