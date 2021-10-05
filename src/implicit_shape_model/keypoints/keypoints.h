@@ -61,7 +61,7 @@ namespace ism3d
          */
         void setNumThreads(int numThreads);
 
-        /** allows to indicate that the training phase is running, only relevant for voxel_grid so far **/
+        /** allows to indicate that the training phase is running, only relevant for voxel_grid_culling so far **/
         void setIsTraining()
         {
             m_is_training = true;

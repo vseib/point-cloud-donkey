@@ -116,8 +116,9 @@ add_library(implicit_shape_model
     keypoints/keypoints.cpp
     keypoints/keypoints_harris3d.cpp
     keypoints/keypoints_iss3d.cpp
-    keypoints/keypoints_voxel_grid.cpp
     keypoints/keypoints_sift3d.cpp
+    keypoints/keypoints_voxel_grid.cpp
+    keypoints/keypoints_voxel_grid_culling.cpp
     utils/debug_utils.cpp
     utils/distance.cpp
     utils/ism_feature.cpp

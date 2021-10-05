@@ -14,8 +14,9 @@
 #include "../utils/factory.h"
 #include "keypoints_harris3d.h"
 #include "keypoints_iss3d.h"
-#include "keypoints_voxel_grid.h"
 #include "keypoints_sift3d.h"
+#include "keypoints_voxel_grid.h"
+#include "keypoints_voxel_grid_culling.h"
 
 namespace ism3d
 {
@@ -26,10 +27,12 @@ namespace ism3d
             return new KeypointsHarris3D();
         else if (type == KeypointsISS3D::getTypeStatic())
             return new KeypointsISS3D();
-        else if (type == KeypointsVoxelGrid::getTypeStatic())
-            return new KeypointsVoxelGrid();
         else if (type == KeypointsSIFT3D::getTypeStatic())
             return new KeypointsSIFT3D();
+        else if (type == KeypointsVoxelGrid::getTypeStatic())
+            return new KeypointsVoxelGrid();
+        else if (type == KeypointsVoxelGridCulling::getTypeStatic())
+            return new KeypointsVoxelGridCulling();
         else
             return 0;
     }

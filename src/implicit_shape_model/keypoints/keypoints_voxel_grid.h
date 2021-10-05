@@ -12,8 +12,6 @@
 #define ISM3D_KEYPOINTSVOXELGRID_H
 
 #include "keypoints.h"
-#include "../third_party/pcl_color_conversion/color_conversion.h"
-#include <pcl/features/principal_curvatures.h>
 
 namespace ism3d
 {
@@ -40,28 +38,8 @@ namespace ism3d
                                                             pcl::PointCloud<PointT>::Ptr eigenValuesWithoutNan,
                                                             pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                             pcl::search::Search<PointT>::Ptr search);
-
-        float computeKPQ(const std::vector<int> &pointIdxs,
-                         pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principle_curvatures) const;
-
-        float computeColorScore(const std::vector<int> &pointIdxs,
-                                pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
-                                const PointNormalT &ref,
-                                const ColorConversion &cc) const;
-
     private:
         float m_leafSize;
-        float m_max_similar_color_distance;
-
-        bool m_disable_filter_in_training;
-
-        float m_filter_threshold_geometry;
-        float m_filter_cutoff_ratio;
-        std::string m_filter_method_geometry;
-        std::string m_filter_type_geometry;
-        std::string m_filter_method_color;
-        std::string m_filter_type_color;
-        float m_filter_threshold_color;
     };
 }
 
