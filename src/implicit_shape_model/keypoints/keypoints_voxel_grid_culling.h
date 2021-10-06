@@ -44,9 +44,8 @@ namespace ism3d
 
         std::tuple<std::vector<float>, std::vector<float>> getScoresForKeypoints(
                 const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
-                pcl::PointCloud<PointNormalT>::Ptr &keypoints_with_normals,
-                const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures,
-                const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures);
+                const pcl::PointCloud<PointNormalT>::Ptr keypoints_with_normals,
+                const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures);
 
         std::tuple<float, float> computeThresholds(
                 const std::vector<float> &geo_scores,
@@ -60,19 +59,26 @@ namespace ism3d
                                 const PointNormalT &ref,
                                 const ColorConversion &cc) const;
 
+        PointT refineKeypointPosition(
+                const float geo_score,
+                const float color_score,
+                const PointT &keypoint,
+                const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
+                const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures);
+
+
     private:
         float m_leafSize;
         float m_max_similar_color_distance;
-
-        bool m_disable_filter_in_training;
-
         float m_filter_threshold_geometry;
         float m_filter_cutoff_ratio;
+        float m_filter_threshold_color;
         std::string m_filter_method_geometry;
         std::string m_filter_type_geometry;
         std::string m_filter_method_color;
         std::string m_filter_type_color;
-        float m_filter_threshold_color;
+        bool m_disable_filter_in_training;
+        bool m_refine_position;
     };
 }
 

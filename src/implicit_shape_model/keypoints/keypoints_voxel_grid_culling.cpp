@@ -13,6 +13,7 @@
 #define PCL_NO_PRECOMPILE
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
+#include <pcl/filters/extract_indices.h>
 #include <fstream>
 #include <boost/algorithm/string.hpp>
 
@@ -34,6 +35,8 @@ namespace ism3d
         addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
 
         addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
+
+        addParameter(m_refine_position, "RefineKeypointPosition", false);
 
         // init false, will be set to true in case training phase is running
         m_is_training = false;
@@ -101,9 +104,6 @@ namespace ism3d
                 exit(1);
             }
 
-            // TODO VS: the following code has many cloud transformations with different formats
-            // if kpq is removed from this class, recheck if something can be simplified
-
             // combine filtered cloud points and filtered normals into one cloud
             pcl::PointCloud<PointNormalT>::Ptr points_with_normals(new pcl::PointCloud<PointNormalT>());
             pcl::concatenateFields(*pointsWithoutNaNNormals, *normalsWithoutNaN, *points_with_normals);
@@ -121,51 +121,39 @@ namespace ism3d
 
             // estimate principle curvatures
             pcl::PrincipalCurvaturesEstimation<PointT, pcl::Normal, pcl::PrincipalCurvatures> curv_est;
-            curv_est.setInputCloud(keypoints_without_normals);
             curv_est.setSearchSurface(pointsWithoutNaNNormals);
             curv_est.setInputNormals(normalsWithoutNaN);
             curv_est.setSearchMethod(search);
             curv_est.setRadiusSearch(m_leafSize);
             pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures>());
-            curv_est.compute(*principal_curvatures);
-
-            pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures>());
-            if(m_filter_method_geometry == "kpq")
+            if(m_filter_method_geometry == "gaussian")
+            {
+                // compute curvatures on sparse cloud only (i.e. only for keypoints)
+                curv_est.setInputCloud(keypoints_without_normals);
+                curv_est.compute(*principal_curvatures);
+            }
+            else if(m_filter_method_geometry == "kpq")
             {
                 // densely estimate principle curvatures - very slow
                 curv_est.setInputCloud(pointsWithoutNaNNormals);
-                curv_est.setSearchSurface(pointsWithoutNaNNormals);
-                curv_est.setInputNormals(normalsWithoutNaN);
-                curv_est.setSearchMethod(search);
-                curv_est.setRadiusSearch(m_leafSize);
-                curv_est.compute(*dense_principal_curvatures);
+                curv_est.compute(*principal_curvatures);
             }
 
-            LOG_INFO("Number of keypoints before filtering: " << keypoints_with_normals->size());
+            LOG_INFO("Number of keypoints before filtering: " << keypoints_without_normals->size());
 
-
-            // TODO VS:
-            // 1) check if everything still works after last refactoring
-            // 2) remove keypoints_with_normals by using geo_scores in same way as color_scores below
-
-            auto[geo_scores, color_scores] = getScoresForKeypoints(points_with_normals, keypoints_with_normals,
-                    principal_curvatures, dense_principal_curvatures);
-
+            auto[geo_scores, color_scores] = getScoresForKeypoints(points_with_normals, keypoints_with_normals, principal_curvatures);
             auto[threshold_geo, threshold_color] = computeThresholds(geo_scores, color_scores);
             m_filter_threshold_geometry = threshold_geo;
             m_filter_threshold_color = threshold_color;
 
             // prepare resulting keypoints cloud
             pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
-            for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+            for(unsigned idx = 0; idx < keypoints_without_normals->size(); idx++)
             {
                 bool geo_passed = true;
                 if(m_filter_method_geometry != "none")
                 {
-                    PointNormalT point = keypoints_with_normals->at(idx);
-                    // NOTE: curvature corresponds to chosen geometry type value
-                    if(point.curvature < m_filter_threshold_geometry)
-                    //if(geo_scores[idx] < m_filter_threshold_geometry)
+                    if(geo_scores[idx] < m_filter_threshold_geometry)
                     {
                         geo_passed = false;
                     }
@@ -181,7 +169,18 @@ namespace ism3d
                 }
 
                 if(geo_passed && color_passed)
-                    keypoints->push_back(keypoints_without_normals->at(idx));
+                {
+                    if(m_refine_position)
+                    {
+                        PointT keypoint = refineKeypointPosition(geo_scores[idx], color_scores[idx], keypoints_without_normals->at(idx),
+                                                                 points_with_normals, principal_curvatures);
+                        keypoints->push_back(keypoint);
+                    }
+                    else
+                    {
+                        keypoints->push_back(keypoints_without_normals->at(idx));
+                    }
+                }
             }
             LOG_INFO("Number of keypoints after filtering: " << keypoints->size());
             return keypoints;
@@ -191,13 +190,12 @@ namespace ism3d
 
     std::tuple<std::vector<float>, std::vector<float>> KeypointsVoxelGridCulling::getScoresForKeypoints(
             const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
-            pcl::PointCloud<PointNormalT>::Ptr &keypoints_with_normals,
-            const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures,
-            const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures)
+            const pcl::PointCloud<PointNormalT>::Ptr keypoints_with_normals,
+            const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures)
     {
         // init result lists
-        std::vector<float> geo_scores;
-        std::vector<float> color_scores;
+        std::vector<float> geo_scores(keypoints_with_normals->size(), 0.0f);
+        std::vector<float> color_scores(keypoints_with_normals->size(), 0.0f);
 
         pcl::KdTreeFLANN<PointNormalT> pts_with_normals_tree;
         pts_with_normals_tree.setInputCloud(points_with_normals); // NOTE: search on original cloud
@@ -209,19 +207,17 @@ namespace ism3d
         for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
         {
             // PCL curvature
-            PointNormalT &reference_point = keypoints_with_normals->at(idx);
+            const PointNormalT &reference_point = keypoints_with_normals->at(idx);
 
             if(m_filter_method_geometry == "curvature")
             {
-                geo_scores.push_back(reference_point.curvature);
+                geo_scores[idx] = reference_point.curvature;
             }
             if(m_filter_method_geometry == "gaussian")
             {
                 // gaussian curvature
                 const pcl::PrincipalCurvatures &pc_point = principal_curvatures->at(idx);
-                geo_scores.push_back(pc_point.pc1 * pc_point.pc2);
-                // overwrite curvature with current method's value
-                reference_point.curvature = pc_point.pc1 * pc_point.pc2;
+                geo_scores[idx] = pc_point.pc1 * pc_point.pc2;
             }
 
             // group these methods as they need nearest neighbor search
@@ -231,15 +227,13 @@ namespace ism3d
                 if(m_filter_method_geometry == "kpq")
                 {
                     // KPQ (keypoint quality)
-                    float kpqval = computeKPQ(point_idxs, dense_principal_curvatures);
-                    geo_scores.push_back(kpqval);
-                    // overwrite curvature with current method's value
-                    reference_point.curvature = kpqval;
+                    float kpqval = computeKPQ(point_idxs, principal_curvatures);
+                    geo_scores[idx] = kpqval;
                 }
                 if(m_filter_method_color == "colordistance")
                 {
                     float color_score = computeColorScore(point_idxs, points_with_normals, reference_point, cc);
-                    color_scores.push_back(color_score);
+                    color_scores[idx] = color_score;
                 }
             }
         }
@@ -251,8 +245,8 @@ namespace ism3d
             const std::vector<float> &geo_scores_orig,
             const std::vector<float> &color_scores_orig)
     {
-        float threshold_geo;
-        float threshold_color;
+        float threshold_geo = std::numeric_limits<float>::min();
+        float threshold_color = std::numeric_limits<float>::min();
 
         // copy original lists for sorting
         std::vector<float> geo_scores;
@@ -385,6 +379,147 @@ namespace ism3d
 
         // compute score
         return float(num_distant_color) / pointIdxs.size();
+    }
+
+
+    PointT KeypointsVoxelGridCulling::refineKeypointPosition(
+            const float geo_score,
+            const float color_score,
+            const PointT &keypoint,
+            const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
+            const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures)
+    {
+        pcl::KdTreeFLANN<PointNormalT> pts_with_normals_tree;
+        pts_with_normals_tree.setInputCloud(points_with_normals);
+        std::vector<int> point_idxs;
+        std::vector<float> point_dists;
+        PointNormalT keyp_normal(keypoint.x, keypoint.y, keypoint.z);
+        pts_with_normals_tree.radiusSearch(keyp_normal, m_leafSize*0.5, point_idxs, point_dists);
+
+        float best_geo = geo_score;
+        float best_color = color_score;
+        int best_index = -1;
+        //std::cout << "-------------- found num neighbors: " << point_idxs.size() << std::endl;
+
+        pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr local_principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures>());
+        if(m_filter_method_geometry == "gaussian")
+        {
+            // extract neighbor indices into point cloud
+            pcl::PointCloud<PointNormalT>::Ptr nn_cloud_with_normals(new pcl::PointCloud<PointNormalT>());
+            pcl::copyPointCloud(*points_with_normals, point_idxs, *nn_cloud_with_normals);
+            pcl::PointCloud<PointT>::Ptr nn_cloud_without_normals(new pcl::PointCloud<PointT>());
+            pcl::copyPointCloud(*nn_cloud_with_normals, *nn_cloud_without_normals);
+
+            // separate points and normals
+            pcl::PointCloud<PointT>::Ptr points_without_normals(new pcl::PointCloud<PointT>());
+            pcl::copyPointCloud(*points_with_normals, *points_without_normals);
+            pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>());
+            pcl::copyPointCloud(*points_with_normals, *normals);
+
+            // estimate principle curvatures
+            pcl::PrincipalCurvaturesEstimation<PointT, pcl::Normal, pcl::PrincipalCurvatures> curv_est;
+            curv_est.setSearchSurface(points_without_normals);
+            curv_est.setInputNormals(normals);
+            curv_est.setRadiusSearch(m_leafSize);
+            curv_est.setInputCloud(nn_cloud_without_normals);
+            curv_est.compute(*local_principal_curvatures);
+        }
+        if(m_filter_method_geometry == "kpq")
+        {
+            local_principal_curvatures = dense_principal_curvatures;
+        }
+
+        ColorConversion& cc = ColorConversionStatic::getColorConversion();
+
+        // check scores of all neighboring points
+        for(unsigned idx = 0; idx < point_idxs.size(); idx++)
+        {
+            const PointNormalT &nn_point = points_with_normals->at(idx);
+            int best_index_geo = -1;
+            int best_index_color = -1;
+            float last_geo_score = -1;
+            float last_color_score = -1;
+
+            if(m_filter_method_geometry == "curvature")
+            {
+                if(nn_point.curvature > best_geo)
+                {
+                    best_index_geo = int(idx);
+                    last_geo_score = best_geo;
+                    best_geo = nn_point.curvature;
+                }
+            }
+            if(m_filter_method_geometry == "gaussian")
+            {
+                const pcl::PrincipalCurvatures &pc_point = local_principal_curvatures->at(idx);
+                if(pc_point.pc1 * pc_point.pc2 > best_geo)
+                {
+                    best_index_geo = int(idx);
+                    last_geo_score = best_geo;
+                    best_geo = pc_point.pc1 * pc_point.pc2;
+                }
+            }
+            // group these methods as they need an additional nearest neighbor search
+            if(m_filter_method_geometry == "kpq" || m_filter_method_color == "colordistance")
+            {
+                std::vector<int> point_idxs_kpq;
+                std::vector<float> point_dists_kpq;
+                pts_with_normals_tree.radiusSearch(nn_point, m_leafSize, point_idxs_kpq, point_dists_kpq);
+                if(m_filter_method_geometry == "kpq")
+                {
+                    float kpqval = computeKPQ(point_idxs, local_principal_curvatures);
+                    if(kpqval > best_geo)
+                    {
+                        best_index_geo = int(idx);
+                        last_geo_score = best_geo;
+                        best_geo = kpqval;
+                    }
+                }
+                if(m_filter_method_color == "colordistance")
+                {
+                    float color_score = computeColorScore(point_idxs_kpq, points_with_normals, nn_point, cc);
+                    if(color_score > best_color)
+                    {
+                        best_index_color = int(idx);
+                        last_color_score = best_color;
+                        best_color = color_score;
+                    }
+                }
+            }
+            // consolidate found indices
+            if(m_filter_method_geometry != "none" && m_filter_method_color == "none")
+            {
+                best_index = best_index_geo;
+            }
+            if(m_filter_method_geometry == "none" && m_filter_method_color != "none")
+            {
+                best_index = best_index_color;
+            }
+            if(m_filter_method_geometry != "none" && m_filter_method_color != "none")
+            {
+                if(best_index_geo != -1 && best_index_color != -1)
+                {
+                    // both, geometric and color filtering yielded the same index - accept it
+                    best_index = int(idx);
+                }
+                else
+                {
+                    // geometric and color filtering did not agree on an indes - restore previous best scores
+                    if(last_geo_score != -1) best_geo = last_geo_score;
+                    if(last_color_score != -1) best_color = last_color_score;
+                }
+            }
+        }
+
+        if(best_index == -1)
+        {
+            return keypoint;
+        }
+        else
+        {
+            const PointNormalT& kp = points_with_normals->at(best_index);
+            return PointT(kp.x, kp.y, kp.z, kp.r, kp.g, kp.b);
+        }
     }
 
     std::string KeypointsVoxelGridCulling::getTypeStatic()
