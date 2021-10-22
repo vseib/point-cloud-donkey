@@ -393,7 +393,10 @@ namespace ism3d
         pts_with_normals_tree.setInputCloud(points_with_normals);
         std::vector<int> point_idxs;
         std::vector<float> point_dists;
-        PointNormalT keyp_normal(keypoint.x, keypoint.y, keypoint.z);
+        PointNormalT keyp_normal;
+        keyp_normal.x = keypoint.x;
+        keyp_normal.y = keypoint.y;
+        keyp_normal.z = keypoint.z;
         pts_with_normals_tree.radiusSearch(keyp_normal, m_leafSize*0.5, point_idxs, point_dists);
 
         float best_geo = geo_score;
@@ -518,7 +521,11 @@ namespace ism3d
         else
         {
             const PointNormalT& kp = points_with_normals->at(best_index);
-            return PointT(kp.x, kp.y, kp.z, kp.r, kp.g, kp.b);
+            PointT res(kp.r, kp.g, kp.b);
+            res.x = kp.x;
+            res.y = kp.y;
+            res.z = kp.z;
+            return res;
         }
     }
 
