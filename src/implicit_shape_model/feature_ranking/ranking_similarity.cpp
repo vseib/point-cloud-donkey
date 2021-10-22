@@ -273,7 +273,7 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
             // transform scores
             for(unsigned i = 0; i < inter_class_scores[class_id].size(); i++)
             {
-                if(m_intra_pos == "front" || m_intra_pos == "back")
+                if(m_inter_pos == "front" || m_inter_pos == "back")
                 {
                     // favors the front of the list
                     if(min < 0)
@@ -286,13 +286,13 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
                         inter_class_scores[class_id][i] = inter_class_scores[class_id][i]/max;
                     }
                 }
-                if(m_intra_pos == "back") // this second step is needed for "back"
+                if(m_inter_pos == "back") // this second step is needed for "back"
                 {
                     // favors the back
                     inter_class_scores[class_id][i] = std::fabs(inter_class_scores[class_id][i] - 1);
                 }
 
-                if(m_intra_pos == "center")
+                if(m_inter_pos == "center")
                 {
                 // favors the center of the list
                 // with median: slightly shifted to the back
@@ -301,7 +301,7 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
                     inter_class_scores[class_id][i] = std::fabs((inter_class_scores[class_id][i]-median) / (max-median));
                 }
 
-                if(m_intra_pos == "center2")
+                if(m_inter_pos == "center2")
                 {
                 // favors the center of the list
                 // with median: slightly shifted to the back
