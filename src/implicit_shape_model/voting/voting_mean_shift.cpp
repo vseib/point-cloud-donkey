@@ -115,7 +115,7 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         }
 
         // NOTE: if "Average", subsequent "Suppress" must be executed to avoid keeping maxima closer than m_bandwidth
-        // TODO VS: this if is not necessary, since there is only "average" and "suppress"
+        // TODO VS: this "if" is not necessary, since there is only "average" and "suppress"
         if(m_maxima_suppression_type == "Average" || m_maxima_suppression_type == "Suppress")
         {
             MaximaHandler::suppressNeighborMaxima(cluster_centers, densities, m_bandwidth, maximum_positions);

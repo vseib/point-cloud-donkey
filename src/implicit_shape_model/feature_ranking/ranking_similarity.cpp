@@ -128,7 +128,7 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
                 std::vector<std::vector<int>> indices_raw;
                 std::vector<std::vector<float>> distances_raw;
                 flann::SearchParams params = m_flann_exact_match ? flann::SearchParams(-1) : flann::SearchParams(128);
-                index_other.knnSearch(query, indices_raw, distances_raw, m_k_search, params);
+                index_other.knnSearch(query, indices_raw, distances_raw, 100, params); // TODO VS: try replacing 100 by (num-classes-1)*m_k_search
                 // simplify indexing for the following steps
                 std::vector<int> indices = indices_raw.at(0);
                 std::vector<float> distances = distances_raw.at(0);
