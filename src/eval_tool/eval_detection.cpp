@@ -466,8 +466,10 @@ int main(int argc, char **argv)
                         std::vector<DetectionObject> class_objects_gt = item.second;
                         // these variables sum over each class
                         int num_gt = int(class_objects_gt.size());
-                        int cumul_tp, cumul_fp;
-                        int global_cumul_tp, global_cumul_fp;
+                        int cumul_tp = 0;
+                        int cumul_fp = 0;
+                        int global_cumul_tp = 0;
+                        int global_cumul_fp = 0;
 
                         // if there are no detections for this class
                         if(det_class_map.find(class_label) == det_class_map.end())
