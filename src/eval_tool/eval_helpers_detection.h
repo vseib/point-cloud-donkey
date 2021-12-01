@@ -63,6 +63,16 @@ struct DetectionObject
     }
 };
 
+// represents a summary for plotting precision and recall
+struct DetectionSummary
+{
+    float confidence;
+    int tp;
+    int fp;
+
+    DetectionSummary(float confidence, int tp, int fp) : confidence(confidence), tp(tp), fp(fp) {}
+};
+
 
 std::tuple<float,float>
 get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_positives, int num_gt)
@@ -84,6 +94,64 @@ get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_p
 
     return {precision, recall};
 }
+
+std::tuple<std::vector<float>, std::vector<float>>
+computePrecisionRecallForPlotting(
+    std::map<std::string, std::vector<DetectionObject>> &det_class_map,
+    std::map<std::string, std::vector<DetectionObject>> &gt_class_map,
+    std::map<std::string, std::vector<int>> &tps_per_class,
+    std::map<std::string, std::vector<int>> &fps_per_class)
+{
+    // count number of gt objects
+    int num_gt = 0;
+    for(auto [class_id, gt_list] : gt_class_map)
+    {
+        num_gt += gt_list.size();
+    }
+
+    // insert all detections into common list and mark them as tp or fp
+    std::vector<DetectionSummary> all_detections;
+    for(auto [class_id, detection_list] : det_class_map)
+    {
+        // sort objects by confidence then loop over sorted list, starting with hightest conf
+        std::sort(detection_list.begin(), detection_list.end(), [](DetectionObject &obj1, DetectionObject &obj2)
+        {
+           return obj1.confidence > obj2.confidence;
+        });
+
+        // assign tp or fp labels
+        for(unsigned i = 0; i < detection_list.size(); i++)
+        {
+            DetectionObject& obj = detection_list.at(i);
+            int tp = tps_per_class[class_id].at(i);
+            int fp = fps_per_class[class_id].at(i);
+
+            all_detections.push_back({obj.confidence, tp, fp});
+        }
+    }
+
+    // sort objects by confidence then loop over sorted list, starting with hightest conf
+    std::sort(all_detections.begin(), all_detections.end(), [](DetectionSummary &obj1, DetectionSummary &obj2)
+    {
+       return obj1.confidence > obj2.confidence;
+    });
+
+    // create precision recall values for plotting
+    int tp_sum = 0;
+    int fp_sum = 0;
+    std::vector<float> precisions;
+    std::vector<float> recalls;
+    for(DetectionSummary &det : all_detections)
+    {
+        tp_sum += det.tp;
+        fp_sum += det.fp;
+        precisions.push_back(tp_sum / float(fp_sum + tp_sum));
+        recalls.push_back(float(tp_sum) / num_gt);
+    }
+
+    return std::make_tuple(precisions, recalls);
+}
+
 
 std::tuple<std::vector<int>,std::vector<int>>
 match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
@@ -139,7 +207,7 @@ match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
 }
 
 
-std::tuple<float, float, float, int, int>
+std::tuple<float, float, float, int, int, std::vector<int>, std::vector<int>>
 computeMetrics(std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
                     float dist_threshold)
@@ -171,7 +239,7 @@ computeMetrics(std::vector<DetectionObject> &class_objects_gt,
         cumul_fp += elem;
     }
 
-    return {float(precision), float(recall), ap, cumul_tp, cumul_fp};
+    return {float(precision), float(recall), ap, cumul_tp, cumul_fp, tp, fp};
 }
 
 

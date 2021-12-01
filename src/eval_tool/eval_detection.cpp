@@ -429,6 +429,11 @@ int main(int argc, char **argv)
                     std::map<std::string, std::vector<DetectionObject>> gt_class_map;
                     std::map<std::string, std::vector<DetectionObject>> det_class_map;
                     std::map<std::string, std::vector<DetectionObject>> det_class_map_global;
+                    // maps a class label to list of tp or fp in descending order of confidence per class
+                    // i.e. allows to lookup for each detection whether it is an fp or tp
+                    // Note: each vector in det_class_map is sorted in descending order of confidence in next for-loop
+                    std::map<std::string, std::vector<int>> tps_per_class;
+                    std::map<std::string, std::vector<int>> fps_per_class;
 
                     rearrangeObjects(gt_objects, gt_class_map);
                     rearrangeObjects(detected_objects, det_class_map);
@@ -466,8 +471,10 @@ int main(int argc, char **argv)
                         std::vector<DetectionObject> class_objects_gt = item.second;
                         // these variables sum over each class
                         int num_gt = int(class_objects_gt.size());
-                        int cumul_tp, cumul_fp;
-                        int global_cumul_tp, global_cumul_fp;
+                        int cumul_tp = 0;
+                        int cumul_fp = 0;
+                        int global_cumul_tp = 0;
+                        int global_cumul_fp = 0;
 
                         // if there are no detections for this class
                         if(det_class_map.find(class_label) == det_class_map.end())
@@ -478,12 +485,16 @@ int main(int argc, char **argv)
                         }
                         else
                         {
-                            std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
+                            std::vector<DetectionObject> &class_objects_det = det_class_map.at(class_label);
 
                             float precision, recall, ap;
-                            std::tie(precision, recall, ap, cumul_tp, cumul_fp) = computeMetrics(class_objects_gt,
+                            std::vector<int> tp_list, fp_list;
+                            std::tie(precision, recall, ap, cumul_tp, cumul_fp, tp_list, fp_list) = computeMetrics(class_objects_gt,
                                                                                              class_objects_det,
                                                                                              dist_threshold);
+                            tps_per_class.insert({class_label, tp_list});
+                            fps_per_class.insert({class_label, fp_list});
+
                             precision_per_class[class_id] = precision;
                             recall_per_class[class_id] = recall;
                             ap_per_class[class_id] = ap;
@@ -503,7 +514,7 @@ int main(int argc, char **argv)
                                 std::vector<DetectionObject> class_objects_det = det_class_map_global.at(class_label);
 
                                 float precision, recall, ap;
-                                std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp) = computeMetrics(class_objects_gt,
+                                std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp, std::ignore, std::ignore) = computeMetrics(class_objects_gt,
                                                                                                  class_objects_det,
                                                                                                  dist_threshold);
                                 global_precision_per_class[class_id] = precision;
@@ -544,6 +555,22 @@ int main(int argc, char **argv)
                         cumul_tp_dataset += cumul_tp;
                         cumul_fp_dataset += cumul_fp;
                     }
+
+                    // compute values for precision-recall curves
+                    std::vector<float> precisions;
+                    std::vector<float> recalls;
+                    std::tie(precisions, recalls) = computePrecisionRecallForPlotting(det_class_map, gt_class_map, tps_per_class, fps_per_class);
+                    std::string outFile = variables["output"].as<std::string>();
+                    std::string plot_filename = outFile;
+                    plot_filename.append("/precision-recall.txt");
+                    std::ofstream plot_file;
+                    plot_file.open(plot_filename.c_str(), std::ios::out);
+                    plot_file << "# recall precision" << std::endl;
+                    for(unsigned ppos = 0; ppos < precisions.size(); ppos++)
+                    {
+                        plot_file  << recalls[ppos] << " " << precisions[ppos] << std::endl;
+                    }
+                    plot_file.close();
 
                     // store sums
                     summaryFile << "-------------------------------------------------------------" << std::endl;
