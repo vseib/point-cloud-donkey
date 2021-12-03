@@ -263,6 +263,18 @@ void ImplicitShapeModel::train()
             point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
 
+//            // temp for debug
+//            pcl::PointCloud<PointNormalT>::Ptr new_cloud(new pcl::PointCloud<PointNormalT>);
+//            std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
+//            LOG_INFO("now saving, name is: "+ name);
+//            for(PointNormalT point : point_cloud->points)
+//            {
+//                new_cloud->push_back(point);
+//                point.x += 0.05;
+//                new_cloud->push_back(point);
+//            }
+//            new_cloud->width = new_cloud->size();
+//            pcl::io::savePCDFile(name, *new_cloud);
 
 
             // TODO VS: remove this completely
@@ -311,11 +323,26 @@ void ImplicitShapeModel::train()
             // compute bounding box
             Utils::BoundingBox bounding_box;
             if (m_bb_type == "MVBB")
+            {
                 bounding_box = Utils::computeMVBB<PointNormalT>(point_cloud);
+            }
             else if (m_bb_type == "AABB")
+            {
                 bounding_box = Utils::computeAABB<PointNormalT>(point_cloud);
+            }
             else
                 throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
+
+//            // temp debug
+//            std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
+//            LOG_INFO("now saving, name is: "+ name);
+//            PointNormalT center;
+//            center.x = bounding_box.position.x();
+//            center.y = bounding_box.position.y();
+//            center.z = bounding_box.position.z();
+//            center.r = 255;
+//            point_cloud->push_back(center);
+//            pcl::io::savePCDFileASCII(name, *point_cloud);
 
             if(m_enable_signals)
             {
