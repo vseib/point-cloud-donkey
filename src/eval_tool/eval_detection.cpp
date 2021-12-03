@@ -566,10 +566,12 @@ int main(int argc, char **argv)
                     std::ofstream plot_file;
                     plot_file.open(plot_filename.c_str(), std::ios::out);
                     plot_file << "# recall precision" << std::endl;
+                    plot_file << "0 1" << std::endl;
                     for(unsigned ppos = 0; ppos < precisions.size(); ppos++)
                     {
                         plot_file  << recalls[ppos] << " " << precisions[ppos] << std::endl;
                     }
+                    plot_file << "1 0" << std::endl;
                     plot_file.close();
 
                     // store sums
