@@ -73,10 +73,14 @@ int main(int argc, char **argv)
     }
 
     // init logging
-    log4cxx::LayoutPtr layout(new log4cxx::PatternLayout("[\%d{HH:mm:ss}] \%p: \%m\%n"));
-    log4cxx::ConsoleAppender* consoleAppender = new log4cxx::ConsoleAppender(layout);
-    log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
-    log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
+    log4cxx::AppenderList appl = log4cxx::Logger::getRootLogger()->getAllAppenders();
+    if(appl.size() == 0)
+    {
+        log4cxx::LayoutPtr layout(new log4cxx::PatternLayout("[\%d{HH:mm:ss}] \%p: \%m\%n"));
+        log4cxx::ConsoleAppender* consoleAppender = new log4cxx::ConsoleAppender(layout);
+        log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
+        log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
+    }
 
     // show help
     if (variables.count("help") || variables.size() == 0) {
