@@ -37,6 +37,7 @@
 #include <Eigen/Core>
 #include "eval_helpers.h"
 #include "../implicit_shape_model/voting/voting_maximum.h"
+#include <filesystem>
 
 // represents one object instance, either detected or ground truth
 struct DetectionObject
@@ -360,6 +361,11 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
                    std::string mode)
 {
     // parse input
+    if(!std::filesystem::exists(input_file_name))
+    {
+        LOG_ERROR("File " << input_file_name << " does not exist!");
+        exit(1);
+    }
     std::ifstream infile(input_file_name);
     std::string file;
     std::string class_label;
@@ -378,12 +384,12 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
     {
         if(mode != class_label)
         {
-            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< mode << "', but your input file says '" << class_label << "'!");
+            LOG_ERROR("Check your command line arguments! You specified to '"<< mode << "', but your input file says '" << class_label << "'!");
             exit(1);
         }
         if (additional_flag != "detection")
         {
-            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
+            LOG_ERROR("You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
             exit(1);
         }
         if (additional_flag_2 == "inst")
@@ -443,6 +449,11 @@ void parseFileListDetectionTest(std::string &input_file_name,
                                       std::vector<std::string> &gt_files)
 {
     // parse input
+    if(!std::filesystem::exists(input_file_name))
+    {
+        LOG_ERROR("File " << input_file_name << " does not exist!");
+        exit(1);
+    }
     std::ifstream infile(input_file_name);
     std::string file;
     std::string gt_file;
@@ -459,12 +470,12 @@ void parseFileListDetectionTest(std::string &input_file_name,
     {
         if("test" != gt_file)
         {
-            LOG_ERROR("ERROR: Check your command line arguments! You specified to '"<< "test" << "', but your input file says '" << gt_file << "'!");
+            LOG_ERROR("Check your command line arguments! You specified to '"<< "test" << "', but your input file says '" << gt_file << "'!");
             exit(1);
         }
         if (additional_flag != "detection")
         {
-            LOG_ERROR("ERROR: You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
+            LOG_ERROR("You are using a classification data set with the detection eval_tool! Use the binary 'eval_tool' instead.");
             exit(1);
         }
         if (additional_flag_2 == "inst")

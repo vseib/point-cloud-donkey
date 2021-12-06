@@ -72,6 +72,12 @@ int main(int argc, char **argv)
         std::cerr << e.what() << std::endl;
     }
 
+    // init logging
+    log4cxx::LayoutPtr layout(new log4cxx::PatternLayout("[\%d{HH:mm:ss}] \%p: \%m\%n"));
+    log4cxx::ConsoleAppender* consoleAppender = new log4cxx::ConsoleAppender(layout);
+    log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
+    log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
+
     // show help
     if (variables.count("help") || variables.size() == 0) {
         std::cout << desc << std::endl;
