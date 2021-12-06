@@ -337,6 +337,12 @@ void ImplicitShapeModel::train()
             else
                 throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
 
+//            // TODO VS: temp for debug
+//            Eigen::Vector4f centroid4f;
+//            pcl::compute3DCentroid(*point_cloud, centroid4f);
+//            Eigen::Vector3f centroid(centroid4f[0], centroid4f[1], centroid4f[2]);
+//            bounding_box.position = centroid;
+
 //            // temp debug
 //            std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
 //            LOG_INFO("now saving, name is: "+ name);
