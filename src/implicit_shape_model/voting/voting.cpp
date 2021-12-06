@@ -342,8 +342,19 @@ std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> Voting:
         for(unsigned i = 0; i < vote_list.size(); i++)
         {
             const Vote &v = vote_list.at(i);
-            scene_keypoints->push_back(PointT(v.keypoint.x(), v.keypoint.y(), v.keypoint.z()));
-            object_keypoints->push_back(PointT(v.keypoint_training.x(), v.keypoint_training.y(), v.keypoint_training.z()));
+
+            PointT scenekeyp;
+            scenekeyp.x = v.keypoint.x();
+            scenekeyp.y = v.keypoint.y();
+            scenekeyp.z = v.keypoint.z();
+            scene_keypoints->push_back(scenekeyp);
+
+            PointT objectkeyp;
+            objectkeyp.x = v.keypoint_training.x();
+            objectkeyp.y = v.keypoint_training.y();
+            objectkeyp.z = v.keypoint_training.z();
+            object_keypoints->push_back(objectkeyp);
+
             initial_corrs.emplace_back(pcl::Correspondence(i, i, 1)); // TODO VS: check if distance is used!
         }
 
