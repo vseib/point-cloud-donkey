@@ -80,6 +80,7 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     log4cxx::ConsoleAppender* consoleAppender = new log4cxx::ConsoleAppender(layout);
     log4cxx::BasicConfigurator::configure(log4cxx::AppenderPtr(consoleAppender));
     log4cxx::Logger::getRootLogger()->setLevel(log4cxx::Level::getInfo());
+    log4cxx::Logger::getRootLogger()->setAdditivity(false);
 
     // parameters for preprocessing
     addParameter(m_use_smoothing, "UseSmoothing", false);
