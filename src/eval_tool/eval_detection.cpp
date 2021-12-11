@@ -596,7 +596,7 @@ int main(int argc, char **argv)
                     summaryFile << "---------------------------------------------------------------------" << std::endl;
                     summaryFile << "Overall:" << std::setw(12) << std::right << num_gt_dataset
                                 << std::setw(5) << std::right << cumul_tp_dataset
-                                << std::setw(6) << std::right << cumul_fp_dataset
+                                << std::setw(6) << std::right << cumul_fp_dataset << "   "
                                 << std::setw(11) << std::left << std::round(overall_precision*10000.0f)/10000.0f
                                 << std::setw(9) << std::round(overall_recall*10000.0f)/10000.0f
                                 << std::setw(8) << std::round(overall_ap*10000.0f)/10000.0f
@@ -651,14 +651,15 @@ int main(int argc, char **argv)
                         if(it.first == "complete") continue;
                         time_sum += (it.second / 1000);
                     }
-                    summaryFile << "\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
+                    summaryFile << std::endl;
+                    summaryFile << "complete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
                     summaryFile << "times per step:\n";
                     summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
                     summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
                     summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
                     summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
                     summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl << std::endl;
 
                     summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
