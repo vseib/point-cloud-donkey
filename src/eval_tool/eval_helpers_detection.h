@@ -96,7 +96,8 @@ get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_p
     return {precision, recall};
 }
 
-std::tuple<std::vector<float>, std::vector<float>>
+
+std::tuple<std::vector<float>, std::vector<float>, float>
 computePrecisionRecallForPlotting(
     std::map<std::string, std::vector<DetectionObject>> &det_class_map,
     std::map<std::string, std::vector<DetectionObject>> &gt_class_map,
@@ -140,6 +141,7 @@ computePrecisionRecallForPlotting(
     // create precision recall values for plotting
     int tp_sum = 0;
     int fp_sum = 0;
+    float ap = 0.0f;
     std::vector<float> precisions;
     std::vector<float> recalls;
     for(DetectionSummary &det : all_detections)
@@ -148,9 +150,13 @@ computePrecisionRecallForPlotting(
         fp_sum += det.fp;
         precisions.push_back(tp_sum / float(fp_sum + tp_sum));
         recalls.push_back(float(tp_sum) / num_gt);
+        if(det.tp == 1)
+        {
+            ap += (float(tp_sum) / (tp_sum+fp_sum)) * (1.0/num_gt);
+        }
     }
 
-    return std::make_tuple(precisions, recalls);
+    return std::make_tuple(precisions, recalls, ap);
 }
 
 

@@ -464,9 +464,9 @@ int main(int argc, char **argv)
                     std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
                     std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
 
-                    summaryFile << "  class       num gt   tp    fp   precision  recall   AP";
+                    summaryFile << "  class       num gt   tp    fp   precision  recall   AP      f-score";
                     if(report_global_metrics)
-                                summaryFile << "        | global tp    fp   precision  recall   AP";
+                                summaryFile << "        | global tp    fp   precision  recall   AP      f-score";
                     summaryFile << std::endl;
 
                     // these variables sum over the whole dataset
@@ -540,6 +540,8 @@ int main(int argc, char **argv)
                         float global_ap = global_ap_per_class[class_id];
                         float global_precision = global_precision_per_class[class_id];
                         float global_recall = global_recall_per_class[class_id];
+                        float fscore = 2*precision*recall/(precision+recall);
+                        float global_fscore = 2*global_precision*global_recall/(global_precision+global_recall);
 
                         summaryFile << std::setw(3) << std::right << class_id << " "
                                     << std::setw(13) << std::left << class_label
@@ -548,7 +550,8 @@ int main(int argc, char **argv)
                                     << std::setw(6) << cumul_fp << "   "
                                     << std::setw(11) << std::left << std::round(precision*10000.0f)/10000.0f
                                     << std::setw(9) << std::round(recall*10000.0f)/10000.0f
-                                    << std::setw(10) << std::round(ap*10000.0f)/10000.0f;
+                                    << std::setw(8) << std::round(ap*10000.0f)/10000.0f
+                                    << std::setw(10) << std::round(fscore*10000.0f)/10000.0f;
                         if(report_global_metrics)
                         {
                             summaryFile << "| "
@@ -556,7 +559,8 @@ int main(int argc, char **argv)
                                         << std::setw(6) << global_cumul_fp << "   "
                                         << std::setw(11) << std::left << std::round(global_precision*10000.0f)/10000.0f
                                         << std::setw(9) << std::round(global_recall*10000.0f)/10000.0f
-                                        << std::setw(10) << std::round(global_ap*10000.0f)/10000.0f;
+                                        << std::setw(8) << std::round(global_ap*10000.0f)/10000.0f
+                                        << std::setw(10) << std::round(global_fscore*10000.0f)/10000.0f;
                         }
                         summaryFile << std::endl;
 
@@ -569,7 +573,8 @@ int main(int argc, char **argv)
                     // compute values for precision-recall curves
                     std::vector<float> precisions;
                     std::vector<float> recalls;
-                    std::tie(precisions, recalls) = computePrecisionRecallForPlotting(det_class_map, gt_class_map, tps_per_class, fps_per_class);
+                    float overall_ap;
+                    std::tie(precisions, recalls, overall_ap) = computePrecisionRecallForPlotting(det_class_map, gt_class_map, tps_per_class, fps_per_class);
                     std::string outFile = variables["output"].as<std::string>();
                     std::string plot_filename = outFile;
                     plot_filename.append("/precision-recall.txt");
@@ -585,26 +590,17 @@ int main(int argc, char **argv)
                     plot_file.close();
 
                     // store sums
-                    summaryFile << "-------------------------------------------------------------" << std::endl;
-                    summaryFile << "Sums:" << std::setw(15) << std::right << num_gt_dataset
+                    float overall_precision = cumul_tp_dataset / float(cumul_tp_dataset+cumul_fp_dataset);
+                    float overall_recall = cumul_tp_dataset / float(num_gt_dataset);
+                    float overall_fscore = 2*overall_precision*overall_recall/(overall_precision+overall_recall);;
+                    summaryFile << "---------------------------------------------------------------------" << std::endl;
+                    summaryFile << "Overall:" << std::setw(12) << std::right << num_gt_dataset
                                 << std::setw(5) << std::right << cumul_tp_dataset
-                                << std::setw(6) << std::right << cumul_fp_dataset << std::endl;
-
-                    // write processing time details to summary
-                    double time_sum = 0;
-                    for(auto it : times)
-                    {
-                        if(it.first == "complete") continue;
-                        time_sum += (it.second / 1000);
-                    }
-                    summaryFile << "\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
-                    summaryFile << "times per step:\n";
-                    summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
+                                << std::setw(6) << std::right << cumul_fp_dataset
+                                << std::setw(11) << std::left << std::round(overall_precision*10000.0f)/10000.0f
+                                << std::setw(9) << std::round(overall_recall*10000.0f)/10000.0f
+                                << std::setw(8) << std::round(overall_ap*10000.0f)/10000.0f
+                                << std::setw(10) << std::round(overall_fscore*10000.0f)/10000.0f;
 
                     // compute average metrics
                     float mAP = 0;
@@ -648,6 +644,22 @@ int main(int argc, char **argv)
                     summaryFile << "       f-score:        " << std::setw(7) << std::round(fscore*10000.0f)/10000.0f << " (" << std::round(fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
 
                     // complete and close summary file
+                    // write processing time details to summary
+                    double time_sum = 0;
+                    for(auto it : times)
+                    {
+                        if(it.first == "complete") continue;
+                        time_sum += (it.second / 1000);
+                    }
+                    summaryFile << "\n\ncomplete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
+                    summaryFile << "times per step:\n";
+                    summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
+                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl;
+
                     summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
                     summaryFile.close();
                 }
