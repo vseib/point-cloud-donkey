@@ -288,6 +288,14 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     if (m_bestK > 0 && maxima.size() >= m_bestK)
         maxima.erase(maxima.begin() + m_bestK, maxima.end());
 
+    printMaxima(maxima);
+
+    return maxima;
+}
+
+
+void Voting::printMaxima(const std::vector<VotingMaximum> &maxima)
+{
     for (int i = 0; i < (int)maxima.size(); i++)
     {
         // TODO VS: format output nicely
@@ -308,7 +316,6 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                      ", num votes: " << max.votes.size());
         }
     }
-    return maxima;
 }
 
 

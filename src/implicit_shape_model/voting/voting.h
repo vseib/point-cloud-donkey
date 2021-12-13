@@ -66,6 +66,12 @@ namespace ism3d
         std::vector<VotingMaximum> findMaxima(pcl::PointCloud<PointT>::ConstPtr &points, pcl::PointCloud<pcl::Normal>::ConstPtr &normals);
 
         /**
+         * @brief printMaxima Prints the resulting maxima to std::out, nicely formatted
+         * @param maxima All maxima to print
+         */
+        void printMaxima(const std::vector<VotingMaximum> &maxima);
+
+        /**
          * @brief get all votes
          * @return a map of votes, the key represents the class id
          */
