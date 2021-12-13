@@ -217,6 +217,12 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         }
     }
 
+    //-------- temp TODO VS ----------
+    // sort maxima
+    std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
+    LOG_INFO("----------- all found maxima, vote threshold applied:");
+    printMaxima(maxima);
+
     // in single object mode: compute global features on the whole cloud once
     if(m_use_global_features && m_single_object_mode)
     {
@@ -252,6 +258,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     // sort maxima
     std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
 
+    //-------- temp TODO VS ----------
+    LOG_INFO("----------- maxima filtering applied (filterMaxima method):");
+    printMaxima(maxima);
+
     // add global features to result classification
     if(m_use_global_features)
     {
@@ -264,6 +274,10 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     // turn weights to probabilities
     normalizeWeights(maxima);
 //    softmaxWeights(maxima);
+    //-------- temp TODO VS ----------
+    LOG_INFO("----------- maxima weights normalized:");
+    printMaxima(maxima);
+
 
     // filter low weight maxima
     // NOTE: if m_minThreshold is positive: filter absolute values
@@ -284,10 +298,16 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     }
     maxima = filtered_maxima;
 
+    //-------- temp TODO VS ----------
+    LOG_INFO("----------- maxima weight threshold applied:");
+    printMaxima(maxima);
+
     // only keep the best k maxima, if specified
     if (m_bestK > 0 && maxima.size() >= m_bestK)
         maxima.erase(maxima.begin() + m_bestK, maxima.end());
 
+    //-------- temp TODO VS ----------
+    LOG_INFO("----------- maxima final result:");
     printMaxima(maxima);
 
     return maxima;
