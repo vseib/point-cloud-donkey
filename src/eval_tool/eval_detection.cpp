@@ -540,8 +540,12 @@ int main(int argc, char **argv)
                         float global_ap = global_ap_per_class[class_id];
                         float global_precision = global_precision_per_class[class_id];
                         float global_recall = global_recall_per_class[class_id];
-                        float fscore = 2*precision*recall/(precision+recall);
-                        float global_fscore = 2*global_precision*global_recall/(global_precision+global_recall);
+                        float fscore = 0.0f;
+                        if((precision+recall) > 0.0f)
+                            fscore = 2*precision*recall/(precision+recall);
+                        float global_fscore = 0.0f;
+                        if((global_precision+global_recall) > 0.0f)
+                            global_fscore = 2*global_precision*global_recall/(global_precision+global_recall);
 
                         summaryFile << std::setw(3) << std::right << class_id << " "
                                     << std::setw(13) << std::left << class_label

@@ -166,6 +166,8 @@ namespace ism3d
         voting.vote(center, weight, classId, instanceId, keyPos, boundingBox, codeword);
     }
 
+
+    // TODO VS: check what this method is used for
     void CodewordDistribution::computeWeights()
     {
         /*Eigen::Vector3f pos(1, 1, 1);

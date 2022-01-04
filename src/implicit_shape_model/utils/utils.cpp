@@ -293,6 +293,7 @@ namespace ism3d
     }
 
 
+    // TODO VS check if this is ever used
     float Utils::computeHingeLoss(const std::vector<float> &class_distances, const unsigned class_id)
     {
         float sum = 0;
