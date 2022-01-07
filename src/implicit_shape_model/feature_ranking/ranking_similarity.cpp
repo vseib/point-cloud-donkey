@@ -14,7 +14,7 @@ namespace ism3d
 {
 RankingSimilarity::RankingSimilarity()
 {
-    addParameter(m_update_type, "UpdateType", std::string("dist"));
+    addParameter(m_update_type, "UpdateType", std::string("score"));
     addParameter(m_intra_pos, "IntraPosition", std::string("front"));
     addParameter(m_inter_pos, "InterPosition", std::string("front"));
 }
