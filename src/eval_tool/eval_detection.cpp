@@ -335,8 +335,7 @@ int main(int argc, char **argv)
                         pointClouds = filenames;
                     }
 
-                    // prepare summary
-                    std::ofstream summaryFile;
+                    // prepare output
                     if (variables.count("output"))
                     {
                         // create folder for output
@@ -344,13 +343,6 @@ int main(int argc, char **argv)
                         std::string folder = variables["output"].as<std::string>();
                         command.append(folder);
                         std::ignore = std::system(command.c_str());
-                        sleep(1);
-
-                        // summary file
-                        std::string outFile = variables["output"].as<std::string>();
-                        std::string outFileName = outFile;
-                        outFileName.append("/summary.txt");
-                        summaryFile.open(outFileName.c_str(), std::ios::out);
                     }
                     else
                     {
@@ -392,242 +384,61 @@ int main(int argc, char **argv)
                                 if(write_log_to_files)
                                 {
                                     std::string out_path = variables["output"].as<std::string>();
-                                    writeLogPerCloud(pointCloud, ismFile, gt_file, out_path, maxima);
+                                    filelog::writeLogPerCloud(pointCloud, ismFile, gt_file, out_path, maxima);
                                 }
                             }
                         }
                     }
 
-                    // maps a class label id to list of objects
-                    std::map<std::string, std::vector<DetectionObject>> gt_class_map;
-                    std::map<std::string, std::vector<DetectionObject>> det_class_map;
-                    std::map<std::string, std::vector<DetectionObject>> det_class_map_global;
-                    // maps a class label to list of tp or fp in descending order of confidence per class
-                    // i.e. allows to lookup for each detection whether it is an fp or tp
-                    // Note: each vector in det_class_map is sorted in descending order of confidence in next for-loop
-                    std::map<std::string, std::vector<int>> tps_per_class;
-                    std::map<std::string, std::vector<int>> fps_per_class;
+                    // create common object to manage all metrics
+                    MetricsCollection mc;
 
-                    rearrangeObjects(gt_objects, gt_class_map);
-                    rearrangeObjects(detected_objects, det_class_map);
+                    rearrangeObjects(gt_objects, mc.gt_class_map);
+                    rearrangeObjects(detected_objects, mc.det_class_map);
                     bool report_global_metrics = ism.isUsingGlobalFeatures();
-//                    report_global_metrics = true;
                     if(report_global_metrics)
-                        rearrangeObjects(detected_objects, det_class_map_global, true);
+                        rearrangeObjects(detected_objects, mc.det_class_map_global, true);
 
-                    float dist_threshold = ism.getDetectionThreshold();
+                    mc.resizeVectors();
 
-                    // collect all metrics
-                    // combined detection - primary metrics
-                    std::vector<float> ap_per_class(gt_class_map.size(), 0.0);
-                    std::vector<float> precision_per_class(gt_class_map.size(), 0.0);
-                    std::vector<float> recall_per_class(gt_class_map.size(), 0.0);
-                    // metrics for the global classifier (if used)
-                    std::vector<float> global_ap_per_class(gt_class_map.size(), 0.0);
-                    std::vector<float> global_precision_per_class(gt_class_map.size(), 0.0);
-                    std::vector<float> global_recall_per_class(gt_class_map.size(), 0.0);
-
-                    summaryFile << "  class       num gt   tp    fp   precision  recall   AP      f-score";
-                    if(report_global_metrics)
-                                summaryFile << "        | global tp    fp   precision  recall   AP      f-score";
-                    summaryFile << std::endl;
+                    // summary file
+                    std::ofstream summaryFile;
+                    if (variables.count("output"))
+                    {
+                        std::string outFile = variables["output"].as<std::string>();
+                        filelog::writeDetectionSummaryHeader(summaryFile, outFile, report_global_metrics);
+                    }
 
                     // these variables sum over the whole dataset
                     int num_gt_dataset = 0;
                     int cumul_tp_dataset = 0;
                     int cumul_fp_dataset = 0;
 
-                    for(auto item : gt_class_map)
+                    float dist_threshold = ism.getDetectionThreshold();
+
+                    for(auto item : mc.gt_class_map)
                     {
                         std::string class_label = item.first;
                         unsigned class_id = class_labels_map[class_label];
                         std::vector<DetectionObject> class_objects_gt = item.second;
-                        // these variables sum over each class
-                        int num_gt = int(class_objects_gt.size());
-                        int cumul_tp = 0;
-                        int cumul_fp = 0;
-                        int global_cumul_tp = 0;
-                        int global_cumul_fp = 0;
 
-                        // if there are no detections for this class
-                        if(det_class_map.find(class_label) == det_class_map.end())
-                        {
-                            ap_per_class[class_id] = 0;
-                            precision_per_class[class_id] = 0;
-                            recall_per_class[class_id] = 0;
-                        }
-                        else
-                        {
-                            std::vector<DetectionObject> &class_objects_det = det_class_map.at(class_label);
-
-                            float precision, recall, ap;
-                            std::vector<int> tp_list, fp_list;
-                            std::tie(precision, recall, ap, cumul_tp, cumul_fp, tp_list, fp_list) = computeMetrics(class_objects_gt,
-                                                                                             class_objects_det,
-                                                                                             dist_threshold);
-                            tps_per_class.insert({class_label, tp_list});
-                            fps_per_class.insert({class_label, fp_list});
-
-                            precision_per_class[class_id] = precision;
-                            recall_per_class[class_id] = recall;
-                            ap_per_class[class_id] = ap;
-                        }
-
-                        if(report_global_metrics)
-                        {
-                            // if there are no detections for this class in global detector
-                            if(det_class_map_global.find(class_label) == det_class_map_global.end())
-                            {
-                                global_ap_per_class[class_id] = 0;
-                                global_precision_per_class[class_id] = 0;
-                                global_recall_per_class[class_id] = 0;
-                            }
-                            else
-                            {
-                                std::vector<DetectionObject> class_objects_det = det_class_map_global.at(class_label);
-
-                                float precision, recall, ap;
-                                std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp, std::ignore, std::ignore) = computeMetrics(class_objects_gt,
-                                                                                                 class_objects_det,
-                                                                                                 dist_threshold);
-                                global_precision_per_class[class_id] = precision;
-                                global_recall_per_class[class_id] = recall;
-                                global_ap_per_class[class_id] = ap;
-                            }
-                        }
-
-                        // log class to summary
-                        float ap = ap_per_class[class_id];
-                        float precision = precision_per_class[class_id];
-                        float recall = recall_per_class[class_id];
-                        float global_ap = global_ap_per_class[class_id];
-                        float global_precision = global_precision_per_class[class_id];
-                        float global_recall = global_recall_per_class[class_id];
-                        float fscore = 0.0f;
-                        if((precision+recall) > 0.0f)
-                            fscore = 2*precision*recall/(precision+recall);
-                        float global_fscore = 0.0f;
-                        if((global_precision+global_recall) > 0.0f)
-                            global_fscore = 2*global_precision*global_recall/(global_precision+global_recall);
-
-                        summaryFile << std::setw(3) << std::right << class_id << " "
-                                    << std::setw(13) << std::left << class_label
-                                    << std::setw(3) << std::right << num_gt
-                                    << std::setw(5) << cumul_tp
-                                    << std::setw(6) << cumul_fp << "   "
-                                    << std::setw(11) << std::left << std::round(precision*10000.0f)/10000.0f
-                                    << std::setw(9) << std::round(recall*10000.0f)/10000.0f
-                                    << std::setw(8) << std::round(ap*10000.0f)/10000.0f
-                                    << std::setw(10) << std::round(fscore*10000.0f)/10000.0f;
-                        if(report_global_metrics)
-                        {
-                            summaryFile << "| "
-                                        << std::setw(9) << std::right << global_cumul_tp
-                                        << std::setw(6) << global_cumul_fp << "   "
-                                        << std::setw(11) << std::left << std::round(global_precision*10000.0f)/10000.0f
-                                        << std::setw(9) << std::round(global_recall*10000.0f)/10000.0f
-                                        << std::setw(8) << std::round(global_ap*10000.0f)/10000.0f
-                                        << std::setw(10) << std::round(global_fscore*10000.0f)/10000.0f;
-                        }
-                        summaryFile << std::endl;
-
-                        // accumulate values of complete dataset
-                        num_gt_dataset += num_gt;
-                        cumul_tp_dataset += cumul_tp;
-                        cumul_fp_dataset += cumul_fp;
+                        filelog::computeAndWriteNextClassSummary(summaryFile, mc, class_label, class_id,
+                                                        class_objects_gt, report_global_metrics,
+                                                        dist_threshold, num_gt_dataset,
+                                                        cumul_tp_dataset, cumul_fp_dataset);
                     }
 
-                    // compute values for precision-recall curves
-                    std::vector<float> precisions;
-                    std::vector<float> recalls;
-                    float overall_ap;
-                    std::tie(precisions, recalls, overall_ap) = computePrecisionRecallForPlotting(det_class_map, gt_class_map, tps_per_class, fps_per_class);
+                    // compute and log values for precision-recall curves
                     std::string outFile = variables["output"].as<std::string>();
-                    std::string plot_filename = outFile;
-                    plot_filename.append("/precision-recall.txt");
-                    std::ofstream plot_file;
-                    plot_file.open(plot_filename.c_str(), std::ios::out);
-                    plot_file << "# recall precision" << std::endl;
-                    for(unsigned ppos = 0; ppos < precisions.size(); ppos++)
-                    {
-                        plot_file  << recalls[ppos] << " " << precisions[ppos] << std::endl;
-                    }
-                    plot_file.close();
+                    float overall_ap;
+                    filelog::computeAndWritePrecisionRecall(outFile, mc, overall_ap);
 
-                    // store sums
-                    float overall_precision = cumul_tp_dataset / float(cumul_tp_dataset+cumul_fp_dataset);
-                    float overall_recall = cumul_tp_dataset / float(num_gt_dataset);
-                    float overall_fscore = 2*overall_precision*overall_recall/(overall_precision+overall_recall);;
-                    summaryFile << "---------------------------------------------------------------------" << std::endl;
-                    summaryFile << "Overall:" << std::setw(12) << std::right << num_gt_dataset
-                                << std::setw(5) << std::right << cumul_tp_dataset
-                                << std::setw(6) << std::right << cumul_fp_dataset << "   "
-                                << std::setw(11) << std::left << std::round(overall_precision*10000.0f)/10000.0f
-                                << std::setw(9) << std::round(overall_recall*10000.0f)/10000.0f
-                                << std::setw(8) << std::round(overall_ap*10000.0f)/10000.0f
-                                << std::setw(10) << std::round(overall_fscore*10000.0f)/10000.0f;
-
-                    // compute average metrics
-                    float mAP = 0;
-                    float mPrec = 0;
-                    float mRec = 0;
-                    float global_mAP = 0;
-                    float global_mPrec = 0;
-                    float global_mRec = 0;
-                    for(int idx = 0; idx < ap_per_class.size(); idx++)
-                    {
-                        mAP += ap_per_class[idx];
-                        mPrec += precision_per_class[idx];
-                        mRec += recall_per_class[idx];
-                        global_mAP += global_ap_per_class[idx];
-                        global_mPrec += global_precision_per_class[idx];
-                        global_mRec += global_recall_per_class[idx];
-                    }
-                    mAP /= ap_per_class.size();
-                    mPrec /= ap_per_class.size();
-                    mRec /= ap_per_class.size();
-                    float fscore = 2*mPrec*mRec / (mPrec+mRec);
-                    global_mAP /= ap_per_class.size();
-                    global_mPrec /= ap_per_class.size();
-                    global_mRec /= ap_per_class.size();
-                    float global_fscore = 2*global_mPrec*global_mRec / (global_mPrec+global_mRec);
-
-                    if(report_global_metrics)
-                    {
-                        summaryFile << std::endl << std::endl;
-                        summaryFile << "global detector metrics:" << std::endl;
-                        summaryFile << "global mAP:            " << std::setw(7) << std::round(global_mAP*10000.0f)/10000.0f    << " (" << std::round(global_mAP*10000.0f)/100.0f   << " %)" << std::endl;
-                        summaryFile << "global mean precision: " << std::setw(7) << std::round(global_mPrec*10000.0f)/10000.0f  << " (" << std::round(global_mPrec*10000.0f)/100.0f << " %)" << std::endl;
-                        summaryFile << "global mean recall:    " << std::setw(7) << std::round(global_mRec*10000.0f)/10000.0f   << " (" << std::round(global_mRec*10000.0f)/100.0f  << " %)" << std::endl;
-                        summaryFile << "global f-score:        " << std::setw(7) << std::round(global_fscore*10000.0f)/10000.0f << " (" << std::round(global_fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
-                    }
-                    summaryFile << std::endl << std::endl;
-                    summaryFile << "main metrics:" << std::endl;
-                    summaryFile << "       mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
-                    summaryFile << "       mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
-                    summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl;
-                    summaryFile << "       f-score:        " << std::setw(7) << std::round(fscore*10000.0f)/10000.0f << " (" << std::round(fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
-
-                    // complete and close summary file
-                    // write processing time details to summary
-                    double time_sum = 0;
-                    for(auto it : times)
-                    {
-                        if(it.first == "complete") continue;
-                        time_sum += (it.second / 1000);
-                    }
-                    summaryFile << std::endl;
-                    summaryFile << "complete time: " << times["complete"] / 1000 << " [s]" << ", sum all steps: " << time_sum << " [s]" << std::endl;
-                    summaryFile << "times per step:\n";
-                    summaryFile << "create flann index: " << std::setw(10) << std::setfill(' ') << times["flann"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute normals:    " << std::setw(10) << std::setfill(' ') << times["normals"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute keypoints:  " << std::setw(10) << std::setfill(' ') << times["keypoints"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "compute features:   " << std::setw(10) << std::setfill(' ') << times["features"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "cast votes:         " << std::setw(10) << std::setfill(' ') << times["voting"] / 1000 << " [s]" << std::endl;
-                    summaryFile << "find maxima:        " << std::setw(10) << std::setfill(' ') << times["maxima"] / 1000 << " [s]" << std::endl << std::endl;
-
-                    summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
-                    summaryFile.close();
+                    // store sums and overall metrics
+                    std::string total_time = timer.format(4, "%w");
+                    filelog::computeAndWriteFinalMetrics(summaryFile, mc, num_gt_dataset,
+                                                         cumul_tp_dataset, cumul_fp_dataset,
+                                                         overall_ap, times, total_time,
+                                                         report_global_metrics);
                 }
                 else
                 {

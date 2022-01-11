@@ -74,6 +74,42 @@ struct DetectionSummary
     DetectionSummary(float confidence, int tp, int fp) : confidence(confidence), tp(tp), fp(fp) {}
 };
 
+// collection of all final and temporary metrics, used to handle only one object instead of each metric separately
+struct MetricsCollection
+{
+    // maps a class label id to list of objects
+    std::map<std::string, std::vector<DetectionObject>> gt_class_map;
+    std::map<std::string, std::vector<DetectionObject>> det_class_map;
+    std::map<std::string, std::vector<DetectionObject>> det_class_map_global;
+    // maps a class label to list of tp or fp in descending order of confidence per class
+    // i.e. allows to lookup for each detection whether it is an fp or tp
+    // Note: each vector in det_class_map is sorted in descending order of confidence in next for-loop
+    std::map<std::string, std::vector<int>> tps_per_class;
+    std::map<std::string, std::vector<int>> fps_per_class;
+
+    // collect all metrics
+    // combined detection - primary metrics
+    std::vector<float> ap_per_class;
+    std::vector<float> precision_per_class;
+    std::vector<float> recall_per_class;
+    // metrics for the global classifier (if used)
+    std::vector<float> global_ap_per_class;
+    std::vector<float> global_precision_per_class;
+    std::vector<float> global_recall_per_class;
+
+    // is called after gt_class_map is filled (externally)
+    void resizeVectors()
+    {
+        ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        // metrics for the global classifier (if used)
+        global_ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        global_precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        global_recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+    }
+};
+
 
 std::tuple<float,float>
 get_precision_recall(std::vector<int> &true_positives, std::vector<int> &false_positives, int num_gt)
@@ -161,9 +197,9 @@ computePrecisionRecallForPlotting(
 
 
 std::tuple<std::vector<int>,std::vector<int>>
-match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
+match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
-                    float distance_threshold)
+                    const float distance_threshold)
 {
     // sort objects by confidence then loop over sorted list, starting with hightest conf
     std::sort(class_objects_det.begin(), class_objects_det.end(), [](DetectionObject &obj1, DetectionObject &obj2)
@@ -215,9 +251,9 @@ match_gt_objects(std::vector<DetectionObject> &class_objects_gt,
 
 
 std::tuple<float, float, float, int, int, std::vector<int>, std::vector<int>>
-computeMetrics(std::vector<DetectionObject> &class_objects_gt,
+computeMetrics(const std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
-                    float dist_threshold)
+                    const float dist_threshold)
 {
     // match detections and ground truth to get list of tp and fp
     std::vector<int> tp, fp;
