@@ -35,6 +35,7 @@
 #include <boost/program_options/errors.hpp>
 #include "../implicit_shape_model/implicit_shape_model.h"
 #include "eval_helpers_detection.h"
+#include "logging_to_files.h"
 
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/consoleappender.h>
@@ -390,46 +391,8 @@ int main(int argc, char **argv)
                                 }
                                 if(write_log_to_files)
                                 {
-                                    unsigned tmp = pointCloud.find_last_of('/');
-                                    if(tmp == std::string::npos) tmp = 0;
-                                    std::string fileWithoutFolder = pointCloud.substr(tmp+1);
-
-                                    std::cout << "writing detection log" << std::endl;
-                                    std::string outFile = variables["output"].as<std::string>();
-                                    std::string outFileName = outFile;
-                                    outFileName.append("/");
-                                    outFileName.append(fileWithoutFolder);
-                                    outFileName.append(".txt");
-
-                                    std::ofstream file;
-                                    file.open(outFileName.c_str(), std::ios::out);
-                                    file << "ISM3D detection log, filename: " << ismFile << ", point cloud: " << pointCloud
-                                         << ", ground truth file: " << gt_file << std::endl;
-                                    file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
-
-                                    for (int i = 0; i < (int)maxima.size(); i++)
-                                    {
-                                        const ism3d::VotingMaximum& maximum = maxima[i];
-
-                                        file << i << ", ";
-                                        file << maximum.classId << ", ";
-                                        file << maximum.weight << ", ";
-                                        file << maximum.instanceId << ", ";
-                                        file << maximum.instanceWeight << ", ";
-                                        file << maximum.votes.size() << ", ";
-                                        file << maximum.position[0] << ", ";
-                                        file << maximum.position[1] << ", ";
-                                        file << maximum.position[2] << ", ";
-                                        file << maximum.boundingBox.size[0] << ", ";
-                                        file << maximum.boundingBox.size[1] << ", ";
-                                        file << maximum.boundingBox.size[2] << ", ";
-                                        file << maximum.boundingBox.rotQuat.R_component_1() << ", ";
-                                        file << maximum.boundingBox.rotQuat.R_component_2() << ", ";
-                                        file << maximum.boundingBox.rotQuat.R_component_3() << ", ";
-                                        file << maximum.boundingBox.rotQuat.R_component_4() << std::endl;
-                                    }
-
-                                    file.close();
+                                    std::string out_path = variables["output"].as<std::string>();
+                                    writeLogPerCloud(pointCloud, ismFile, gt_file, out_path, maxima);
                                 }
                             }
                         }
