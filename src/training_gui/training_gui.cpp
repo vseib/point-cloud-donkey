@@ -12,6 +12,10 @@
 #include "../implicit_shape_model/voting/voting_mean_shift.h"
 #include "../implicit_shape_model/utils/exception.h"
 
+// used to color boxes as tp and fp, i.e. dataset info
+#include "../eval_tool/eval_helpers_detection.h"
+
+
 // NOTE temporarily disabling ROS
 //#include <pcl_conversions/pcl_conversions.h>
 
@@ -79,7 +83,8 @@ TrainingGUI::TrainingGUI(QWidget* parent)
       m_detectCloud(new pcl::PointCloud<PointNormalT>()),
       m_cloud(new pcl::PointCloud<PointNormalT>()),
       m_normals(new pcl::PointCloud<pcl::Normal>()),
-      m_displayCloud(new pcl::PointCloud<PointNormalT>())
+      m_displayCloud(new pcl::PointCloud<PointNormalT>()),
+      m_use_gt_info(false)
 {
     srand(0);
     buildTable(1000);
@@ -163,9 +168,14 @@ QGroupBox* TrainingGUI::createNavigatorApplication()
     connect(btReset, SIGNAL(clicked()), this, SLOT(reset()));
     btReset->setText("Reset");
 
+    QPushButton* btDatasetInfo = new QPushButton(this);
+    connect(btDatasetInfo, SIGNAL(clicked()), this, SLOT(addDatasetInfo()));
+    btDatasetInfo->setText("Add Dataset Info");
+
     QVBoxLayout* layout = new QVBoxLayout();
     layout->addWidget(btClose);
     layout->addWidget(btReset);
+    layout->addWidget(btDatasetInfo);
 
     QGroupBox* groupBox = new QGroupBox(this);
     groupBox->setTitle("Application");
@@ -396,7 +406,108 @@ void TrainingGUI::reset()
     //m_btPauseResume->setText("Pause");
 
     m_renderView->reset();
+
+    m_dataset_mapping.clear();
+    m_use_gt_info = false;
 }
+
+
+void TrainingGUI::addDatasetInfo()
+{
+    m_use_gt_info = true;
+
+    // TODO VS: select file in dialogue
+    std::string input_file_name;
+    QString filename = QFileDialog::getOpenFileName(this, "Load Dataset File", QString(), tr("TXT-Files (*.txt);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
+    if (!filename.isEmpty() && filename.endsWith(".txt", Qt::CaseInsensitive))
+    {
+        input_file_name = filename.toStdString();
+    }
+    else
+    {
+        // some kind of error
+        return;
+    }
+
+
+
+    // from eval_helpers_detection.h:
+    std::vector<std::string> filenames;
+    std::vector<std::string> gt_filenames;
+    parseFileListDetectionTest(input_file_name, filenames, gt_filenames);
+
+    if(filenames.size() == gt_filenames.size())
+    {
+        m_dataset_mapping.clear();
+        for(unsigned i = 0; i < filenames.size(); i++)
+        {
+            m_dataset_mapping.insert({filenames[i], gt_filenames[i]});
+        }
+    }
+
+    // the next should be a separate method, for now, code copy from eval_detection.cpp
+    if (filenames.size() > 0 && gt_filenames.size() > 0)
+    {
+        // TODO variable imported in header, add namespace
+        std::vector<std::string> pointClouds;
+        // load label information from training
+        class_labels_rmap = m_ism->getClassLabels();
+        instance_labels_rmap = m_ism->getInstanceLabels();
+        instance_to_class_map = m_ism->getInstanceClassMap();
+        // populate maps with loaded data
+        for(auto &elem : class_labels_rmap)
+        {
+            class_labels_map.insert({elem.second, elem.first});
+        }
+        for(auto &elem : instance_labels_rmap)
+        {
+            instance_labels_map.insert({elem.second, elem.first});
+        }
+
+        // TODO VS: label usage as separate method?
+        // determine label_usage: empty mapping means that no instance labels were given
+        if(instance_to_class_map.size() == 0)
+        {
+            label_usage = LabelUsage::CLASS_ONLY;
+        }
+        else
+        {
+            // determine label_usage: compare all instance and class labels
+            bool all_equal = true;
+            for(auto elem : class_labels_rmap)
+            {
+                std::string label1 = elem.second;
+                std::string label2 = instance_labels_rmap[elem.first];
+                if(label1 != label2)
+                {
+                    all_equal = false;
+                    break;
+                }
+            }
+
+            if(all_equal && m_ism->isInstancePrimaryLabel())
+            {
+                // instances used as primary labels, classes determined over mapping
+                label_usage = LabelUsage::INSTANCE_PRIMARY;
+            }
+            else if(!all_equal && !m_ism->isInstancePrimaryLabel())
+            {
+                // both labels used, class labels as primary
+                label_usage = LabelUsage::CLASS_PRIMARY;
+            }
+            else
+            {
+                std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
+                std::cerr << "Config file has InstanceLabelsPrimary as " << m_ism->isInstancePrimaryLabel() << ", while trained file has " << !m_ism->isInstancePrimaryLabel() << std::endl;
+            }
+        }
+    }
+    else
+    {
+        // some kind of error message
+    }
+}
+
 
 void TrainingGUI::addModel()
 {
@@ -448,6 +559,7 @@ void TrainingGUI::addModel()
 void TrainingGUI::loadScene()
 {
     m_updateSensorCloud = false;
+    std::string loaded_scene_path;
 
     QString filename = QFileDialog::getOpenFileName(this, "Load Scene", QString(), tr("PCD-Files (*.pcd);;PLY-Files (*.ply);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
 
@@ -456,10 +568,11 @@ void TrainingGUI::loadScene()
         if (filename.endsWith(".pcd", Qt::CaseInsensitive)) {
             if (pcl::io::loadPCDFile(filename.toStdString(), *m_detectCloud) < 0)
                 QMessageBox::warning(this, "Error", "Could not load PCD file!");
-            {
+            else {
                 m_cloud->clear();
                 pcl::copyPointCloud(*m_detectCloud, *m_cloud);
                 m_isLoaded = true;
+                loaded_scene_path = filename.toStdString();
             }
         }
         else if (filename.endsWith(".ply", Qt::CaseInsensitive)) {
@@ -469,6 +582,7 @@ void TrainingGUI::loadScene()
                 m_cloud->clear();
                 pcl::copyPointCloud(*m_detectCloud, *m_cloud);
                 m_isLoaded = true;
+                loaded_scene_path = filename.toStdString();
             }
         }
         else
@@ -476,6 +590,25 @@ void TrainingGUI::loadScene()
     }
 
     m_updateSensorCloud = true;
+
+    // load ground-truth information for loaded scene
+    // TODO VS: check loaded scene path, might need to cut off the path and retain filename
+    std::cout << "loaded scene path: " << loaded_scene_path << std::endl;
+// loaded scene path: /home/vseib/git/vseib-diss/ism_3d_new/build/bin/data_shot_scenes/test_scenes/scene001.pcd
+    // data_shot_scenes/test_scenes/scene001.pcd data_shot_scenes/gt_object_positions/scene001.txt
+
+    // trim path
+    std::string example_filename = m_dataset_mapping.begin().first;
+
+    if(m_dataset_mapping.find(loaded_scene_path) != m_dataset_mapping.end())
+    {
+        std::string gt_file = m_dataset_mapping[loaded_scene_path];
+        std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
+    }
+    else
+    {
+        std::cout << "    path not found in map" << std::endl;
+    }
 }
 
 

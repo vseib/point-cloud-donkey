@@ -55,6 +55,7 @@ private slots:
     void spinOnce(); // NOTE ROS is disabled inside this function
     // void pauseResume(); // NOTE temporarily disabling ROS
     void reset();
+    void addDatasetInfo();
     void addModel();
     void loadScene();
     void loadConfig();
@@ -132,6 +133,10 @@ private:
     vtkSmartPointer<vtkActor> m_normalsActor;
 
     std::vector<bool> m_maxima_classes; // used to display only the best maximum per class
+
+    // used to color boxes as tp and fp
+    bool m_use_gt_info;
+    std::map<std::string,std::string> m_dataset_mapping;
 
     // temporary data for visualization
     ism3d::Utils::BoundingBox m_boundingBox;
