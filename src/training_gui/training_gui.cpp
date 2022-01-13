@@ -1035,7 +1035,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 
                 unsigned char color[4] = {(unsigned char) (classColor[0] * 255), (unsigned char) (classColor[1] * 255),
                                           (unsigned char) (classColor[2] * 255), (unsigned char) (alpha * 255)};
-                colors->InsertNextTupleValue(color);
+                colors->InsertNextTypedTuple(color);
 
                 // create vote line from keypoint to vote position
                 vtkSmartPointer<vtkPoints> line = vtkSmartPointer<vtkPoints>::New();
@@ -1049,8 +1049,8 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 
                 vtkSmartPointer<vtkUnsignedCharArray> lineColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
                 lineColors->SetNumberOfComponents(4);
-                lineColors->InsertNextTupleValue(color);
-                lineColors->InsertNextTupleValue(color);
+                lineColors->InsertNextTypedTuple(color);
+                lineColors->InsertNextTypedTuple(color);
 
                 // Create a cell array to store the lines in and add the lines to it
                 vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
