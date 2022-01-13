@@ -414,23 +414,21 @@ void TrainingGUI::reset()
 
 void TrainingGUI::addDatasetInfo()
 {
-    m_use_gt_info = true;
-
-    // TODO VS: select file in dialogue
     std::string input_file_name;
     QString filename = QFileDialog::getOpenFileName(this, "Load Dataset File", QString(), tr("TXT-Files (*.txt);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
     if (!filename.isEmpty() && filename.endsWith(".txt", Qt::CaseInsensitive))
     {
+        m_use_gt_info = true;
         input_file_name = filename.toStdString();
     }
     else
     {
-        // some kind of error
+        LOG_ERROR("Could not load dataset information!");
         return;
     }
 
-    std::cout << "input file name: " << input_file_name << std::endl;
-
+    unsigned pos = input_file_name.find_last_of('/');
+    std::string path_prefix = input_file_name.substr(0, pos+1);
 
     // from eval_helpers_detection.h:
     std::vector<std::string> filenames;
@@ -442,7 +440,7 @@ void TrainingGUI::addDatasetInfo()
         m_dataset_mapping.clear();
         for(unsigned i = 0; i < filenames.size(); i++)
         {
-            m_dataset_mapping.insert({filenames[i], gt_filenames[i]});
+            m_dataset_mapping.insert({path_prefix + filenames[i], path_prefix + gt_filenames[i]});
         }
     }
 
