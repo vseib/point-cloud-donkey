@@ -429,6 +429,7 @@ void TrainingGUI::addDatasetInfo()
         return;
     }
 
+    std::cout << "input file name: " << input_file_name << std::endl;
 
 
     // from eval_helpers_detection.h:
@@ -598,7 +599,7 @@ void TrainingGUI::loadScene()
     // data_shot_scenes/test_scenes/scene001.pcd data_shot_scenes/gt_object_positions/scene001.txt
 
     // trim path
-    std::string example_filename = m_dataset_mapping.begin().first;
+    //std::string example_filename = m_dataset_mapping.begin().first;
 
     if(m_dataset_mapping.find(loaded_scene_path) != m_dataset_mapping.end())
     {
