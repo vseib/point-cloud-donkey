@@ -221,7 +221,8 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
         for(unsigned gt_idx = 0; gt_idx < class_objects_gt.size(); gt_idx++)
         {
             const DetectionObject &gt_obj = class_objects_gt[gt_idx];
-            if(det_obj.filepath != gt_obj.filepath)
+            // NOTE: second condition is needed for GUI tool, where objects of all classes are in the list
+            if(det_obj.filepath != gt_obj.filepath || det_obj.class_label != gt_obj.class_label)
             {
                 continue;
             }
