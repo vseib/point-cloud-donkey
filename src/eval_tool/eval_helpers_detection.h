@@ -83,7 +83,7 @@ struct MetricsCollection
     std::map<std::string, std::vector<DetectionObject>> det_class_map_global;
     // maps a class label to list of tp or fp in descending order of confidence per class
     // i.e. allows to lookup for each detection whether it is an fp or tp
-    // Note: each vector in det_class_map is sorted in descending order of confidence in next for-loop
+    // Note: each vector in det_class_map is sorted in descending order of confidence later
     std::map<std::string, std::vector<int>> tps_per_class;
     std::map<std::string, std::vector<int>> fps_per_class;
 
@@ -213,7 +213,7 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
 
     for(unsigned det_idx = 0; det_idx < class_objects_det.size(); det_idx++)
     {
-        float best_dist = 0.0f;
+        float best_dist = std::numeric_limits<float>::max();
         int best_index = -1;
 
         // find matching gt object with smallest distance
@@ -228,7 +228,7 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
 
             float distance = (gt_obj.position - det_obj.position).norm();
             // record index and smallest dist if this gt object was not used before
-            if(distance > best_dist && !used_gt[gt_idx])
+            if(distance < best_dist && !used_gt[gt_idx])
             {
                 best_dist = distance;
                 best_index = int(gt_idx);
