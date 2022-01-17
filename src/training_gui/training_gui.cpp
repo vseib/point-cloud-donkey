@@ -443,6 +443,7 @@ void TrainingGUI::addDatasetInfo()
     }
     else
     {
+        QMessageBox::warning(this, "Error", "Only detection dataset files for test mode are supported!");
         LOG_ERROR("Could not load dataset information: wrong file selected");
         return;
     }
@@ -503,6 +504,7 @@ void TrainingGUI::loadGTInfoForScene()
             {
                 LOG_ERROR("Loaded scene path\"" << m_loaded_scene_path << "\" not found in the dataset map!");
                 LOG_ERROR("Detected object boxes will NOT be colored as true and false positives!");
+                QMessageBox::warning(this, "Error", "Loaded scene does not match any in loaded dataset info!");
                 m_use_gt_info = false;
             }
         }
