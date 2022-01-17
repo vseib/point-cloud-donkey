@@ -36,7 +36,7 @@ void ISMWorker::detect()
     if (!m_ism || !m_cloud.get())
         emit detectionFinished(false);
 
-    m_ism->detect(m_cloud);
+    m_ism->detect(m_cloud, false);
 
     emit detectionFinished(true);
     emit finished();

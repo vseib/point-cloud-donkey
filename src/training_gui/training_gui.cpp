@@ -84,7 +84,9 @@ TrainingGUI::TrainingGUI(QWidget* parent)
       m_cloud(new pcl::PointCloud<PointNormalT>()),
       m_normals(new pcl::PointCloud<pcl::Normal>()),
       m_displayCloud(new pcl::PointCloud<PointNormalT>()),
-      m_use_gt_info(false)
+      m_use_gt_info(false),
+      m_dataset_info_added(false),
+      m_loaded_scene_path("")
 {
     srand(0);
     buildTable(1000);
@@ -142,7 +144,8 @@ TrainingGUI::TrainingGUI(QWidget* parent)
 
     // create ism class
     m_ism = new ism3d::ImplicitShapeModel();
-    m_ism->readObject("default_config_kinect.ism", true);
+    //m_ism->readObject("default_config_kinect.ism", true);
+    m_ism->readObject("ds5_ransac_test.ism", false);
     m_ism->m_signalPointCloud.connect(boost::bind(&TrainingGUI::signalPointCloud, this, _1));
     m_ism->m_signalBoundingBox.connect(boost::bind(&TrainingGUI::signalBoundingBox, this, _1));
     m_ism->m_signalNormals.connect(boost::bind(&TrainingGUI::signalNormals, this, _1, _2));
@@ -244,7 +247,7 @@ QGroupBox* TrainingGUI::createNavigatorDetect()
 
     m_chkShowKeypoints = new QCheckBox(this);
     m_chkShowKeypoints->setText("Show Keypoints");
-    m_chkShowKeypoints->setChecked(true);
+    m_chkShowKeypoints->setChecked(false);
 
     m_chkShowNormals = new QCheckBox(this);
     m_chkShowNormals->setText("Show Normals");
@@ -256,7 +259,7 @@ QGroupBox* TrainingGUI::createNavigatorDetect()
 
     m_chkShowVotes = new QCheckBox(this);
     m_chkShowVotes->setText("Show Votes");
-    m_chkShowVotes->setChecked(true);
+    m_chkShowVotes->setChecked(false);
 
     m_chkShowBbAndCenters = new QCheckBox(this);
     m_chkShowBbAndCenters->setText("Show Results");
@@ -409,6 +412,8 @@ void TrainingGUI::reset()
 
     m_dataset_mapping.clear();
     m_use_gt_info = false;
+    m_dataset_info_added = false;
+    m_loaded_scene_path = "";
 }
 
 
@@ -418,7 +423,6 @@ void TrainingGUI::addDatasetInfo()
     QString filename = QFileDialog::getOpenFileName(this, "Load Dataset File", QString(), tr("TXT-Files (*.txt);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
     if (!filename.isEmpty() && filename.endsWith(".txt", Qt::CaseInsensitive))
     {
-        m_use_gt_info = true;
         input_file_name = filename.toStdString();
     }
     else
@@ -433,7 +437,15 @@ void TrainingGUI::addDatasetInfo()
     // from eval_helpers_detection.h:
     std::vector<std::string> filenames;
     std::vector<std::string> gt_filenames;
-    parseFileListDetectionTest(input_file_name, filenames, gt_filenames);
+    if(checkFileListDetectionTest(input_file_name))
+    {
+        parseFileListDetectionTest(input_file_name, filenames, gt_filenames);
+    }
+    else
+    {
+        LOG_ERROR("Could not load dataset information: wrong file selected");
+        return;
+    }
 
     if(filenames.size() == gt_filenames.size())
     {
@@ -442,8 +454,10 @@ void TrainingGUI::addDatasetInfo()
         {
             m_dataset_mapping.insert({path_prefix + filenames[i], path_prefix + gt_filenames[i]});
         }
+        m_dataset_info_added = true;
     }
 
+    // TODO clean up
     // the next should be a separate method, for now, code copy from eval_detection.cpp
     if (filenames.size() > 0 && gt_filenames.size() > 0)
     {
@@ -468,6 +482,7 @@ void TrainingGUI::addDatasetInfo()
         if(instance_to_class_map.size() == 0)
         {
             label_usage = LabelUsage::CLASS_ONLY;
+            std::cout << "label: class only" << std::endl;
         }
         else
         {
@@ -488,11 +503,13 @@ void TrainingGUI::addDatasetInfo()
             {
                 // instances used as primary labels, classes determined over mapping
                 label_usage = LabelUsage::INSTANCE_PRIMARY;
+                std::cout << "label: intance primary" << std::endl;
             }
             else if(!all_equal && !m_ism->isInstancePrimaryLabel())
             {
                 // both labels used, class labels as primary
                 label_usage = LabelUsage::CLASS_PRIMARY;
+                std::cout << "label: class primary" << std::endl;
             }
             else
             {
@@ -504,6 +521,33 @@ void TrainingGUI::addDatasetInfo()
     else
     {
         // some kind of error message
+        m_dataset_info_added = false;
+    }
+
+    loadGTInfoForScene();
+}
+
+
+void TrainingGUI::loadGTInfoForScene()
+{
+    if(m_loaded_scene_path != "")
+    {
+        // load ground-truth information for loaded scene
+        if(m_dataset_info_added)
+        {
+            if(m_dataset_mapping.find(m_loaded_scene_path) != m_dataset_mapping.end())
+            {
+                m_gt_file = m_dataset_mapping[m_loaded_scene_path];
+                m_gt_objects = parseGtFile(m_gt_file);
+                m_use_gt_info = true;
+            }
+            else
+            {
+                LOG_ERROR("Loaded scene path\"" << m_loaded_scene_path << "\" not found in the dataset map!");
+                LOG_ERROR("Detected object boxes will NOT be colored as true and false positives!");
+                m_use_gt_info = false;
+            }
+        }
     }
 }
 
@@ -558,7 +602,6 @@ void TrainingGUI::addModel()
 void TrainingGUI::loadScene()
 {
     m_updateSensorCloud = false;
-    std::string loaded_scene_path;
 
     QString filename = QFileDialog::getOpenFileName(this, "Load Scene", QString(), tr("PCD-Files (*.pcd);;PLY-Files (*.ply);;All Files (*.*)"), 0, QFileDialog::DontUseNativeDialog);
 
@@ -571,7 +614,7 @@ void TrainingGUI::loadScene()
                 m_cloud->clear();
                 pcl::copyPointCloud(*m_detectCloud, *m_cloud);
                 m_isLoaded = true;
-                loaded_scene_path = filename.toStdString();
+                m_loaded_scene_path = filename.toStdString();
             }
         }
         else if (filename.endsWith(".ply", Qt::CaseInsensitive)) {
@@ -581,7 +624,7 @@ void TrainingGUI::loadScene()
                 m_cloud->clear();
                 pcl::copyPointCloud(*m_detectCloud, *m_cloud);
                 m_isLoaded = true;
-                loaded_scene_path = filename.toStdString();
+                m_loaded_scene_path = filename.toStdString();
             }
         }
         else
@@ -591,23 +634,7 @@ void TrainingGUI::loadScene()
     m_updateSensorCloud = true;
 
     // load ground-truth information for loaded scene
-    // TODO VS: check loaded scene path, might need to cut off the path and retain filename
-    std::cout << "loaded scene path: " << loaded_scene_path << std::endl;
-// loaded scene path: /home/vseib/git/vseib-diss/ism_3d_new/build/bin/data_shot_scenes/test_scenes/scene001.pcd
-    // data_shot_scenes/test_scenes/scene001.pcd data_shot_scenes/gt_object_positions/scene001.txt
-
-    // trim path
-    //std::string example_filename = m_dataset_mapping.begin().first;
-
-    if(m_dataset_mapping.find(loaded_scene_path) != m_dataset_mapping.end())
-    {
-        std::string gt_file = m_dataset_mapping[loaded_scene_path];
-        std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
-    }
-    else
-    {
-        std::cout << "    path not found in map" << std::endl;
-    }
+    loadGTInfoForScene();
 }
 
 
@@ -796,10 +823,10 @@ void TrainingGUI::signalPointCloud(pcl::PointCloud<ism3d::PointT>::ConstPtr poin
 void TrainingGUI::signalBoundingBox(const ism3d::Utils::BoundingBox& box)
 {
     m_boundingBox = box;
-    addBoundingBox(box);
+    addBoundingBox(box, false, false);
 }
 
-void TrainingGUI::addBoundingBox(const ism3d::Utils::BoundingBox& box)
+void TrainingGUI::addBoundingBox(const ism3d::Utils::BoundingBox& box, const bool tp, const bool fp)
 {
     // convert inverse quaternion into angle axis representation
     Eigen::Vector3f axis;
@@ -833,7 +860,12 @@ void TrainingGUI::addBoundingBox(const ism3d::Utils::BoundingBox& box)
     vtkSmartPointer<vtkActor> bboxActor = vtkSmartPointer<vtkActor>::New();
     bboxActor->SetMapper(bboxMapper);
     bboxActor->GetProperty()->SetLighting(false);
-    bboxActor->GetProperty()->SetColor(0, 0, 255);
+    if (fp && !tp)
+        bboxActor->GetProperty()->SetColor(255, 0, 0);
+    if (tp && !fp)
+        bboxActor->GetProperty()->SetColor(0, 200, 0);
+    if (tp == fp)
+        bboxActor->GetProperty()->SetColor(0, 0, 255);
     bboxActor->GetProperty()->SetLineWidth(2);
     bboxActor->GetProperty()->SetRepresentationToWireframe();
 
@@ -977,6 +1009,46 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 {
     m_renderView->lock();
 
+    std::cout << "max size: " << maxima.size() << std::endl;
+    std::cout << "gt info: " << m_use_gt_info << std::endl;
+    std::cout << "gt file: " << m_gt_file << std::endl;
+
+    std::cout << "gt objects: " << m_gt_objects.size() << std::endl;
+    for(auto x : m_gt_objects)
+    {
+        x.print();
+    }
+
+    std::vector<int> tp_list(maxima.size(), 0);
+    std::vector<int> fp_list(maxima.size(), 0);
+    if(m_use_gt_info)
+    {
+        // collect all detections
+        std::vector<DetectionObject> detected_objects;
+        for (int i = 0; i < (int)maxima.size(); i++)
+        {
+            DetectionObject detected_obj = convertMaxToObj(maxima[i], m_gt_file);
+            detected_objects.push_back(std::move(detected_obj));
+        }
+        float dist_threshold = m_ism->getDetectionThreshold();
+        std::tie(std::ignore, std::ignore, std::ignore, std::ignore, std::ignore,
+                         tp_list, fp_list) = computeMetrics(m_gt_objects,
+                                                            detected_objects,
+                                                            dist_threshold);
+        std::cout << "det objects: " << detected_objects.size() << std::endl;
+        for(auto x : detected_objects)
+        {
+            x.print();
+        }
+    }
+
+    for(auto x : tp_list)
+        std::cout << "tp: " << x << std::endl;
+    std::cout << std::endl;
+    for(auto x : fp_list)
+        std::cout << "fp: " << x << std::endl;
+
+
     const std::map<unsigned, std::vector<ism3d::Vote> >& votes = m_ism->getVoting()->getVotes();
     vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
 
@@ -1097,7 +1169,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 
     // clear list of maxima to show
     m_maxima_classes.clear();
-    m_maxima_classes.resize(64, false); // TODO VS: actually should be number of possible classes, not a fixed value
+    m_maxima_classes.resize(votes.size(), false);
 
     // enable / disable bounding box and center visualization
     if(m_chkShowBbAndCenters->isChecked())
@@ -1153,7 +1225,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
             {
                 if(m_maxima_classes.at(max.classId))
                 {
-                    continue; // one max of with this class id has been displayed already
+                    continue; // one max with this class id has been displayed already
                 }
                 m_maxima_classes.at(max.classId) = true; // mark this class as shown
             }
@@ -1179,7 +1251,9 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
             m_renderView->getRendererFront(true)->AddActor(actor);
 
             // add an oriented box
-            addBoundingBox(max.boundingBox);
+            bool tp = tp_list[i] == 1 ? true : false;
+            bool fp = fp_list[i] == 1 ? true : false;
+            addBoundingBox(max.boundingBox, tp, fp);
         }
     }
 

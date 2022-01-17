@@ -41,6 +41,7 @@ namespace ism3d
 }
 
 class RenderView;
+struct DetectionObject;
 
 class TrainingGUI
         : public QWidget
@@ -88,7 +89,16 @@ private:
     void signalCodebook(const ism3d::Codebook&);
     void signalMaxima(std::vector<ism3d::VotingMaximum>);
 
-    void addBoundingBox(const ism3d::Utils::BoundingBox&);
+    void loadGTInfoForScene();
+
+    /**
+     * @brief addBoundingBox
+     * @param box the bounding box to be added to the list for visualization
+     * @param tp true if box represents a true positive detection, false otherwise (box will be green)
+     * @param fp true if box represents a false positive detection, false otherwise (box will be red)
+     * @note if both, tp and fp are equal no information is assumed (box will be blue, default)
+     */
+    void addBoundingBox(const ism3d::Utils::BoundingBox& box, const bool tp, const bool fp);
 
     // NOTE temporarily disabling ROS
 //    ros::NodeHandle m_node;
@@ -136,7 +146,11 @@ private:
 
     // used to color boxes as tp and fp
     bool m_use_gt_info;
+    bool m_dataset_info_added;
+    std::string m_gt_file;
+    std::string m_loaded_scene_path;
     std::map<std::string,std::string> m_dataset_mapping;
+    std::vector<DetectionObject> m_gt_objects;
 
     // temporary data for visualization
     ism3d::Utils::BoundingBox m_boundingBox;

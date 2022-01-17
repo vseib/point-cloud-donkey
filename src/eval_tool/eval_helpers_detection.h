@@ -486,6 +486,41 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
     }
 }
 
+// only check without parsing
+bool checkFileListDetectionTest(std::string &input_file_name)
+{
+    if(!std::filesystem::exists(input_file_name))
+    {
+        LOG_ERROR("File " << input_file_name << " does not exist!");
+        return false;
+    }
+
+    std::ifstream infile(input_file_name);
+    std::string file;
+    std::string gt_file;
+    std::string additional_flag;
+
+    // special treatment of first line: determine mode
+    infile >> file;     // in the first line: #
+    infile >> gt_file;  // in the first line: the mode ("train" or "test") - here: must be "test"
+    infile >> additional_flag; // in the first line mandatory: "detection"
+
+    if(file == "#" && (gt_file == "train" || gt_file == "test"))
+    {
+        if("test" != gt_file)
+        {
+            LOG_ERROR("Only the mode '"<< "test" << "' is supported, but your input file says '" << gt_file << "'!");
+            return false;
+        }
+        if (additional_flag != "detection")
+        {
+            LOG_ERROR("Only the mode '"<< "detection" << "' is supported, but your input file says '" << additional_flag << "'!");
+            return false;
+        }
+    }
+    return true;
+}
+
 
 void parseFileListDetectionTest(std::string &input_file_name,
                                       std::vector<std::string> &filenames,
