@@ -457,12 +457,8 @@ void TrainingGUI::addDatasetInfo()
         m_dataset_info_added = true;
     }
 
-    // TODO clean up
-    // the next should be a separate method, for now, code copy from eval_detection.cpp
     if (filenames.size() > 0 && gt_filenames.size() > 0)
     {
-        // TODO variable imported in header, add namespace
-        std::vector<std::string> pointClouds;
         // load label information from training
         class_labels_rmap = m_ism->getClassLabels();
         instance_labels_rmap = m_ism->getInstanceLabels();
@@ -477,46 +473,8 @@ void TrainingGUI::addDatasetInfo()
             instance_labels_map.insert({elem.second, elem.first});
         }
 
-        // TODO VS: label usage as separate method?
-        // determine label_usage: empty mapping means that no instance labels were given
-        if(instance_to_class_map.size() == 0)
-        {
-            label_usage = LabelUsage::CLASS_ONLY;
-            std::cout << "label: class only" << std::endl;
-        }
-        else
-        {
-            // determine label_usage: compare all instance and class labels
-            bool all_equal = true;
-            for(auto elem : class_labels_rmap)
-            {
-                std::string label1 = elem.second;
-                std::string label2 = instance_labels_rmap[elem.first];
-                if(label1 != label2)
-                {
-                    all_equal = false;
-                    break;
-                }
-            }
-
-            if(all_equal && m_ism->isInstancePrimaryLabel())
-            {
-                // instances used as primary labels, classes determined over mapping
-                label_usage = LabelUsage::INSTANCE_PRIMARY;
-                std::cout << "label: intance primary" << std::endl;
-            }
-            else if(!all_equal && !m_ism->isInstancePrimaryLabel())
-            {
-                // both labels used, class labels as primary
-                label_usage = LabelUsage::CLASS_PRIMARY;
-                std::cout << "label: class primary" << std::endl;
-            }
-            else
-            {
-                std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
-                std::cerr << "Config file has InstanceLabelsPrimary as " << m_ism->isInstancePrimaryLabel() << ", while trained file has " << !m_ism->isInstancePrimaryLabel() << std::endl;
-            }
-        }
+        // init label usage: class/instance or both
+        initLabelUsage(m_ism->isInstancePrimaryLabel());
     }
     else
     {
@@ -1009,11 +967,12 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
 {
     m_renderView->lock();
 
-    std::cout << "max size: " << maxima.size() << std::endl;
-    std::cout << "gt info: " << m_use_gt_info << std::endl;
-    std::cout << "gt file: " << m_gt_file << std::endl;
+    // TODO VS: clean up debug output later
+    std::cout << "--- debug   max size: " << maxima.size() << std::endl;
+    std::cout << "--- debug   gt info: " << m_use_gt_info << std::endl;
+    std::cout << "--- debug   gt file: " << m_gt_file << std::endl;
 
-    std::cout << "gt objects: " << m_gt_objects.size() << std::endl;
+    std::cout << "--- debug   gt objects: " << m_gt_objects.size() << std::endl;
     for(auto x : m_gt_objects)
     {
         x.print();
@@ -1035,13 +994,14 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
                          tp_list, fp_list) = computeMetrics(m_gt_objects,
                                                             detected_objects,
                                                             dist_threshold);
-        std::cout << "det objects: " << detected_objects.size() << std::endl;
+        std::cout << "--- debug   det objects: " << detected_objects.size() << std::endl;
         for(auto x : detected_objects)
         {
             x.print();
         }
     }
 
+    // TODO --- debug
     for(auto x : tp_list)
         std::cout << "tp: " << x << std::endl;
     std::cout << std::endl;

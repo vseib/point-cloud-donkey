@@ -287,6 +287,47 @@ computeMetrics(const std::vector<DetectionObject> &class_objects_gt,
 }
 
 
+void initLabelUsage(const bool instance_labels_primary)
+{
+    // determine label_usage: empty mapping means that no instance labels were given
+    if(instance_to_class_map.size() == 0)
+    {
+        label_usage = LabelUsage::CLASS_ONLY;
+    }
+    else
+    {
+        // determine label_usage: compare all instance and class labels
+        bool all_equal = true;
+        for(auto elem : class_labels_rmap)
+        {
+            std::string label1 = elem.second;
+            std::string label2 = instance_labels_rmap[elem.first];
+            if(label1 != label2)
+            {
+                all_equal = false;
+                break;
+            }
+        }
+
+        if(all_equal && instance_labels_primary)
+        {
+            // instances used as primary labels, classes determined over mapping
+            label_usage = LabelUsage::INSTANCE_PRIMARY;
+        }
+        else if(!all_equal && !instance_labels_primary)
+        {
+            // both labels used, class labels as primary
+            label_usage = LabelUsage::CLASS_PRIMARY;
+        }
+        else
+        {
+            std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
+            std::cerr << "Config file has InstanceLabelsPrimary as " << instance_labels_primary << ", while trained file has " << !instance_labels_primary << std::endl;
+            exit(1);
+        }
+    }
+}
+
 void rearrangeObjects(const std::vector<DetectionObject> &source_list,
                       std::map<std::string, std::vector<DetectionObject>> &target_map,
                       bool use_global_class_label = false)

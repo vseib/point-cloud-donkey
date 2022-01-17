@@ -292,43 +292,8 @@ int main(int argc, char **argv)
                         instance_labels_map.insert({elem.second, elem.first});
                     }
 
-                    // determine label_usage: empty mapping means that no instance labels were given
-                    if(instance_to_class_map.size() == 0)
-                    {
-                        label_usage = LabelUsage::CLASS_ONLY;
-                    }
-                    else
-                    {
-                        // determine label_usage: compare all instance and class labels
-                        bool all_equal = true;
-                        for(auto elem : class_labels_rmap)
-                        {
-                            std::string label1 = elem.second;
-                            std::string label2 = instance_labels_rmap[elem.first];
-                            if(label1 != label2)
-                            {
-                                all_equal = false;
-                                break;
-                            }
-                        }
-
-                        if(all_equal && ism.isInstancePrimaryLabel())
-                        {
-                            // instances used as primary labels, classes determined over mapping
-                            label_usage = LabelUsage::INSTANCE_PRIMARY;
-                        }
-                        else if(!all_equal && !ism.isInstancePrimaryLabel())
-                        {
-                            // both labels used, class labels as primary
-                            label_usage = LabelUsage::CLASS_PRIMARY;
-                        }
-                        else
-                        {
-                            std::cerr << "Mismatch in instance label usage between config file (.ism) and trained file (.ismd)!" << std::endl;
-                            std::cerr << "Config file has InstanceLabelsPrimary as " << ism.isInstancePrimaryLabel() << ", while trained file has " << !ism.isInstancePrimaryLabel() << std::endl;
-                            return 1;
-                        }
-                    }
+                    // init label usage: class/instance or both
+                    initLabelUsage(ism.isInstancePrimaryLabel());
 
                     if(filenames.size() > 0) // input inside file given on command line
                     {
