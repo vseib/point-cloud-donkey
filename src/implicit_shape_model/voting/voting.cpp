@@ -30,7 +30,7 @@ Voting::Voting()
     addParameter(m_bestK, "BestK", -1);
     addParameter(m_averageRotation, "AverageRotation", false);
     addParameter(m_radiusType, "BinOrBandwidthType", std::string("Config"));
-    addParameter(m_radiusFactor, "BinOrBandwidthFactor", 1.0f);
+    addParameter(m_radiusFactor, "BinOrBandwidthFactor", 1.0f); // TODO VS later remove this param and use the bandwith param as factor for variable bandwidth
     addParameter(m_max_filter_type, "MaxFilterType", std::string("None"));
     addParameter(m_max_type_param, "SingleObjectMaxType", std::string("Default"));
     addParameter(m_single_object_mode, "SingleObjectMode", false);
@@ -460,7 +460,8 @@ void Voting::clear()
     m_votes.clear();
 }
 
-void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes)
+void Voting::forwardBoxesAndRadii(const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
+                                  const std::map<unsigned, std::vector<float>> &object_radii)
 {
     m_dimensions_map.clear();
     m_variance_map.clear();
@@ -468,10 +469,8 @@ void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std:
     for(auto it : boundingBoxes)
     {
         unsigned classId = it.first;
-        float max_accu = 0;
-        float max_accuSqr = 0;
-        float med_accu = 0;
-        float med_accuSqr = 0;
+        float median_box_dim = 0;
+        float median_box_dim_squared = 0;
 
         // check each bounding box of this class id
         for(auto box : it.second)
@@ -489,23 +488,32 @@ void Voting::determineAverageBoundingBoxDimensions(const std::map<unsigned, std:
             }
 
             // use "radius" of bb dimensions, i.e. half of the sizes
-            max_accu += max/2;
-            med_accu += med/2;
-            max_accuSqr += ((max/2)*(max/2));
-            med_accuSqr += ((med/2)*(med/2));
+            median_box_dim += med/2;
+            median_box_dim_squared += ((med/2)*(med/2));
+        }
+
+        assert(object_radii[classId].size() == it.second.size());
+
+        // check each radius of this class id
+        float class_radii = 0;
+        float class_radii_squared = 0;
+        for(float radius : object_radii.at(classId))
+        {
+            class_radii += radius;
+            class_radii_squared += radius*radius;
         }
 
         // compute average
-        max_accu /= it.second.size();
-        med_accu /= it.second.size();
-        max_accuSqr /= it.second.size();
-        med_accuSqr /= it.second.size();
+        median_box_dim /= it.second.size();
+        median_box_dim_squared /= it.second.size();
+        class_radii /= it.second.size();
+        class_radii_squared /= it.second.size();
 
         // compute variance
-        float max_var = max_accuSqr - (max_accu*max_accu);
-        float med_var = med_accuSqr - (med_accu*med_accu);
-        m_dimensions_map.insert({classId, {max_accu, med_accu}});
-        m_variance_map.insert({classId, {max_var, med_var}});
+        float median_box_variance = median_box_dim_squared - (median_box_dim*median_box_dim);
+        float class_radii_variance = class_radii_squared - (class_radii*class_radii);
+        m_dimensions_map.insert({classId, {class_radii, median_box_dim}});
+        m_variance_map.insert({classId, {class_radii_variance, median_box_variance}});
     }
 }
 

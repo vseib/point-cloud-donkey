@@ -508,11 +508,12 @@ namespace ism3d
 
     float MaximaHandler::getSearchDistForClass(const unsigned class_id)
     {
-        if(m_radius_type == "Config")
+        // TODO VS remove old names: FirstDim and SecondDim, when all evaluations are done
+        if(m_radius_type == "Config" || m_radius_type == "Fixed")
             return m_radius;
-        if(m_radius_type == "FirstDim")
+        if(m_radius_type == "FirstDim" || m_radius_type == "ObjectRadius")
             return m_dimensions_map.at(class_id).first * m_radius_factor;
-        if(m_radius_type == "SecondDim")
+        if(m_radius_type == "SecondDim" || m_radius_type == "BoundingBoxMedian")
             return m_dimensions_map.at(class_id).second * m_radius_factor;
 
         LOG_ERROR("Invalid radius type: " << m_radius_type << "! Using config value instead.");

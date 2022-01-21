@@ -18,6 +18,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/filters/filter.h>
 #include <pcl/common/common.h>
+#include <pcl/common/centroid.h>
 #include <boost/math/quaternion.hpp>
 #include <log4cxx/logger.h>
 
@@ -92,6 +93,7 @@ namespace ism3d
 
             return false;
         }
+        static float computeCloudRadius(const pcl::PointCloud<PointNormalT>::Ptr &cloud);
         static float computeHingeLoss(const std::vector<float> &class_distances, const unsigned class_id);
 
         // quaternions

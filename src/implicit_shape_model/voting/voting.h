@@ -78,10 +78,12 @@ namespace ism3d
         const std::map<unsigned, std::vector<Vote> >& getVotes() const;
 
         /**
-         * @brief calculate average bounding box dimensions during training to be used as hints for bin size and bandwidth during recognition
+         * @brief calculate average bounding box dimensions and object radii per class during training to be used as hints object sizes during recognition
          * @param boundingBoxes bounding boxes of trained objects
+         * @param object_radii object radii of trained objects
          */
-        void determineAverageBoundingBoxDimensions(const std::map<unsigned, std::vector<Utils::BoundingBox> > &boundingBoxes);
+        void forwardBoxesAndRadii(const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes,
+                                  const std::map<unsigned, std::vector<float>> &object_radii);
 
         /**
          * @brief forwardGlobalFeatures set a map <class id, list of feature clouds> to be stored during training and
@@ -118,6 +120,11 @@ namespace ism3d
         bool isUsingGlobalFeatures()
         {
             return m_use_global_features;
+        }
+
+        std::map<unsigned, std::pair<float, float>> getObjectClassDimensions()
+        {
+            return m_dimensions_map;
         }
 
     protected:

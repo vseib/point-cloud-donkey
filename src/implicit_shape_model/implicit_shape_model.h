@@ -199,9 +199,39 @@ namespace ism3d
             return m_instance_labels_primary;
         }
 
-        float getDetectionThreshold()
+        std::map<unsigned, float> getDetectionThreshold()
         {
-            return m_distance_detection_thresh;
+            // serves as size hint per class for detection
+            // maps class id to pair; pair is: first: average object radius, second: average median bounding box dimension
+            std::map<unsigned, std::pair<float, float>> dimensions = m_voting->getObjectClassDimensions();
+
+            // init with value from config for each class
+            std::map<unsigned, float> output_dims;
+            for(auto it : dimensions)
+            {
+                output_dims.insert({it.first, m_distance_detection_thresh});
+            }
+
+            // adjust class-wise thresholds to type specified in config
+            if(m_distance_thresh_type == "Fixed")
+            {
+                // unchanged
+            }
+            if(m_distance_thresh_type == "ObjectRadius")
+            {
+                for(auto it : dimensions)
+                {
+                    output_dims[it.first] *= it.second.first;
+                }
+            }
+            if(m_distance_thresh_type == "BoundingBoxMedian")
+            {
+                for(auto it : dimensions)
+                {
+                    output_dims[it.first] *= it.second.second;
+                }
+            }
+            return output_dims;
         }
 
         bool isUsingGlobalFeatures()
@@ -299,6 +329,7 @@ namespace ism3d
         float m_voxel_leaf_size;
 
         float m_distance_detection_thresh;
+        std::string m_distance_thresh_type;
 
         float m_normal_radius;
         int m_consistent_normals_k;

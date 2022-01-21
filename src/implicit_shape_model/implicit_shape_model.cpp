@@ -100,6 +100,7 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
 
     // detection threshold for evaluation
     addParameter(m_distance_detection_thresh, "DistanceThresholdDetection", 0.05f);
+    addParameter(m_distance_thresh_type, "DistanceThresholdType", std::string("Fixed"));
 
     addParameter(m_distanceType, "DistanceType", std::string("Euclidean"));
     addParameter(m_normal_radius, "NormalRadius", 0.05f);
@@ -241,6 +242,7 @@ void ImplicitShapeModel::train()
     std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> features; // TODO VS rethink the whole feature data type!!!
     std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> globalFeatures;
     std::map<unsigned, std::vector<Utils::BoundingBox>> boundingBoxes;
+    std::map<unsigned, std::vector<float>> object_radii;
 
     // compute features for all models and all classes
     for (auto it = m_training_objects_filenames.begin(); it != m_training_objects_filenames.end(); it++)
@@ -266,6 +268,7 @@ void ImplicitShapeModel::train()
             pcl::PointCloud<PointNormalT>::Ptr point_cloud = loadPointCloud(cloud_filenames[j]);
             point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
+            float cloud_radius = Utils::computeCloudRadius(point_cloud);
 
 //            // temp for debug
 //            pcl::PointCloud<PointNormalT>::Ptr new_cloud(new pcl::PointCloud<PointNormalT>);
@@ -403,6 +406,7 @@ void ImplicitShapeModel::train()
             features[class_id].push_back(cloud_features_cleaned);
             globalFeatures[class_id].push_back(global_features_cleaned);
             boundingBoxes[class_id].push_back(bounding_box);
+            object_radii[class_id].push_back(cloud_radius);
         }
     }
 
@@ -415,8 +419,10 @@ void ImplicitShapeModel::train()
         trainSVM(globalFeatures);
     }
 
-    // store average sizes as a hint for bandwidth during detection
-    m_voting->determineAverageBoundingBoxDimensions(boundingBoxes); // TODO VS: remove this if inferior to standard params
+    // store sizes information as a hint for
+    // 1) bandwidth during detection
+    // 2) allowed deviance to ground truth during detection
+    m_voting->forwardBoxesAndRadii(boundingBoxes, object_radii);
     // forward global feature to voting class to store them
     m_voting->forwardGlobalFeatures(globalFeatures);
 

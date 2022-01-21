@@ -292,6 +292,27 @@ namespace ism3d
         return box;
     }
 
+    float Utils::computeCloudRadius(const pcl::PointCloud<PointNormalT>::Ptr &cloud)
+    {
+        // compute the object centroid
+        Eigen::Vector4f centroid4f;
+        pcl::compute3DCentroid(*cloud, centroid4f);
+        Eigen::Vector3f centroid(centroid4f[0], centroid4f[1], centroid4f[2]);
+
+        // compute radius (maximum distance of a point to centroid)
+        float radius = 0.0f;
+        for(const PointNormalT &point : cloud->points)
+        {
+            Eigen::Vector3f eigpoint = point.getArray3fMap();
+            float temp_radius = (eigpoint-centroid).norm();
+            if(temp_radius > radius)
+            {
+                radius = temp_radius;
+            }
+        }
+        return radius;
+    }
+
 
     // TODO VS check if this is ever used
     float Utils::computeHingeLoss(const std::vector<float> &class_distances, const unsigned class_id)

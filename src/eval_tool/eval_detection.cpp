@@ -379,12 +379,13 @@ int main(int argc, char **argv)
                     int cumul_tp_dataset = 0;
                     int cumul_fp_dataset = 0;
 
-                    float dist_threshold = ism.getDetectionThreshold();
+                    std::map<unsigned, float> dist_thresholds = ism.getDetectionThreshold();
 
                     for(auto item : mc.gt_class_map)
                     {
                         std::string class_label = item.first;
                         unsigned class_id = class_labels_map[class_label];
+                        float dist_threshold = dist_thresholds[class_id];
                         std::vector<DetectionObject> class_objects_gt = item.second;
 
                         filelog::computeAndWriteNextClassSummary(summaryFile, mc, class_label, class_id,
