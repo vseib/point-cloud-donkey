@@ -991,12 +991,9 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
             DetectionObject detected_obj = convertMaxToObj(maxima[i], m_gt_file);
             detected_objects.push_back(std::move(detected_obj));
         }
-        float dist_threshold = m_ism->getDetectionThreshold();
+
         std::map<unsigned, float> dist_thresholds = m_ism->getDetectionThreshold();
-        std::tie(std::ignore, std::ignore, std::ignore, std::ignore, std::ignore,
-                         tp_list, fp_list) = computeAllMetrics(m_gt_objects,
-                                                            detected_objects,
-                                                            dist_threshold);
+        std::tie(tp_list, fp_list) = computeTpFpMetrics(m_gt_objects, detected_objects, dist_thresholds);
         std::cout << "--- debug   det objects: " << detected_objects.size() << std::endl;
         for(auto x : detected_objects)
         {

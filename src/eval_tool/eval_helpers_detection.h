@@ -195,11 +195,25 @@ computePrecisionRecallForPlotting(
     return std::make_tuple(precisions, recalls, ap);
 }
 
-
+// adapter for the method, used only in command line eval tool (objects of a single class per method call)
 std::tuple<std::vector<int>,std::vector<int>>
 match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
                     const float distance_threshold)
+{
+    // since only one class is used, only insert its threshold into map
+    std::map<unsigned, float> dist_thresholds;
+    dist_thresholds.insert({class_objects_gt.front().class_label, distance_threshold});
+    return match_gt_objects(class_objects_gt, class_objects_det, dist_thresholds);
+}
+
+
+// this is used with objects and detection of only one single class in the command line eval tool
+// and with mixed classes in the GUI tool
+std::tuple<std::vector<int>,std::vector<int>>
+match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
+                    std::vector<DetectionObject> &class_objects_det,
+                    const std::map<unsigned, float> &dist_thresholds)
 {
     // sort objects by confidence then loop over sorted list, starting with hightest conf
     std::sort(class_objects_det.begin(), class_objects_det.end(), [](DetectionObject &obj1, DetectionObject &obj2)
@@ -236,7 +250,7 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
             }
         }
 
-        if(best_dist > distance_threshold || best_index == -1)
+        if(best_dist > dist_thresholds[det_obj.class_label] || best_index == -1)
         {
             fp[det_idx] = 1;
         }
@@ -250,7 +264,20 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
     return {tp, fp};
 }
 
+// this is used in GUI only
+std::tuple<std::vector<int>, std::vector<int>>
+computeTpFpMetrics(const std::vector<DetectionObject> &class_objects_gt,
+                    std::vector<DetectionObject> &class_objects_det,
+                    const std::map<unsigned, float> &dist_thresholds)
+{
+    // match detections and ground truth to get list of tp and fp
+    std::vector<int> tp, fp;
+    std::tie(tp, fp) = match_gt_objects(class_objects_gt, class_objects_det, dist_thresholds);
 
+    return {tp, fp};
+}
+
+// this is used in the command line eval script
 std::tuple<float, float, float, int, int, std::vector<int>, std::vector<int>>
 computeAllMetrics(const std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
