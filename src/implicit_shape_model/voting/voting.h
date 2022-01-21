@@ -152,7 +152,8 @@ namespace ism3d
 
         std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> filterVotesWithRansac(
                 const std::vector<Eigen::Vector3f> &clusters,
-                const std::vector<std::vector<Vote>> &cluster_votes) const;
+                const std::vector<std::vector<Vote>> &cluster_votes,
+                const float inlier_threshold) const;
 
         static bool sortMaxima(const VotingMaximum&, const VotingMaximum&);
 
@@ -191,6 +192,7 @@ namespace ism3d
         bool m_vote_filtering_with_ransac;
         bool m_refine_model;
         float m_inlier_threshold;
+        std::string m_inlier_threshold_type;
 
         // NOTE: only for debug // not used anymore?
         static float state_gt;

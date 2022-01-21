@@ -47,6 +47,7 @@ Voting::Voting()
     addParameter(m_vote_filtering_with_ransac, "RansacVoteFiltering", false);
     addParameter(m_refine_model, "RansacRefineModel", false);
     addParameter(m_inlier_threshold, "RansacInlierThreshold", 0.1f);
+    addParameter(m_inlier_threshold_type, "RansacInlierThresholdType", std::string("Fixed"));
 }
 
 Voting::~Voting()
@@ -107,7 +108,19 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
         if(m_vote_filtering_with_ransac)
         {
-            auto[clusters_filtered, cluster_votes_filtered] = filterVotesWithRansac(clusters, cluster_votes);
+            // init with "Fixed" type: same for all classes
+            float inlier_threshold = m_inlier_threshold;
+
+            if(m_inlier_threshold_type == "ObjectRadius")
+            {
+                inlier_threshold *= m_dimensions_map.at(classId).first;
+            }
+            else if(m_inlier_threshold_type == "BoundingBoxMedian")
+            {
+                inlier_threshold *= m_dimensions_map.at(classId).second;
+            }
+
+            auto[clusters_filtered, cluster_votes_filtered] = filterVotesWithRansac(clusters, cluster_votes, inlier_threshold);
             clusters = clusters_filtered;
             cluster_votes = cluster_votes_filtered;
         }
@@ -322,13 +335,14 @@ void Voting::printMaxima(const std::vector<VotingMaximum> &maxima)
 
 std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> Voting::filterVotesWithRansac(
         const std::vector<Eigen::Vector3f> &clusters,
-        const std::vector<std::vector<Vote>> &cluster_votes) const
+        const std::vector<std::vector<Vote>> &cluster_votes,
+        const float inlier_threshold) const
 {
     pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
     corr_rejector.setMaximumIterations(10000);
     // TODO VS params!!!
     // for classification: around 0.05 to 0.1 ? // for detection: around 0.01 ?
-    corr_rejector.setInlierThreshold(m_inlier_threshold);
+    corr_rejector.setInlierThreshold(inlier_threshold);
     corr_rejector.setRefineModel(m_refine_model);
 
     std::vector<Eigen::Matrix4f> transformations;
