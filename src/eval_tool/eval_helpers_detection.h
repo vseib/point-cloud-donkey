@@ -203,7 +203,8 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
 {
     // since only one class is used, only insert its threshold into map
     std::map<unsigned, float> dist_thresholds;
-    dist_thresholds.insert({class_objects_gt.front().class_label, distance_threshold});
+    unsigned class_id = class_labels_map[class_objects_gt.front().class_label];
+    dist_thresholds.insert({class_id, distance_threshold});
     return match_gt_objects(class_objects_gt, class_objects_det, dist_thresholds);
 }
 
@@ -250,7 +251,8 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
             }
         }
 
-        if(best_dist > dist_thresholds[det_obj.class_label] || best_index == -1)
+        unsigned class_id = class_labels_map[det_obj.class_label];
+        if(best_dist > dist_thresholds[class_id] || best_index == -1)
         {
             fp[det_idx] = 1;
         }
