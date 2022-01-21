@@ -268,7 +268,7 @@ int main (int argc, char** argv)
                     std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
 
                     float precision, recall, ap;
-                    std::tie(precision, recall, ap, cumul_tp, cumul_fp, std::ignore, std::ignore) = computeMetrics(class_objects_gt,
+                    std::tie(precision, recall, ap, cumul_tp, cumul_fp, std::ignore, std::ignore) = computeAllMetrics(class_objects_gt,
                                                                                      class_objects_det,
                                                                                      dist_threshold);
                     precision_per_class[class_id] = precision;
