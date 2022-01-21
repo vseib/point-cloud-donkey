@@ -134,7 +134,7 @@ void computeAndWriteNextClassSummary(std::ofstream &summaryFile,
 
         float precision, recall, ap;
         std::vector<int> tp_list, fp_list;
-        std::tie(precision, recall, ap, cumul_tp, cumul_fp, tp_list, fp_list) = computeMetrics(class_objects_gt,
+        std::tie(precision, recall, ap, cumul_tp, cumul_fp, tp_list, fp_list) = computeAllMetrics(class_objects_gt,
                                                                          class_objects_det,
                                                                          dist_threshold);
         mc.tps_per_class.insert({class_label, tp_list});
@@ -159,7 +159,7 @@ void computeAndWriteNextClassSummary(std::ofstream &summaryFile,
             std::vector<DetectionObject> class_objects_det = mc.det_class_map_global.at(class_label);
 
             float precision, recall, ap;
-            std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp, std::ignore, std::ignore) = computeMetrics(class_objects_gt,
+            std::tie(precision, recall, ap, global_cumul_tp, global_cumul_fp, std::ignore, std::ignore) = computeAllMetrics(class_objects_gt,
                                                                              class_objects_det,
                                                                              dist_threshold);
             mc.global_precision_per_class[class_id] = precision;

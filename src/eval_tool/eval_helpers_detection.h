@@ -252,7 +252,7 @@ match_gt_objects(const std::vector<DetectionObject> &class_objects_gt,
 
 
 std::tuple<float, float, float, int, int, std::vector<int>, std::vector<int>>
-computeMetrics(const std::vector<DetectionObject> &class_objects_gt,
+computeAllMetrics(const std::vector<DetectionObject> &class_objects_gt,
                     std::vector<DetectionObject> &class_objects_det,
                     const float dist_threshold)
 {

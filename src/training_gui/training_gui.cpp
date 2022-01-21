@@ -994,7 +994,7 @@ void TrainingGUI::signalMaxima(std::vector<ism3d::VotingMaximum> maxima)
         float dist_threshold = m_ism->getDetectionThreshold();
         std::map<unsigned, float> dist_thresholds = m_ism->getDetectionThreshold();
         std::tie(std::ignore, std::ignore, std::ignore, std::ignore, std::ignore,
-                         tp_list, fp_list) = computeMetrics(m_gt_objects,
+                         tp_list, fp_list) = computeAllMetrics(m_gt_objects,
                                                             detected_objects,
                                                             dist_threshold);
         std::cout << "--- debug   det objects: " << detected_objects.size() << std::endl;
