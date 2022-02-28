@@ -599,6 +599,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
     // read bounding box data
     m_dimensions_map.clear();
     m_variance_map.clear();
+    std::map<unsigned, float> global_radii;
 
     unsigned bb_dims_size;
     ia >> bb_dims_size;
@@ -611,6 +612,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         ia >> firstDim;
         ia >> secondDim;
         m_dimensions_map.insert({classId, {firstDim, secondDim}});
+        global_radii.insert({classId, secondDim});
     }
 
     unsigned bb_vars_size;
@@ -700,7 +702,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
                     m_k_global_features);
         m_global_classifier->setFlannHelper(fh);
         m_global_classifier->setLoadedFeatures(global_features_cloud);
-        m_global_classifier->computeAverageRadii(global_features_map);
+        m_global_classifier->setGlobalRadii(global_radii);
         m_global_classifier->loadSVMModels(m_svm_path);
 
         if(m_single_object_mode)

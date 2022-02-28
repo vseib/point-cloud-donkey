@@ -110,6 +110,11 @@ namespace ism3d
             m_global_features = loaded_features;
         }
 
+        void setGlobalRadii(std::map<unsigned, float> &global_radii)
+        {
+            m_average_radii = global_radii;
+        }
+
         void setDistanceType(std::string type)
         {
             m_distance_type = type;

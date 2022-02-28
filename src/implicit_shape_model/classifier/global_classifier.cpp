@@ -42,6 +42,7 @@ namespace ism3d
         }
     }
 
+    // TODO VS get rid of this method
     void GlobalClassifier::computeAverageRadii(
             // maps class ids to a vector of global features,
             // number of objects per class = number of global features per class

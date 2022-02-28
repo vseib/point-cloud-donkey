@@ -32,7 +32,7 @@ namespace ism3d
 
         // only used for global descriptors, -1 otherwise
         // learned in training, needed to estimate object size in cluttered regions during recognition
-        float globalDescriptorRadius;
+        float globalDescriptorRadius; // TODO VS get rid of this
 
         // used for:
         //   1) global features during detection
