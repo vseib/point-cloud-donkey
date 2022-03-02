@@ -166,51 +166,65 @@ namespace ism3d
             VotingMaximum &maximum)
     {
         // compute global features
-        pcl::PointCloud<ISMFeature>::ConstPtr global_features = computeGlobalFeatures(points, normals);
-
-        // if no SVM data available defaul to KNN
-        if(m_svm_error) m_global_feature_method = "KNN";
-
-        // process current global features according to some strategy
-        if(!m_index_created)
+        // require a minimum number of votes for feature computation
+        if(points->size() > 500)
         {
-            LOG_INFO("creating flann index for global features");
-            m_flann_helper->buildIndex(m_distance_type, 1);
-            m_index_created = true;
-        }
+            pcl::PointCloud<ISMFeature>::ConstPtr global_features = computeGlobalFeatures(points, normals);
+            // if no SVM data available defaul to KNN
+            if(m_svm_error) m_global_feature_method = "KNN";
 
-        if(m_global_feature_method == "KNN")
-        {
-            LOG_INFO("starting global classification with knn");
-            classifyWithKNN(global_features, maximum);
-        }
-        else if(m_global_feature_method == "SVM")
-        {
-            LOG_INFO("starting global classification with svm");
-            classifyWithSVM(global_features, maximum);
-            // SVM does not support instance labels, so we have to get it from KNN classifier
-            VotingMaximum instance_maximum;
-            instance_maximum.classId = maximum.classId;
-            // TODO VS: use only if
-            // if( ... secondary labels ...) --> else: init instance id and weight with class id and weight
-            // 1. secondary labels are used
-            // 2. feature type of training and test is the same (usually this is the case, but it's possible
-            //    to use an SVM with a different descriptor type than was used for training the global KNN classifier)
-            if(global_features->at(0).descriptor.size() == m_global_features->at(0).descriptor.size())
+            // process current global features according to some strategy
+            if(!m_index_created)
             {
-                classifyWithKNN(global_features, instance_maximum);
-                // fill in instance result into actual maximum
-                maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
-                maximum.globalHypothesis.instanceWeight = instance_maximum.globalHypothesis.instanceWeight;
+                LOG_INFO("creating flann index for global features");
+                m_flann_helper->buildIndex(m_distance_type, 1);
+                m_index_created = true;
             }
-            else
+
+            if(m_global_feature_method == "KNN")
             {
-                LOG_ERROR("ERROR: Loaded descriptors and computed descriptors do not match in dimensionality!");
-                LOG_ERROR("       Loaded features have dimension " << m_global_features->at(0).descriptor.size() <<
-                          " while computed features have " << global_features->at(0).descriptor.size() << "!");
-                LOG_ERROR("Check your config (global feature type vs. SVM feature type)!");
-                exit(1);
+                LOG_INFO("starting global classification with knn");
+                classifyWithKNN(global_features, maximum);
             }
+            else if(m_global_feature_method == "SVM")
+            {
+                LOG_INFO("starting global classification with svm");
+                classifyWithSVM(global_features, maximum);
+                // SVM does not support instance labels, so we have to get it from KNN classifier
+                VotingMaximum instance_maximum;
+                instance_maximum.classId = maximum.classId;
+                // TODO VS: use only if
+                // if( ... secondary labels ...) --> else: init instance id and weight with class id and weight
+                // 1. secondary labels are used
+                // 2. feature type of training and test is the same (usually this is the case, but it's possible
+                //    to use an SVM with a different descriptor type than was used for training the global KNN classifier)
+                if(global_features->at(0).descriptor.size() == m_global_features->at(0).descriptor.size())
+                {
+                    classifyWithKNN(global_features, instance_maximum);
+                    // fill in instance result into actual maximum
+                    maximum.globalHypothesis.instanceId = instance_maximum.globalHypothesis.instanceId;
+                    maximum.globalHypothesis.instanceWeight = instance_maximum.globalHypothesis.instanceWeight;
+                }
+                else
+                {
+                    LOG_ERROR("ERROR: Loaded descriptors and computed descriptors do not match in dimensionality!");
+                    LOG_ERROR("       Loaded features have dimension " << m_global_features->at(0).descriptor.size() <<
+                              " while computed features have " << global_features->at(0).descriptor.size() << "!");
+                    LOG_ERROR("Check your config (global feature type vs. SVM feature type)!");
+                    exit(1);
+                }
+            }
+        }
+        else
+        {
+            LOG_WARN("----------- DEBUG TODO VS ---------- skipping global feature, with num points = " << points->size());
+            // assign global hypothesis with zero weight
+            VotingMaximum::GlobalHypothesis glob;
+            glob.classId = maximum.classId;
+            glob.classWeight = 0.0f;
+            glob.instanceId = maximum.instanceId;
+            glob.instanceWeight = 0.0f;
+            maximum.globalHypothesis = glob;
         }
     }
 
@@ -311,6 +325,12 @@ namespace ism3d
                 }
                 std::pair<int, float> elem = gra.instance_ids.at(global_result.instanceId);
                 global_result.instanceWeight = elem.second / elem.first;
+
+                LOG_WARN("----------- DEBUG TODO VS ---------- actually computing global results");
+            }
+            else
+            {
+                LOG_WARN("----------- DEBUG TODO VS ---------- NOT computing global results");
             }
         }
 
