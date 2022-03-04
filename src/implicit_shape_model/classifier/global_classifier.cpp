@@ -256,7 +256,9 @@ LOG_WARN("mk_global: " << m_k_global_features);
             }
             else if(m_flann_helper->getDistType() == "ChiSquared")
             {
-                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
+                auto index = m_flann_helper->getIndexChi();
+LOG_WARN("------ what 2.5");
+                index->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
 LOG_WARN("------ what 3");
             delete[] query.ptr();
