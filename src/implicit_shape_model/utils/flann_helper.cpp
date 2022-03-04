@@ -76,7 +76,7 @@ std::shared_ptr<flann::Index<flann::L2<float>>> FlannHelper::getIndexL2()
 
 std::shared_ptr<flann::Index<flann::ChiSquareDistance<float>>> FlannHelper::getIndexChi()
 {
-    LOG_WARN("----------- flann helper return");
+    LOG_WARN("----------- flann helper return, index created: " << m_index_created);
     return std::static_pointer_cast<flann::Index<flann::ChiSquareDistance<float>>>(m_index);
 }
 
