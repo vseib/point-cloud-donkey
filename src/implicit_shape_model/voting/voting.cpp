@@ -231,7 +231,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     }
 
     // in single object mode: compute global features on the whole cloud once
-    if(m_use_global_features && m_single_object_mode)
+    if(m_use_global_features && m_single_object_mode) // TODO VS: refactor! single_object_mode has double meaning: classification and single_object_mode!
     {
         VotingMaximum global_result;
         m_global_classifier->classify(points, normals, global_result);
@@ -256,7 +256,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
     // filter maxima if not in single object mode
     std::vector<VotingMaximum> filtered_maxima = maxima; // init for the case that no filtering type is selected
-    if(!m_single_object_mode)
+    if(!m_single_object_mode) // TODO VS: would it harm to do it in single object mode?
     {
         filtered_maxima = MaximaHandler::filterMaxima(m_max_filter_type, maxima);
     }
@@ -272,6 +272,19 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
         // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
+        // find first maximum with weight = 0
+//        unsigned zero_idx = 0;
+//        for(; zero_idx < maxima.size(); zero_idx++)
+//        {
+//            if(maxima.at(zero_idx).weight == 0)
+//                break;
+//        }
+        auto it = std::find_if(maxima.begin(), maxima.end(), [](const VotingMaximum &max){
+            return max.weight == 0;
+        });
+        // delete maxima with zero weight
+        //maxima.erase(maxima.begin()+zero_idx, maxima.end());
+        maxima.erase(it, maxima.end());
     }
 
     // turn weights to probabilities

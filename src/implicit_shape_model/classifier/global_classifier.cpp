@@ -471,18 +471,6 @@ namespace ism3d
             // type 3: take global class if it is among the top classes
             useHighRankedGlobalHypothesis(maxima);
         }
-        // TODO VS disabled only for testing: restore old method 4
-//        else if(merge_function == 4) // this method's name in the phd thesis: fm3
-//        {
-//            // type 4: upweight consistent results by fixed factor
-//            for(VotingMaximum &max : maxima)
-//            {
-//                if(max.classId == max.globalHypothesis.classId)
-//                    max.weight *= m_weight_factor;
-//                if(max.instanceId == max.globalHypothesis.instanceId)
-//                    max.instanceWeight *= m_weight_factor;
-//            }
-//        }
         else if(merge_function == 4) // this method's name in the phd thesis: fm3
         {
             // type 4: upweight consistent results by fixed factor
@@ -496,7 +484,12 @@ namespace ism3d
                         max.weight *= m_weight_factor;
                 }
                 if(max.instanceId == max.globalHypothesis.instanceId)
-                    max.instanceWeight *= m_weight_factor;
+                {
+                    if(max.globalHypothesis.instanceWeight == 0)
+                        max.instanceWeight = 0;
+                    else
+                        max.instanceWeight *= m_weight_factor;
+                }
             }
         }
         else if(merge_function == 5) // this method's name in the phd thesis: fm4
@@ -510,9 +503,20 @@ namespace ism3d
                     max.instanceWeight *= 1 + max.globalHypothesis.instanceWeight;
             }
         }
-        else if(merge_function == 6)  // this method's name in the phd thesis: fm5
+        else if(merge_function == 6)
         {
-            // type 6: apply intermediate T-conorm: S(a,b) = a+b-ab
+            // type 6: multiply weights
+            for(VotingMaximum &max : maxima)
+            {
+                if(max.classId == max.globalHypothesis.classId)
+                    max.weight *= max.globalHypothesis.classWeight;
+                if(max.instanceId == max.globalHypothesis.instanceId)
+                    max.instanceWeight *= max.globalHypothesis.instanceWeight;
+            }
+        }
+        else if(merge_function == 7)  // this method's name in the phd thesis: fm5
+        {
+            // type 7: apply intermediate T-conorm: S(a,b) = a+b-ab
             for(VotingMaximum &max : maxima)
             {
                 if(max.classId == max.globalHypothesis.classId)
