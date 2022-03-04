@@ -245,6 +245,8 @@ LOG_WARN("------ what 1");
                 query[0][i] = query_feature.descriptor.at(i);
             }
 LOG_WARN("------ what 2");
+LOG_WARN("query sizes: " << query.cols << "  " << query.rows);
+LOG_WARN("mk_global: " << m_k_global_features);
             // search
             std::vector<std::vector<int>> indices;
             std::vector<std::vector<float>> distances;
