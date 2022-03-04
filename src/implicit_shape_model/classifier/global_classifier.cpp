@@ -237,16 +237,13 @@ namespace ism3d
         // NOTE: some global features produce more than 1 descriptor per object, hence the loop
         for(ISMFeature query_feature : global_features->points)
         {
-LOG_WARN("------ what 1");
             // insert the query point
             flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
             for(int i = 0; i < query_feature.descriptor.size(); i++)
             {
                 query[0][i] = query_feature.descriptor.at(i);
             }
-LOG_WARN("------ what 2");
-LOG_WARN("query sizes: " << query.cols << "  " << query.rows);
-LOG_WARN("mk_global: " << m_k_global_features);
+
             // search
             std::vector<std::vector<int>> indices;
             std::vector<std::vector<float>> distances;
@@ -256,13 +253,11 @@ LOG_WARN("mk_global: " << m_k_global_features);
             }
             else if(m_flann_helper->getDistType() == "ChiSquared")
             {
-                auto index = m_flann_helper->getIndexChi();
-LOG_WARN("------ what 2.5");
-                index->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
+                // TODO VS: occasional segfault on knn search: check if flann helper is used correctly for global features (because it never happens with local features)
+                m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
-LOG_WARN("------ what 3");
             delete[] query.ptr();
-LOG_WARN("------ what 4");
+
             // classic KNN approach
             // loop over results
             for(int i = 0; i < indices[0].size(); i++)
@@ -273,13 +268,12 @@ LOG_WARN("------ what 4");
                 float score = std::exp(-sqrt(dist_squared));
                 insertGlobalResult(max_global_voting, temp.classId, temp.instanceId, score);
             }
-LOG_WARN("------ what 5");
         }
 
         // determine score based on all votes
         VotingMaximum::GlobalHypothesis global_result = {maximum.classId, 0}; // pair of class id and score
         unsigned max_occurences = 0;
-LOG_WARN("------ what 6");
+
         if(m_single_object_mode)
         {
             // find class with most occurences
@@ -313,11 +307,9 @@ LOG_WARN("------ what 6");
         }
         else
         {
-LOG_WARN("------ what 7");
             // determine score based on current class
             if(max_global_voting.find(maximum.classId) != max_global_voting.end())
             {
-LOG_WARN("------ what 8");
                 GlobalResultAccu gra = max_global_voting.at(maximum.classId);
                 global_result.classWeight = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
 
@@ -332,15 +324,8 @@ LOG_WARN("------ what 8");
                         global_result.instanceId = it.first;
                     }
                 }
-LOG_WARN("------ what 9");
                 std::pair<int, float> elem = gra.instance_ids.at(global_result.instanceId);
                 global_result.instanceWeight = elem.second / elem.first;
-
-                LOG_WARN("----------- DEBUG TODO VS ---------- actually computing global results");
-            }
-            else
-            {
-                LOG_WARN("----------- DEBUG TODO VS ---------- NOT computing global results");
             }
         }
 
