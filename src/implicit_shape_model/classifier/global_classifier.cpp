@@ -237,13 +237,14 @@ namespace ism3d
         // NOTE: some global features produce more than 1 descriptor per object, hence the loop
         for(ISMFeature query_feature : global_features->points)
         {
+LOG_WARN("------ what 1");
             // insert the query point
             flann::Matrix<float> query(new float[query_feature.descriptor.size()], 1, query_feature.descriptor.size());
             for(int i = 0; i < query_feature.descriptor.size(); i++)
             {
                 query[0][i] = query_feature.descriptor.at(i);
             }
-
+LOG_WARN("------ what 2");
             // search
             std::vector<std::vector<int>> indices;
             std::vector<std::vector<float>> distances;
@@ -255,9 +256,9 @@ namespace ism3d
             {
                 m_flann_helper->getIndexChi()->knnSearch(query, indices, distances, m_k_global_features, flann::SearchParams(-1));
             }
-
+LOG_WARN("------ what 3");
             delete[] query.ptr();
-
+LOG_WARN("------ what 4");
             // classic KNN approach
             // loop over results
             for(int i = 0; i < indices[0].size(); i++)
@@ -268,11 +269,13 @@ namespace ism3d
                 float score = std::exp(-sqrt(dist_squared));
                 insertGlobalResult(max_global_voting, temp.classId, temp.instanceId, score);
             }
+LOG_WARN("------ what 5");
         }
 
         // determine score based on all votes
         VotingMaximum::GlobalHypothesis global_result = {maximum.classId, 0}; // pair of class id and score
         unsigned max_occurences = 0;
+LOG_WARN("------ what 6");
         if(m_single_object_mode)
         {
             // find class with most occurences
@@ -306,9 +309,11 @@ namespace ism3d
         }
         else
         {
+LOG_WARN("------ what 7");
             // determine score based on current class
             if(max_global_voting.find(maximum.classId) != max_global_voting.end())
             {
+LOG_WARN("------ what 8");
                 GlobalResultAccu gra = max_global_voting.at(maximum.classId);
                 global_result.classWeight = gra.num_occurences > 0 ? gra.score_sum / gra.num_occurences : 0;
 
@@ -323,6 +328,7 @@ namespace ism3d
                         global_result.instanceId = it.first;
                     }
                 }
+LOG_WARN("------ what 9");
                 std::pair<int, float> elem = gra.instance_ids.at(global_result.instanceId);
                 global_result.instanceWeight = elem.second / elem.first;
 
@@ -476,13 +482,30 @@ namespace ism3d
             // type 3: take global class if it is among the top classes
             useHighRankedGlobalHypothesis(maxima);
         }
+        // TODO VS disabled only for testing: restore old method 4
+//        else if(merge_function == 4) // this method's name in the phd thesis: fm3
+//        {
+//            // type 4: upweight consistent results by fixed factor
+//            for(VotingMaximum &max : maxima)
+//            {
+//                if(max.classId == max.globalHypothesis.classId)
+//                    max.weight *= m_weight_factor;
+//                if(max.instanceId == max.globalHypothesis.instanceId)
+//                    max.instanceWeight *= m_weight_factor;
+//            }
+//        }
         else if(merge_function == 4) // this method's name in the phd thesis: fm3
         {
             // type 4: upweight consistent results by fixed factor
             for(VotingMaximum &max : maxima)
             {
                 if(max.classId == max.globalHypothesis.classId)
-                    max.weight *= m_weight_factor;
+                {
+                    if(max.globalHypothesis.classWeight == 0)
+                        max.weight = 0;
+                    else
+                        max.weight *= m_weight_factor;
+                }
                 if(max.instanceId == max.globalHypothesis.instanceId)
                     max.instanceWeight *= m_weight_factor;
             }
