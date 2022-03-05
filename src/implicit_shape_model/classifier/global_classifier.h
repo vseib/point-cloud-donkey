@@ -82,8 +82,11 @@ namespace ism3d
                               pcl::PointCloud<PointT>::Ptr &segmented_points,
                               pcl::PointCloud<pcl::Normal>::Ptr &segmented_normals);
 
+        // min_points: minimal number of points to compute global descriptor, otherwise no descriptor is computed and
+        //          global result is handled as invalid; if min_points is -1 then we don't care about the number
         void classify(const pcl::PointCloud<PointT>::ConstPtr &points,
                       const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
+                      const int min_points,
                       VotingMaximum &maximum);
 
         void computeAverageRadii(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &global_features);

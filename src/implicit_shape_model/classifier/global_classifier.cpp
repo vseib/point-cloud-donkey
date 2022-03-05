@@ -163,11 +163,12 @@ namespace ism3d
     void GlobalClassifier::classify(
             const pcl::PointCloud<PointT>::ConstPtr &points,
             const pcl::PointCloud<pcl::Normal>::ConstPtr &normals,
+            const int min_points,
             VotingMaximum &maximum)
     {
         // compute global features
-        // require a minimum number of votes for feature computation
-        if(points->size() > 500)
+        // require a minimum number of points for feature computation
+        if(points->size() > min_points || min_points < 0)
         {
             pcl::PointCloud<ISMFeature>::ConstPtr global_features = computeGlobalFeatures(points, normals);
             // if no SVM data available defaul to KNN

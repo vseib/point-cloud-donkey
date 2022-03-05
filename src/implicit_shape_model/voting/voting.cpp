@@ -42,8 +42,8 @@ Voting::Voting()
     addParameter(m_min_svm_score, "GlobalParamMinSvmScore", 0.70f);
     addParameter(m_rate_limit, "GlobalParamRateLimit", 0.60f);
     addParameter(m_weight_factor, "GlobalParamWeightFactor", 1.5f);
+    addParameter(m_min_points, "GlobalFeatureMinPoints", 500);
 
-    // TODO VS: use these params for later when adding ransac filtering
     addParameter(m_vote_filtering_with_ransac, "RansacVoteFiltering", false);
     addParameter(m_refine_model, "RansacRefineModel", false);
     addParameter(m_inlier_threshold, "RansacInlierThreshold", 0.1f);
@@ -220,7 +220,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
                 pcl::PointCloud<pcl::Normal>::Ptr segmented_normals(new pcl::PointCloud<pcl::Normal>());
 
                 m_global_classifier->segmentROI(points, normals, maximum, segmented_points, segmented_normals);
-                m_global_classifier->classify(segmented_points, segmented_normals, maximum);
+                m_global_classifier->classify(segmented_points, segmented_normals, m_min_points, maximum);
             }
 
             #pragma omp critical
@@ -234,7 +234,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     if(m_use_global_features && m_single_object_mode) // TODO VS: refactor! single_object_mode has double meaning: classification and single_object_mode!
     {
         VotingMaximum global_result;
-        m_global_classifier->classify(points, normals, global_result);
+        m_global_classifier->classify(points, normals, -1, global_result); // single object mode: don't care about min_points number (-1)
 
         // add global result to all maxima if in single object mode
         for(VotingMaximum &max : maxima)

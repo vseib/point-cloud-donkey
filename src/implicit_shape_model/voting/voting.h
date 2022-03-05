@@ -179,6 +179,7 @@ namespace ism3d
         Features* m_global_feature_descriptor;
         // ... when maxima are detected
         int m_merge_function;
+        int m_min_points;
         float m_min_svm_score;
         float m_rate_limit;
         float m_weight_factor;
