@@ -79,6 +79,7 @@ namespace ism3d
         std::string m_filter_type_color;
         bool m_disable_filter_in_training;
         bool m_refine_position;
+        bool m_require_both_filters;
     };
 }
 

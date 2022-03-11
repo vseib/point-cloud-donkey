@@ -35,6 +35,7 @@ namespace ism3d
         addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
 
         addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
+        addParameter(m_require_both_filters, "RequireBothFilterTypes", true);// TODO VS: this param is not yes in config files
 
         addParameter(m_refine_position, "RefineKeypointPosition", false);
 
@@ -59,7 +60,6 @@ namespace ism3d
         boost::algorithm::to_lower(m_filter_type_geometry);
         boost::algorithm::to_lower(m_filter_type_color);
 
-
         // disable in training if desired -> becomes normal voxel grid without culling
         if((m_is_training && m_disable_filter_in_training)
                    || (m_filter_method_geometry == "none" && m_filter_method_color == "none"))
@@ -75,7 +75,7 @@ namespace ism3d
         }
         else
         {
-            // TODO VS: if kpq is not needed for eval, delete it completely or move to own keypoint class
+            // TODO VS: move kpq to own keypoint class
             if(m_filter_method_geometry != "none" && m_filter_method_geometry != "curvature" &&
                     m_filter_method_geometry != "gaussian" && m_filter_method_geometry != "kpq")
             {
@@ -150,7 +150,10 @@ namespace ism3d
             pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
             for(unsigned idx = 0; idx < keypoints_without_normals->size(); idx++)
             {
-                bool geo_passed = true;
+                // assign true if both required: if active will be checked, otherwise is already true
+                // if only one required: set to false in ordner not to break the other one if this is not active
+                // e.g. only color active and only one required: automatically setting this to true would overwrite color result
+                bool geo_passed = m_require_both_filters ? true : false;
                 if(m_filter_method_geometry != "none")
                 {
                     if(geo_scores[idx] < m_filter_threshold_geometry)
@@ -159,7 +162,10 @@ namespace ism3d
                     }
                 }
 
-                bool color_passed = true;
+                // assign true if both required: if active will be checked, otherwise is already true
+                // if only one required: set to false in ordner not to break the other one if this is not active
+                // e.g. only geo active and only one required: automatically setting this to true would overwrite geo result
+                bool color_passed = m_require_both_filters ? true : false;
                 if(m_filter_method_color != "none")
                 {
                     if(color_scores[idx] < m_filter_threshold_color)
@@ -168,9 +174,10 @@ namespace ism3d
                     }
                 }
 
-                if(geo_passed && color_passed)
+                if((m_require_both_filters && geo_passed && color_passed) ||
+                   (!m_require_both_filters && (geo_passed || color_passed)))
                 {
-                    if(m_refine_position)
+                    if(m_refine_position) // TODO VS: part 2 of chapter 18 - change code!!!
                     {
                         PointT keypoint = refineKeypointPosition(geo_scores[idx], color_scores[idx], keypoints_without_normals->at(idx),
                                                                  points_with_normals, principal_curvatures);
