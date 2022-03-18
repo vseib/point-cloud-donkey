@@ -104,6 +104,9 @@ namespace ism3d
                 exit(1);
             }
 
+            LOG_INFO("---- using method " << m_filter_method_geometry << " with type " << m_filter_type_geometry << " with ratio " << m_filter_cutoff_ratio)
+
+
             // combine filtered cloud points and filtered normals into one cloud
             pcl::PointCloud<PointNormalT>::Ptr points_with_normals(new pcl::PointCloud<PointNormalT>());
             pcl::concatenateFields(*pointsWithoutNaNNormals, *normalsWithoutNaN, *points_with_normals);
