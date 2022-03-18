@@ -18,7 +18,7 @@ class Hough3d
 {
 
 public:
-    Hough3d(std::string dataset, float bin = -1, float th = -1, int count = -1);
+    Hough3d(std::string dataset, float bin = -1, float th = -1, float count = -1, float count2 = -1);
 
     virtual ~Hough3d()
     {
@@ -102,7 +102,8 @@ private:
     std::shared_ptr<pcl::recognition::HoughSpace3D> m_hough_space;
 
     float m_th;
-    int m_count;
+    float m_count;
+    float m_count2;
 
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;

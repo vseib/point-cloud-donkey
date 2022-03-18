@@ -37,6 +37,7 @@
 #include "hough3d.h"
 #include <boost/timer/timer.hpp>
 #include "../../eval_tool/eval_helpers_detection.h"
+#include "../../eval_tool/logging_to_files.h"
 
 /**
  * Evaluation pipeline for the approach described in
@@ -74,8 +75,8 @@ int main (int argc, char** argv)
 
     float bin = atof(argv[3]);
     float th = atof(argv[4]);
-    int count = atoi(argv[5]);
-    int count2 = atoi(argv[6]);
+    float count = atof(argv[5]);
+    float count2 = atof(argv[6]);
 
 
     // parse input
@@ -101,7 +102,7 @@ int main (int argc, char** argv)
         datasetname = str1;
     }
 
-    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname,bin, th, count));
+    std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname, bin, th, count, count2));
 
     // workaround to set "mode"
     {
@@ -202,8 +203,9 @@ int main (int argc, char** argv)
             std::vector<DetectionObject> gt_objects;
             std::vector<DetectionObject> detected_objects;
 
-            std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
-            std::ofstream summaryFile("output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_"+std::to_string(count)+"_"+"_"+std::to_string(count2)+outputname);
+            std::string outputname = model.substr(0, model.find_last_of('.'));// + ".txt";
+            outputname = "output_tombari_"+std::to_string(bin)+"_"+std::to_string(th)+"_inlier_th_"+std::to_string(count)+"_"+"_bools_"+std::to_string(count2)+outputname;
+            std::ofstream summaryFile;
 
             for(unsigned i = 0; i < filenames.size(); i++)
             {
@@ -214,7 +216,7 @@ int main (int argc, char** argv)
 
                 std::cout << "Processing file " << pointCloud << std::endl;
 
-                bool useHypothesisVerification = true;
+                bool useHypothesisVerification = false;
                 bool useSingleVotingSpace = true;
                 maxima = hough3d->detect(pointCloud, useHypothesisVerification, useSingleVotingSpace);
 
@@ -229,112 +231,49 @@ int main (int argc, char** argv)
                 }
             }
 
-            // maps a class label id to list of objects
-            std::map<std::string, std::vector<DetectionObject>> gt_class_map;
-            std::map<std::string, std::vector<DetectionObject>> det_class_map;
-
-            rearrangeObjects(gt_objects, gt_class_map);
-            rearrangeObjects(detected_objects, det_class_map);
+            // create common object to manage all metrics
+            MetricsCollection mc;
+            rearrangeObjects(gt_objects, mc.gt_class_map);
+            rearrangeObjects(detected_objects, mc.det_class_map);
+            mc.resizeVectors();
 
             // max. allowed distance to ground truth position to count the detection as correct
             // TODO VS depends on dataset/cloud resolution --> make param?
             float dist_threshold = 0.05;
 
-            // collect all metrics
-            // combined detection - primary metrics
-            std::vector<float> ap_per_class(gt_class_map.size(), 0.0);
-            std::vector<float> precision_per_class(gt_class_map.size(), 0.0);
-            std::vector<float> recall_per_class(gt_class_map.size(), 0.0);
-
-            summaryFile << "  class       num gt   tp    fp   precision  recall   AP";
-            summaryFile << std::endl;
+            std::string command = "mkdir " + outputname;
+            std::ignore = std::system(command.c_str());
+            filelog::writeDetectionSummaryHeader(summaryFile, outputname, false);
 
             // these variables sum over the whole dataset
             int num_gt_dataset = 0;
             int cumul_tp_dataset = 0;
             int cumul_fp_dataset = 0;
 
-            for(auto item : gt_class_map)
+            for(auto item : mc.gt_class_map)
             {
                 std::string class_label = item.first;
                 unsigned class_id = class_labels_map[class_label];
+                // TODO VS dist threshold
                 std::vector<DetectionObject> class_objects_gt = item.second;
-                // these variables sum over each class
-                int num_gt = int(class_objects_gt.size());
-                int cumul_tp = 0;
-                int cumul_fp = 0;
 
-                // if there are no detections for this class
-                if(det_class_map.find(class_label) == det_class_map.end())
-                {
-                    ap_per_class[class_id] = 0;
-                    precision_per_class[class_id] = 0;
-                    recall_per_class[class_id] = 0;
-                }
-                else
-                {
-                    std::vector<DetectionObject> class_objects_det = det_class_map.at(class_label);
-
-                    float precision, recall, ap;
-                    std::tie(precision, recall, ap, cumul_tp, cumul_fp, std::ignore, std::ignore) = computeAllMetrics(class_objects_gt,
-                                                                                     class_objects_det,
-                                                                                     dist_threshold);
-                    precision_per_class[class_id] = precision;
-                    recall_per_class[class_id] = recall;
-                    ap_per_class[class_id] = ap;
-                }
-
-                // log class to summary
-                float ap = ap_per_class[class_id];
-                float precision = precision_per_class[class_id];
-                float recall = recall_per_class[class_id];
-
-                summaryFile << std::setw(3) << std::right << class_id << " "
-                            << std::setw(13) << std::left << class_label
-                            << std::setw(3) << std::right << num_gt
-                            << std::setw(5) << cumul_tp
-                            << std::setw(6) << cumul_fp << "   "
-                            << std::setw(11) << std::left << std::round(precision*10000.0f)/10000.0f
-                            << std::setw(9) << std::round(recall*10000.0f)/10000.0f
-                            << std::setw(10) << std::round(ap*10000.0f)/10000.0f;
-                summaryFile << std::endl;
-
-                // accumulate values of complete dataset
-                num_gt_dataset += num_gt;
-                cumul_tp_dataset += cumul_tp;
-                cumul_fp_dataset += cumul_fp;
+                filelog::computeAndWriteNextClassSummary(summaryFile, mc, class_label, class_id,
+                                                class_objects_gt, false,
+                                                dist_threshold, num_gt_dataset,
+                                                cumul_tp_dataset, cumul_fp_dataset);
             }
 
-            // store sums
-            summaryFile << "-------------------------------------------------------------" << std::endl;
-            summaryFile << "Sums:" << std::setw(15) << std::right << num_gt_dataset
-                        << std::setw(5) << std::right << cumul_tp_dataset
-                        << std::setw(6) << std::right << cumul_fp_dataset << std::endl;
 
-            // compute average metrics
-            float mAP = 0;
-            float mPrec = 0;
-            float mRec = 0;
-            for(int idx = 0; idx < ap_per_class.size(); idx++)
-            {
-                mAP += ap_per_class[idx];
-                mPrec += precision_per_class[idx];
-                mRec += recall_per_class[idx];
-            }
-            mAP /= ap_per_class.size();
-            mPrec /= ap_per_class.size();
-            mRec /= ap_per_class.size();
-            float fscore = 2*mPrec*mRec / (mPrec+mRec);
-            summaryFile << std::endl << std::endl;
-            summaryFile << "main metrics:" << std::endl;
-            summaryFile << "       mAP:            " << std::setw(7) << std::round(mAP*10000.0f)/10000.0f    << " (" << std::round(mAP*10000.0f)/100.0f   << " %)" << std::endl;
-            summaryFile << "       mean precision: " << std::setw(7) << std::round(mPrec*10000.0f)/10000.0f  << " (" << std::round(mPrec*10000.0f)/100.0f << " %)" << std::endl;
-            summaryFile << "       mean recall:    " << std::setw(7) << std::round(mRec*10000.0f)/10000.0f   << " (" << std::round(mRec*10000.0f)/100.0f  << " %)" << std::endl;
-            summaryFile << "       f-score:        " << std::setw(7) << std::round(fscore*10000.0f)/10000.0f << " (" << std::round(fscore*10000.0f)/100.0f<< " %)" << std::endl << std::endl;
-
-            // complete and close summary file
-            summaryFile << "total processing time: " << timer.format(4, "%w") << " seconds \n";
-            summaryFile.close();
+            float overall_ap;
+            std::tie(std::ignore, std::ignore, overall_ap) = computePrecisionRecallForPlotting(mc.det_class_map, mc.gt_class_map,
+                                                                                          mc.tps_per_class, mc.fps_per_class);
+            std::map<std::string, double> times; // dummy empty map
+            // store sums and overall metrics
+            std::string total_time = timer.format(4, "%w");
+            filelog::computeAndWriteFinalMetrics(summaryFile, mc, num_gt_dataset,
+                                                 cumul_tp_dataset, cumul_fp_dataset,
+                                                 overall_ap, times, total_time,
+                                                 false);
         }
         else
         {

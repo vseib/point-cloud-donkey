@@ -37,101 +37,15 @@ pcl::CorrespondencesPtr findNnCorrespondences(
         if(distances[0][0] < matching_threshold)
         {
             // for all following PCL algorithms to work correctly, we need to swap query and match
-            // this is because all PCL algrithms handle the object as source (query) and the scene as target (match)
-            // (e.g. for registration, ransac, ...), but so far we have the scene as query and the object as match
+            // this is because all PCL algorithms handle the object as source (query) and the scene as target (match)
+            // (e.g. for registration, ransac, ...), but until here we have the scene as query and the object as match
             // !!!
-            // now: query/source index is codebook ("object"), match/target index is scene
+            // now swapping: query/source index is codebook ("object"), match/target index is scene
             // !!!
             pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
             #pragma omp critical
             {
                 model_scene_corrs->push_back(corr);
-            }
-        }
-    }
-
-    return model_scene_corrs;
-}
-
-
-// TODO VS temp code - knn rule
-pcl::CorrespondencesPtr findNnCorrespondences(
-        const pcl::PointCloud<ISMFeature>::Ptr scene_features,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        const flann::Index<flann::L2<float>> &index)
-{
-    pcl::CorrespondencesPtr model_scene_corrs(new pcl::Correspondences());
-    float m_distance_ratio_threshold = 0.9;
-
-    // loop over all features extracted from the scene
-    #pragma omp parallel for
-    for(int fe = 0; fe < scene_features->size(); fe++)
-    {
-        // insert the query point
-        ISMFeature feature = scene_features->at(fe);
-        flann::Matrix<float> query(new float[feature.descriptor.size()], 1, feature.descriptor.size());
-        for(int i = 0; i < feature.descriptor.size(); i++)
-        {
-            query[0][i] = feature.descriptor.at(i);
-        }
-
-        // prepare results
-        std::vector<std::vector<int>> indices;
-        std::vector<std::vector<float>> distances;
-        index.knnSearch(query, indices, distances, 3, flann::SearchParams(128));
-
-        delete[] query.ptr();
-
-        std::array<int, 3> class_ids = {object_features->at(indices[0][0]).classId,
-                                        object_features->at(indices[0][1]).classId,
-                                        object_features->at(indices[0][2]).classId};
-
-        if(class_ids[0] == class_ids[1] && class_ids[0] == class_ids[2])
-        {
-            // if all are same, accept match
-            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
-            #pragma omp critical
-            {
-                model_scene_corrs->push_back(corr);
-            }
-        }
-        else if(class_ids[0] == class_ids[1] && class_ids[0] != class_ids[2])
-        {
-            // if k1 and k2 are same class
-            if(distances[0][0] / distances[0][2] < m_distance_ratio_threshold)
-            {
-                // accept if valid distance ratio between k1 and k3
-                pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
-                #pragma omp critical
-                {
-                    model_scene_corrs->push_back(corr);
-                }
-            }
-        }
-//        else if(class_ids[0] != class_ids[1] && class_ids[1] == class_ids[2])
-//        {
-//            // if k2 and k3 are same, but different from k1
-//            if(distances[0][0] / distances[0][1] >= m_distance_ratio_threshold)
-//            {
-//                // accept __k2__ if distance ratio k1-k2 INvalid? (TODO VS: AND k2-k3 valid?)
-//                pcl::Correspondence corr(indices[0][1], fe, distances[0][1]);
-//                #pragma omp critical
-//                {
-//                    model_scene_corrs->push_back(corr);
-//                }
-//            }
-//        }
-        else if(class_ids[0] != class_ids[1] && class_ids[1] != class_ids[2])
-        {
-            // if all are different or k2 different from k1 and k3
-            if(distances[0][0] / distances[0][1] < m_distance_ratio_threshold)
-            {
-                // accept if valid distance ratio between k1 and k2
-                pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
-                #pragma omp critical
-                {
-                    model_scene_corrs->push_back(corr);
-                }
             }
         }
     }
@@ -358,6 +272,7 @@ void generateHypothesesWithAbsoluteOrientation(
     corr_rejector.setMaximumIterations(10000);
     corr_rejector.setInlierThreshold(inlier_threshold);
     corr_rejector.setRefineModel(refine_model);
+    corr_rejector.setSaveInliers(true);
     if(!separate_voting_spaces) // just use common clouds
     {
         corr_rejector.setInputSource(object_keypoints);
@@ -368,7 +283,7 @@ void generateHypothesesWithAbsoluteOrientation(
     for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
     {
         // skip maxima with view votes, mostly FP
-        if(vote_indices[j].size() < 5)
+        if(vote_indices[j].size() < 3)
         {
             continue;
         }
