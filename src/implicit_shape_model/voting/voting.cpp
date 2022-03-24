@@ -394,8 +394,8 @@ std::tuple<std::vector<Eigen::Vector3f>, std::vector<std::vector<Vote>>> Voting:
         }
 
         // correspondence rejection with ransac
-        corr_rejector.setInputSource(scene_keypoints);
-        corr_rejector.setInputTarget(object_keypoints);
+        corr_rejector.setInputSource(object_keypoints);
+        corr_rejector.setInputTarget(scene_keypoints);
         corr_rejector.setSaveInliers(true);
         corr_rejector.getRemainingCorrespondences(initial_corrs, filtered_corrs);
         std::vector<int> inlier_indices;
