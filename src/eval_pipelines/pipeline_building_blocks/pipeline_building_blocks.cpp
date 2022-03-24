@@ -1,5 +1,4 @@
 #include "pipeline_building_blocks.h"
-#include "../../implicit_shape_model/utils/utils.h"
 #include "../../implicit_shape_model/utils/distance.h"
 
 #include <pcl/recognition/cg/hough_3d.h>
@@ -42,7 +41,8 @@ pcl::CorrespondencesPtr findNnCorrespondences(
             // !!!
             // now swapping: query/source index is codebook ("object"), match/target index is scene
             // !!!
-            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
+//            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
+            pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
             #pragma omp critical
             {
                 model_scene_corrs->push_back(corr);
@@ -69,7 +69,7 @@ void remapIndicesToLocalCloud(
     {
         // create new list of keypoints and reassign the object (i.e. query) index
         pcl::Correspondence &corr = object_scene_corrs->at(i);
-        int index = corr.index_query;
+        int index = corr.index_match;
         const ISMFeature &feat = all_features->at(index);
         object_features->push_back(feat);
         object_center_vectors.push_back(all_center_vectors.at(index));
@@ -81,7 +81,7 @@ void remapIndicesToLocalCloud(
         object_lrf->push_back(lrf);
         // remap index to new position in the created point clouds
         // no longer referring to m_features, but now to object_features
-        corr.index_query = i;
+        corr.index_match = i;
     }
 }
 
@@ -94,11 +94,11 @@ std::vector<Eigen::Vector3f> prepareCenterVotes(
     std::vector<Eigen::Vector3f> votelist;
     for(const pcl::Correspondence &corr : *object_scene_corrs)
     {
-        const ISMFeature &scene_feat = scene_features->at(corr.index_match);
+        const ISMFeature &scene_feat = scene_features->at(corr.index_query);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
 
-        Eigen::Vector3f vote = object_center_vectors.at(corr.index_query);
+        Eigen::Vector3f vote = object_center_vectors.at(corr.index_match);
         Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
         votelist.push_back(center);
     }
@@ -256,6 +256,7 @@ void generateClassificationHypotheses(
 }
 
 
+
 void generateHypothesesWithAbsoluteOrientation(
         const pcl::CorrespondencesPtr object_scene_corrs,
         const std::vector<std::vector<int>> &vote_indices,
@@ -275,8 +276,8 @@ void generateHypothesesWithAbsoluteOrientation(
     corr_rejector.setSaveInliers(true);
     if(!separate_voting_spaces) // just use common clouds
     {
-        corr_rejector.setInputSource(object_keypoints);
-        corr_rejector.setInputTarget(scene_keypoints);
+        corr_rejector.setInputSource(scene_keypoints);
+        corr_rejector.setInputTarget(object_keypoints);
     }
 
     // correspondences were grouped by hough voting
@@ -302,10 +303,10 @@ void generateHypothesesWithAbsoluteOrientation(
             {
                 pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
                 temp_corrs.push_back(pcl::Correspondence(i, i, corr.distance)); // now correspondences refer to local cloud copy of maximum
-                max_scene_keypoints->push_back(scene_keypoints->at(corr.index_match));
-                max_object_keypoints->push_back(object_keypoints->at(corr.index_query));
-                mapping_scene.push_back(corr.index_match);
-                mapping_object.push_back(corr.index_query);
+                max_scene_keypoints->push_back(scene_keypoints->at(corr.index_query));
+                max_object_keypoints->push_back(object_keypoints->at(corr.index_match));
+                mapping_scene.push_back(corr.index_query);
+                mapping_object.push_back(corr.index_match);
             }
 
             corr_rejector.setInputSource(max_object_keypoints);
@@ -336,8 +337,8 @@ void generateHypothesesWithAbsoluteOrientation(
                     for(int i = 0; i < filtered_corrs.size(); i++)
                     {
                         pcl::Correspondence &corr = filtered_corrs.at(i);
-                        corr.index_query = mapping_object[corr.index_query];
-                        corr.index_match = mapping_scene[corr.index_match];
+                        corr.index_query = mapping_scene[corr.index_query];
+                        corr.index_match = mapping_object[corr.index_match];
                     }
                 }
                 model_instances.push_back(filtered_corrs);
@@ -351,14 +352,72 @@ void generateHypothesesWithAbsoluteOrientation(
                 for(int i = 0; i < temp_corrs.size(); i++)
                 {
                     pcl::Correspondence &corr = temp_corrs.at(i);
-                    corr.index_query = mapping_object[corr.index_query];
-                    corr.index_match = mapping_scene[corr.index_match];
+                    corr.index_query = mapping_scene[corr.index_query];
+                    corr.index_match = mapping_object[corr.index_match];
                 }
             }
             model_instances.push_back(temp_corrs);
         }
     }
 }
+
+
+//void generateHypothesesWithAbsoluteOrientation(
+//        const pcl::CorrespondencesPtr object_scene_corrs,
+//        const std::vector<std::vector<int>> &vote_indices,
+//        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+//        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+//        const float inlier_threshold,
+//        const bool refine_model,
+//        const bool separate_voting_spaces,
+//        const bool use_hv,
+//        std::vector<Eigen::Matrix4f> &transformations,
+//        std::vector<pcl::Correspondences> &model_instances)
+//{
+//    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
+//    corr_rejector.setMaximumIterations(10000);
+//    corr_rejector.setInlierThreshold(inlier_threshold);
+//    corr_rejector.setRefineModel(refine_model);
+//    corr_rejector.setSaveInliers(true);
+//    corr_rejector.setInputSource(scene_keypoints);
+//    corr_rejector.setInputTarget(object_keypoints);
+
+//    // correspondences were grouped by hough voting
+//    for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
+//    {
+//        // skip maxima with view votes, mostly FP
+//        if(vote_indices[j].size() < 3)
+//        {
+//            continue;
+//        }
+
+//        pcl::Correspondences temp_corrs, filtered_corrs;
+
+//        for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
+//        {
+//            pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
+//            temp_corrs.push_back(corr);
+//        }
+
+//        if(use_hv)
+//        {
+//            // correspondence rejection with ransac
+//            corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
+//            Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
+//            // save transformations for recognition
+//            if(!best_transform.isIdentity(0.0001))
+//            {
+//                // keep transformation and correspondences if RANSAC was run successfully
+//                transformations.push_back(best_transform);
+//                model_instances.push_back(filtered_corrs);
+//            }
+//        }
+//        else
+//        {
+//            model_instances.push_back(temp_corrs);
+//        }
+//    }
+//}
 
 
 void findClassAndPositionFromCluster(
@@ -379,11 +438,11 @@ void findClassAndPositionFromCluster(
     // compute
     for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
     {
-        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_query;
+        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_match;
         const ISMFeature &cur_feat = object_features->at(object_idx);
         unsigned class_id = cur_feat.classId;
 
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_match;
+        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
         const ISMFeature &scene_feat = scene_features->at(scene_idx);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
@@ -433,9 +492,9 @@ void findClassAndPositionFromTransformedObjectKeypoints(
     for(unsigned corr_idx; corr_idx < filtered_corrs.size(); corr_idx++)
     {
         pcl::Correspondence corr = filtered_corrs.at(corr_idx);
-        instance_object_keypoints->push_back(object_keypoints->at(corr.index_query));
-        instance_object_features->push_back(object_features->at(corr.index_query));
-        instance_center_vectors.push_back(object_center_vectors.at(corr.index_query));
+        instance_object_keypoints->push_back(object_keypoints->at(corr.index_match));
+        instance_object_features->push_back(object_features->at(corr.index_match));
+        instance_center_vectors.push_back(object_center_vectors.at(corr.index_match));
     }
 
     // determine position based on keypoints
@@ -984,3 +1043,41 @@ void getMetricsAndInlierPoints(
         mr_metrics.emplace_back(std::move(mr1));
     }
 }
+
+
+std::map<unsigned, float> computeAverageClassRadii(
+        const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes)
+{
+    std::map<unsigned, float> dims;
+
+    for(auto it : boundingBoxes)
+    {
+        unsigned classId = it.first;
+        float median_box_dim = 0;
+
+        // check each bounding box of this class id
+        for(auto box : it.second)
+        {
+            float max = box.size.maxCoeff();
+            float min = box.size.minCoeff();
+            // find the other value
+            float med = box.size[0];
+            for(int i = 1; i < 3; i++)
+            {
+                if(med == max || med == min)
+                {
+                    med = box.size[i];
+                }
+            }
+            // use "radius" of bb dimensions, i.e. half of the sizes
+            median_box_dim += med/2;
+        }
+
+        // compute average
+        median_box_dim /= it.second.size();
+        dims.insert({classId, median_box_dim});
+    }
+
+    return dims;
+}
+

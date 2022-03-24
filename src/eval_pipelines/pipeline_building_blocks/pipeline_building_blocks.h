@@ -4,6 +4,7 @@
 #include <pcl/features/feature.h>
 #include <pcl/recognition/cg/hough_3d.h>
 #include "../../implicit_shape_model/utils/ism_feature.h"
+#include "../../implicit_shape_model/utils/utils.h"
 
 using namespace ism3d;
 
@@ -185,3 +186,6 @@ void getMetricsAndInlierPoints(
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &inlier_points_of_instances,
         std::vector<float> &fs_metrics,
         std::vector<float> &mr_metrics);
+
+std::map<unsigned, float> computeAverageClassRadii(
+        const std::map<unsigned, std::vector<Utils::BoundingBox>> &boundingBoxes);

@@ -216,7 +216,7 @@ int main (int argc, char** argv)
 
                 std::cout << "Processing file " << pointCloud << std::endl;
 
-                bool useHypothesisVerification = false;
+                bool useHypothesisVerification = true;
                 bool useSingleVotingSpace = true;
                 maxima = hough3d->detect(pointCloud, useHypothesisVerification, useSingleVotingSpace);
 

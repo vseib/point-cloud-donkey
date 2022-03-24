@@ -140,6 +140,8 @@ void GlobalHV::train(const std::vector<std::string> &filenames,
        all_vectors.insert({tr_class, {}});
    }
 
+   std::map<unsigned, std::vector<Utils::BoundingBox>> all_bounding_boxes;
+
    int num_features = 0;
    // process each input file
    for(int i = 0; i < filenames.size(); i++)
@@ -155,6 +157,9 @@ void GlobalHV::train(const std::vector<std::string> &filenames,
        {
            std::cerr << "ERROR: loading file " << file << std::endl;
        }
+
+       Utils::BoundingBox bounding_box = Utils::computeMVBB<PointT>(cloud);
+       all_bounding_boxes[tr_class].push_back(bounding_box);
 
        // all these pointers are initialized within the called method
        pcl::PointCloud<PointT>::Ptr keypoints;
@@ -186,7 +191,7 @@ void GlobalHV::train(const std::vector<std::string> &filenames,
    std::cout << "Extracted " << num_features << " features." << std::endl;
 
    std::string save_file(output_file);
-   if(saveModelToFile(save_file, all_features, all_vectors))
+   if(saveModelToFile(save_file, all_features, all_vectors, all_bounding_boxes))
    {
        std::cout << "GlobalHV training finished!" << std::endl;
    }
@@ -629,7 +634,8 @@ void GlobalHV::findObjects(
 
 bool GlobalHV::saveModelToFile(std::string &filename,
                               std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
-                              std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const
+                              std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors,
+                              std::map<unsigned, std::vector<Utils::BoundingBox>> &all_bounding_boxes) const
 {
     // create boost data object
     std::ofstream ofs(filename);
@@ -730,6 +736,18 @@ bool GlobalHV::saveModelToFile(std::string &filename,
             pos = elem.second.at(vec).z();
             oa << pos;
         }
+    }
+
+    std::map<unsigned, float> dims = computeAverageClassRadii(all_bounding_boxes);
+    // fill in bounding box information
+    unsigned bb_dims_size = dims.size();
+    oa << bb_dims_size;
+    for(auto it : dims)
+    {
+        unsigned classId = it.first;
+        float radius = it.second;
+        oa << classId;
+        oa << radius;
     }
 
     ofs.close();
@@ -835,6 +853,18 @@ bool GlobalHV::loadModelFromFile(std::string& filename)
                 ia >> z;
                 m_center_vectors.push_back(Eigen::Vector3f(x,y,z));
             }
+        }
+
+        m_class_radii.clear();
+        unsigned bb_dims_size;
+        ia >> bb_dims_size;
+        for(int i = 0; i < bb_dims_size; i++)
+        {
+            unsigned classId;
+            float radius;
+            ia >> classId;
+            ia >> radius;
+            m_class_radii.insert({classId, radius});
         }
 
         ifs.close();

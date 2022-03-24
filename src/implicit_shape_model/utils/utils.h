@@ -93,7 +93,10 @@ namespace ism3d
 
             return false;
         }
-        static float computeCloudRadius(const pcl::PointCloud<PointNormalT>::Ptr &cloud);
+
+        template<typename T>
+        static float computeCloudRadius(const typename pcl::PointCloud<T>::Ptr &cloud);
+
         static float computeHingeLoss(const std::vector<float> &class_distances, const unsigned class_id);
 
         // quaternions

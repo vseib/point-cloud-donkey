@@ -88,7 +88,8 @@ private:
 
     bool saveModelToFile(std::string &filename,
                          std::map<unsigned, pcl::PointCloud<ISMFeature>::Ptr> &all_features,
-                         std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors) const;
+                         std::map<unsigned, std::vector<Eigen::Vector3f>> &all_vectors,
+                         std::map<unsigned, std::vector<Utils::BoundingBox>> &all_bounding_boxes) const;
 
     bool loadModelFromFile(std::string& filename);
 
@@ -109,7 +110,7 @@ private:
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
     std::vector<Eigen::Vector3f> m_center_vectors;
-
+    std::map<unsigned, float> m_class_radii;
     flann::Index<flann::L2<float>> m_flann_index;
 };
 

@@ -268,7 +268,7 @@ void ImplicitShapeModel::train()
             pcl::PointCloud<PointNormalT>::Ptr point_cloud = loadPointCloud(cloud_filenames[j]);
             point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
-            float cloud_radius = Utils::computeCloudRadius(point_cloud);
+            float cloud_radius = Utils::computeCloudRadius<PointNormalT>(point_cloud);
 
 //            // temp for debug
 //            pcl::PointCloud<PointNormalT>::Ptr new_cloud(new pcl::PointCloud<PointNormalT>);

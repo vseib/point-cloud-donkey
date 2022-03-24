@@ -292,7 +292,14 @@ namespace ism3d
         return box;
     }
 
-    float Utils::computeCloudRadius(const pcl::PointCloud<PointNormalT>::Ptr &cloud)
+    template
+    float Utils::computeCloudRadius<PointT>(const pcl::PointCloud<PointT>::Ptr &cloud);
+
+    template
+    float Utils::computeCloudRadius<PointNormalT>(const pcl::PointCloud<PointNormalT>::Ptr &cloud);
+
+    template<typename T>
+    float Utils::computeCloudRadius(const typename pcl::PointCloud<T>::Ptr &cloud)
     {
         // compute the object centroid
         Eigen::Vector4f centroid4f;
@@ -301,7 +308,7 @@ namespace ism3d
 
         // compute radius (maximum distance of a point to centroid)
         float radius = 0.0f;
-        for(const PointNormalT &point : cloud->points)
+        for(const T &point : cloud->points)
         {
             Eigen::Vector3f eigpoint = point.getArray3fMap();
             float temp_radius = (eigpoint-centroid).norm();
