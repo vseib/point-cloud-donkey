@@ -58,6 +58,11 @@ public:
         return m_instance_to_class_map;
     }
 
+    std::map<unsigned, float> getDetectionThresholds()
+    {
+        return m_class_radii;
+    }
+
 private:
 
     flann::Matrix<float> createFlannDataset() const;
