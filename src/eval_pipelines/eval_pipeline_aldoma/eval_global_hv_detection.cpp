@@ -219,8 +219,8 @@ int main (int argc, char** argv)
 
                 std::cout << "Processing file " << pointCloud << std::endl;
 
-                bool use_global_hv = true; // true --> aldoma global hv (default), false --> no global hv
-                bool use_hough = (count % 2 == 0); //false; // false --> use chen (default), true --> use tombari to generate hypotheses
+                bool use_global_hv = false; // true --> aldoma global hv (default), false --> no global hv
+                bool use_hough = false; // false --> use chen (default), true --> use tombari to generate hypotheses
                 maxima = global_hv->detect(pointCloud, use_hough, use_global_hv);
 
                 // collect all gt objects

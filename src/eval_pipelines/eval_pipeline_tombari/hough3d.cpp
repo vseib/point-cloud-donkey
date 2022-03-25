@@ -22,7 +22,7 @@
 
 
 Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float count2) :
-    m_features(new pcl::PointCloud<ISMFeature>()),
+    m_features(new pcl::PointCloud<ISMFeature>()), m_keypoints(new pcl::PointCloud<PointT>()),
     m_flann_index(flann::KDTreeIndexParams(4))
 {
     std::cout << "-------- loading parameters for " << dataset << " dataset --------" << std::endl;
@@ -82,8 +82,8 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         {
             fp::normal_method = 0;
             fp::feature_type = "CSHOT";
-            m_th = -th;//-0.50;
-            m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.02, 0.02, 0.02);
+            m_th = -th;//-0.80;
+            m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.05, 0.05, 0.05);
         }
     }
     else
@@ -224,8 +224,7 @@ std::vector<std::pair<unsigned, float>> Hough3d::classify(const std::string &fil
 
 
 std::vector<VotingMaximum> Hough3d::detect(const std::string &filename,
-                                           bool useHypothesisVerification,
-                                           bool useSingleVotingSpace)
+                                           bool useHypothesisVerification)
 {
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if(pcl::io::loadPCDFile<PointT>(filename, *cloud) == -1)
@@ -247,14 +246,7 @@ std::vector<VotingMaximum> Hough3d::detect(const std::string &filename,
     std::vector<std::pair<unsigned, float>> results;
     std::vector<Eigen::Vector3f> positions;
     bool use_hv = useHypothesisVerification;
-    if(useSingleVotingSpace)
-    {
-        findObjectsWithSingleVotingSpace(features, keypoints, use_hv, results, positions);
-    }
-    else
-    {
-        findObjectsWithSeparateVotingSpaces(features, keypoints, use_hv, results, positions);
-    }
+    findObjects(features, keypoints, use_hv, results, positions);
 
     // here higher values are better
     std::sort(results.begin(), results.end(), [](const std::pair<unsigned, float> &a, const std::pair<unsigned, float> &b)
@@ -422,153 +414,21 @@ void Hough3d::classifyObjectsWithSingleVotingSpace(
 }
 
 
-void Hough3d::findObjectsWithSeparateVotingSpaces(
+void Hough3d::findObjects(
         const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
         const pcl::PointCloud<PointT>::Ptr scene_keypoints,
         const bool use_hv,
         std::vector<std::pair<unsigned, float>> &results,
         std::vector<Eigen::Vector3f> &positions)
 {
-    // get model-scene correspondences
-    // query/source index is scene, match/target index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
-    pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
-
-    std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
-
-    // object keypoints are simply the matched keypoints from the codebook
-    // however in order not to pass the whole codebook, we need to adjust the index mapping
-    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
-    std::vector<Eigen::Vector3f> object_center_vectors;
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
-            object_keypoints, object_features, object_center_vectors, object_lrf);
-
-    // prepare voting
-    std::vector<Eigen::Vector3f> all_votes = std::move(prepareCenterVotes(object_scene_corrs, scene_features, object_center_vectors));
-
-    // separate votelist to individual classes
-    std::map<unsigned, std::vector<Eigen::Vector3f>> class_votes;
-    for(unsigned i = 0; i < all_votes.size(); i++)
-    {
-        Eigen::Vector3f vote = all_votes.at(i);
-        unsigned object_idx = object_scene_corrs->at(i).index_match;
-        unsigned class_id = object_features->at(object_idx).classId;
-        if(class_votes.find(class_id) != class_votes.end())
-        {
-            class_votes.at(class_id).push_back(vote);
-        }
-        else
-        {
-            class_votes.insert({class_id, {vote}});
-        }
-    }
-
-    // cast votes of each class separately
-    std::map<unsigned, std::vector<double>> class_maxima;
-    std::map<unsigned, std::vector<std::vector<int>>> class_vote_indices;
-    int num_max = 0;
-    for(auto [class_id, votelist] : class_votes)
-    {
-        // cast votes and retrieve maxima per class
-        std::vector<double> maxima;
-        std::vector<std::vector<int>> vote_indices;
-        float relative_threshold = m_th; // minimal weight of a maximum in percent of highest maximum to be considered a hypothesis
-        bool use_distance_weight = false;
-        castVotesAndFindMaxima(object_scene_corrs, votelist, relative_threshold, use_distance_weight,
-                               maxima, vote_indices, m_hough_space);
-        class_maxima.insert({class_id, maxima});
-        class_vote_indices.insert({class_id, vote_indices});
-        num_max += maxima.size();
-    }
-
-    std::cout << "Found " << num_max;
-    if(num_max != 1)
-        std::cout << " maxima" << std::endl;
-    else
-        std::cout << " maximum" << std::endl;
-
-    // generate 6DOF hypotheses with absolute orientation for each class
-    std::map<unsigned, std::vector<Eigen::Matrix4f>> class_transformations;
-    std::map<unsigned, std::vector<pcl::Correspondences>> class_model_instances;
-    int num_hyp = 0;
-    for(auto [class_id, vote_indices] : class_vote_indices)
-    {
-        std::vector<Eigen::Matrix4f> transformations;
-        std::vector<pcl::Correspondences> model_instances;
-        bool refine_model = int(m_count2)%2 == 0;
-        float inlier_threshold = m_count;
-        bool separate_voting_spaces = false;
-        generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
-                                                  inlier_threshold, refine_model, separate_voting_spaces, use_hv,
-                                                  transformations, model_instances);
-        class_transformations.insert({class_id, transformations});
-        class_model_instances.insert({class_id, model_instances});
-        num_hyp += model_instances.size();
-    }
-
-    std::cout << "Remaining hypotheses after RANSAC: " << num_hyp << std::endl;
-
-    bool useClustersForPosition = true;
-
-    // process remaining hypotheses
-    results.clear();
-    positions.clear();
-    for(auto [class_id, model_instances] : class_model_instances)
-    {
-        std::vector<Eigen::Matrix4f> transformations = class_transformations[class_id];
-        for(unsigned idx = 0; idx < model_instances.size(); idx++)
-        {
-            Eigen::Vector3f res_position;
-            const pcl::Correspondences &filtered_corrs = model_instances[idx];
-            const Eigen::Matrix4f &transformation = transformations[idx];
-
-            if(useClustersForPosition)
-            {
-                findPositionFromCluster(filtered_corrs, scene_features, object_center_vectors, res_position);
-            }
-            else
-            {
-                findPositionFromTransformedObjectKeypoints(filtered_corrs, transformation, object_features, object_keypoints,
-                                                           object_center_vectors, res_position);
-            }
-
-            results.push_back({class_id, filtered_corrs.size()});
-            positions.push_back(res_position);
-        }
-    }
-}
-
-
-void Hough3d::findObjectsWithSingleVotingSpace(
-        const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
-        const bool use_hv,
-        std::vector<std::pair<unsigned, float>> &results,
-        std::vector<Eigen::Vector3f> &positions)
-{
     // get model-scene correspondences
-    // query/source index is scene, match/target index is codebook ("object")
-    // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
-    float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
-    //pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, m_features, m_flann_index));
-
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
 
-    // object keypoints are simply the matched keypoints from the codebook
-    // however in order not to pass the whole codebook, we need to adjust the index mapping
-    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
-    std::vector<Eigen::Vector3f> object_center_vectors;
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
-            object_keypoints, object_features, object_center_vectors, object_lrf);
-
     // prepare voting
-    std::vector<Eigen::Vector3f> votelist = std::move(prepareCenterVotes(object_scene_corrs, scene_features, object_center_vectors));
+    std::vector<Eigen::Vector3f> votelist = std::move(prepareCenterVotes(object_scene_corrs, scene_features, m_center_vectors));
 
     // cast votes and retrieve maxima
     std::vector<double> maxima;
@@ -589,10 +449,9 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     std::vector<pcl::Correspondences> model_instances;
     bool refine_model = int(m_count2)%2 == 0;
     float inlier_threshold = m_count;
-    bool single_voting_space = true;
-    generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
-                                              inlier_threshold, refine_model, single_voting_space, use_hv,
-                                              transformations, model_instances);
+    generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints,
+                                              m_keypoints, inlier_threshold, refine_model,
+                                              use_hv, transformations, model_instances);
 
     std::cout << "Remaining hypotheses after RANSAC: " << model_instances.size() << std::endl;
 
@@ -611,14 +470,15 @@ void Hough3d::findObjectsWithSingleVotingSpace(
 
         if(useClustersForPosition)
         {
-            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features, object_center_vectors,
+            findClassAndPositionFromCluster(filtered_corrs, m_features, scene_features, m_center_vectors,
                                             m_number_of_classes, res_class, res_num_votes, res_position);
         }
         else
         {
             // in general worse results // TODO VS eval at the end again, when best params are found
-            findClassAndPositionFromTransformedObjectKeypoints(filtered_corrs, transformation, object_features,
-                                            object_keypoints, object_center_vectors, m_number_of_classes, res_class, res_num_votes, res_position);
+            findClassAndPositionFromTransformedObjectKeypoints(filtered_corrs, transformation, m_features,
+                                            m_keypoints, m_center_vectors, m_number_of_classes, res_class,
+                                            res_num_votes, res_position);
         }
 
         results.push_back({res_class, res_num_votes});
@@ -803,6 +663,7 @@ bool Hough3d::loadModelFromFile(std::string& filename)
 
         // read features
         m_features->clear();
+        m_keypoints->clear();
         for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
         {
             ISMFeature feature;
@@ -830,6 +691,11 @@ bool Hough3d::loadModelFromFile(std::string& filename)
             }
             feature.classId = m_class_lookup.at(feat_i);
             m_features->push_back(feature);
+            PointT point;
+            point.x = feature.x;
+            point.y = feature.y;
+            point.z = feature.z;
+            m_keypoints->push_back(point);
         }
 
         // read all vectors

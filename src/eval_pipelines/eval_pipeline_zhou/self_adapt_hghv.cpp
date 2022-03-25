@@ -379,10 +379,9 @@ void SelfAdaptHGHV::findObjects(
     std::vector<Eigen::Matrix4f> transformations;
     float inlier_threshold = found_bin_size;
     bool refine_model = false;
-    bool separate_voting_spaces = true;
     // second RANSAC: filter correspondence groups by position
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
-                                              inlier_threshold, refine_model, separate_voting_spaces, use_hv,
+                                              inlier_threshold, refine_model, use_hv,
                                               transformations, clustered_corrs);
     // check for background knowledge:
     // https://www.ais.uni-bonn.de/papers/RAM_2015_Holz_PCL_Registration_Tutorial.pdf
@@ -402,8 +401,10 @@ void SelfAdaptHGHV::findObjects(
     // ------ this is where the hypothesis verification starts -------
 
     // Generate clouds for each instance found
+    std::vector<pcl::PointCloud<PointT>::ConstPtr> instances_scene;
     std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
-    generateCloudsFromTransformations(clustered_corrs, transformations, object_features, instances);
+    generateCloudsFromTransformations(clustered_corrs, transformations, object_keypoints,
+                                      scene_keypoints, instances, instances_scene);
 
 
     // TODO VS: ab hier parametersuche fortsetzen!!!
@@ -417,7 +418,7 @@ void SelfAdaptHGHV::findObjects(
     std::vector<Eigen::Matrix4f> final_transformations;
     // TODO VS try passing the whole scene cloud instead of only scene keypoints
     alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                       scene_keypoints, instances, registered_instances, final_transformations);
+                       instances_scene, instances, registered_instances, final_transformations);
 
     // find nearest neighbors for each point of a registered instance in the scene
     std::vector<pcl::PointCloud<PointT>::ConstPtr> inlier_points_of_instances;
@@ -463,7 +464,7 @@ void SelfAdaptHGHV::findObjects(
     std::vector<Eigen::Matrix4f> final_transformations2; // unused
     // TODO VS try passing the whole scene cloud instead of only scene keypoints
     alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                       scene_keypoints, first_pass_instances, registered_instances2, final_transformations2);
+                       instances_scene, first_pass_instances, registered_instances2, final_transformations2);
 
     // find nearest neighbors for each point of a registered instance in the scene
     std::vector<pcl::PointCloud<PointT>::ConstPtr> inlier_points_of_instances2;

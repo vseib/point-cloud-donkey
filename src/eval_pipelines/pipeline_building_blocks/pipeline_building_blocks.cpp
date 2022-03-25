@@ -35,7 +35,10 @@ pcl::CorrespondencesPtr findNnCorrespondences(
 
         if(distances[0][0] < matching_threshold)
         {
-            pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
+            // NOTE: When computing, the scene index is the query and the codebook ("object")
+            // index is the match. However, to avoid confusion later, the object index is stored
+            // as query and the scene index as match
+            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
             #pragma omp critical
             {
                 model_scene_corrs->push_back(corr);
@@ -60,9 +63,9 @@ void remapIndicesToLocalCloud(
     // however in order not to pass the whole codebook, we need to adjust the index mapping
     for(unsigned i = 0; i < object_scene_corrs->size(); i++)
     {
-        // create new list of keypoints and reassign the object (i.e. query) index
+        // create new list of keypoints and reassign the object index
         pcl::Correspondence &corr = object_scene_corrs->at(i);
-        int index = corr.index_match;
+        int index = corr.index_query;
         const ISMFeature &feat = all_features->at(index);
         object_features->push_back(feat);
         object_center_vectors.push_back(all_center_vectors.at(index));
@@ -74,7 +77,7 @@ void remapIndicesToLocalCloud(
         object_lrf->push_back(lrf);
         // remap index to new position in the created point clouds
         // no longer referring to m_features, but now to object_features
-        corr.index_match = i;
+        corr.index_query = i;
     }
 }
 
@@ -87,11 +90,11 @@ std::vector<Eigen::Vector3f> prepareCenterVotes(
     std::vector<Eigen::Vector3f> votelist;
     for(const pcl::Correspondence &corr : *object_scene_corrs)
     {
-        const ISMFeature &scene_feat = scene_features->at(corr.index_query);
+        const ISMFeature &scene_feat = scene_features->at(corr.index_match);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
 
-        Eigen::Vector3f vote = object_center_vectors.at(corr.index_match);
+        Eigen::Vector3f vote = object_center_vectors.at(corr.index_query);
         Eigen::Vector3f center = keyPos + Utils::rotateBack(vote, ref);
         votelist.push_back(center);
     }
@@ -257,7 +260,6 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
-        const bool single_voting_space,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances)
@@ -267,11 +269,10 @@ void generateHypothesesWithAbsoluteOrientation(
     corr_rejector.setInlierThreshold(inlier_threshold);
     corr_rejector.setRefineModel(refine_model);
     corr_rejector.setSaveInliers(true);
-    if(single_voting_space) // just use common clouds
-    {
-        corr_rejector.setInputSource(scene_keypoints);
-        corr_rejector.setInputTarget(object_keypoints);
-    }
+    // NOTE: setting all keypoints leads to worse results,
+    // therefore only required keypoints are set for each maximum below
+//    corr_rejector.setInputSource(object_keypoints);
+//    corr_rejector.setInputTarget(scene_keypoints);
 
     // correspondences were grouped by hough voting
     for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
@@ -282,74 +283,49 @@ void generateHypothesesWithAbsoluteOrientation(
             continue;
         }
 
-        pcl::Correspondences temp_corrs, filtered_corrs;
-        std::vector<int> mapping_object;
-        std::vector<int> mapping_scene;
+        pcl::Correspondences temp_corrs, unused_corrs;
+        pcl::PointCloud<PointT>::Ptr maximum_scene_keypoints(new pcl::PointCloud<PointT>());
+        pcl::PointCloud<PointT>::Ptr maximum_object_keypoints(new pcl::PointCloud<PointT>());
 
-        if(!single_voting_space) // create clouds for each maximum and remap indices
+        // iterate over each vote of maximum
+        for (size_t i = 0; i < vote_indices[j].size(); i++)
         {
-            // will be filled with points of current maximum
-            pcl::PointCloud<PointT>::Ptr max_scene_keypoints(new pcl::PointCloud<PointT>());
-            pcl::PointCloud<PointT>::Ptr max_object_keypoints(new pcl::PointCloud<PointT>());
-
-            for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
-            {
-                pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
-                temp_corrs.push_back(pcl::Correspondence(i, i, corr.distance)); // now correspondences refer to local cloud copy of maximum
-                max_scene_keypoints->push_back(scene_keypoints->at(corr.index_query));
-                max_object_keypoints->push_back(object_keypoints->at(corr.index_match));
-                mapping_scene.push_back(corr.index_query);
-                mapping_object.push_back(corr.index_match);
-            }
-
-            corr_rejector.setInputSource(max_object_keypoints);
-            corr_rejector.setInputTarget(max_scene_keypoints);
+            pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
+            maximum_object_keypoints->push_back(object_keypoints->at(corr.index_query));
+            maximum_scene_keypoints->push_back(scene_keypoints->at(corr.index_match));
+            // remapping indices from complete clouds to current maximum
+            temp_corrs.push_back(pcl::Correspondence(i, i, corr.distance));
+            // only for the case that no hv is used
+            unused_corrs.push_back(pcl::Correspondence(corr.index_query, corr.index_match, corr.distance));
         }
-        else
-        {
-            for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
-            {
-                pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
-                temp_corrs.push_back(corr);
-            }
-        }
+        corr_rejector.setInputSource(maximum_object_keypoints);
+        corr_rejector.setInputTarget(maximum_scene_keypoints);
 
         if(use_hv)
         {
             // correspondence rejection with ransac
-            corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
+            // NOTE: due to remapped indices, unused_corrs are useless for further processing
+            corr_rejector.getRemainingCorrespondences(temp_corrs, unused_corrs);
             Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
             // save transformations for recognition
             if(!best_transform.isIdentity(0.0001))
             {
+                // using inlier_indices to map corr indices back to global clouds
+                std::vector<int> inlier_indices;
+                corr_rejector.getInliersIndices(inlier_indices);
+                pcl::Correspondences filtered_corrs;
+                for(int inlier_idx : inlier_indices)
+                {
+                    filtered_corrs.push_back(object_scene_corrs->at(vote_indices[j][inlier_idx]));
+                }
                 // keep transformation and correspondences if RANSAC was run successfully
                 transformations.push_back(best_transform);
-                if(!single_voting_space) // remap indices back to common clouds
-                {
-                    // remap indices from local maximum cloud to input clouds
-                    for(int i = 0; i < filtered_corrs.size(); i++)
-                    {
-                        pcl::Correspondence &corr = filtered_corrs.at(i);
-                        corr.index_query = mapping_scene[corr.index_query];
-                        corr.index_match = mapping_object[corr.index_match];
-                    }
-                }
                 model_instances.push_back(filtered_corrs);
             }
         }
         else
         {
-            if(!single_voting_space) // remap indices back to common clouds
-            {
-                // remap indices from local maximum cloud to input clouds
-                for(int i = 0; i < temp_corrs.size(); i++)
-                {
-                    pcl::Correspondence &corr = temp_corrs.at(i);
-                    corr.index_query = mapping_scene[corr.index_query];
-                    corr.index_match = mapping_object[corr.index_match];
-                }
-            }
-            model_instances.push_back(temp_corrs);
+            model_instances.push_back(unused_corrs);
         }
     }
 }
@@ -431,11 +407,11 @@ void findClassAndPositionFromCluster(
     // compute
     for(unsigned fcorr_idx = 0; fcorr_idx < filtered_corrs.size(); fcorr_idx++)
     {
-        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_match;
+        unsigned object_idx = filtered_corrs.at(fcorr_idx).index_query;
         const ISMFeature &cur_feat = object_features->at(object_idx);
         unsigned class_id = cur_feat.classId;
 
-        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_query;
+        unsigned scene_idx = filtered_corrs.at(fcorr_idx).index_match;
         const ISMFeature &scene_feat = scene_features->at(scene_idx);
         pcl::ReferenceFrame ref = scene_feat.referenceFrame;
         Eigen::Vector3f keyPos(scene_feat.x, scene_feat.y, scene_feat.z);
@@ -485,9 +461,9 @@ void findClassAndPositionFromTransformedObjectKeypoints(
     for(unsigned corr_idx; corr_idx < filtered_corrs.size(); corr_idx++)
     {
         pcl::Correspondence corr = filtered_corrs.at(corr_idx);
-        instance_object_keypoints->push_back(object_keypoints->at(corr.index_match));
-        instance_object_features->push_back(object_features->at(corr.index_match));
-        instance_center_vectors.push_back(object_center_vectors.at(corr.index_match));
+        instance_object_keypoints->push_back(object_keypoints->at(corr.index_query));
+        instance_object_features->push_back(object_features->at(corr.index_query));
+        instance_center_vectors.push_back(object_center_vectors.at(corr.index_query));
     }
 
     // determine position based on keypoints
@@ -668,23 +644,29 @@ void findPositionFromTransformedObjectKeypoints(
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
         const std::vector<Eigen::Matrix4f> transformations,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances)
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances_scene)
 {
     for(size_t i = 0; i < transformations.size (); ++i)
     {
-        pcl::PointCloud<PointT>::Ptr transformed_object(new pcl::PointCloud<PointT>());
-        // NOTE: object_keypoints might contain multiple objects, so use only keypoints of a single cluster
         pcl::PointCloud<PointT>::Ptr cluster_keypoints(new pcl::PointCloud<PointT>());
+        pcl::PointCloud<PointT>::Ptr cluster_keypoints_scene(new pcl::PointCloud<PointT>());
         pcl::Correspondences this_cluster = clustered_corrs[i];
         for(const pcl::Correspondence &corr : this_cluster)
         {
-            const ISMFeature &feat = object_features->at(corr.index_query);
-            PointT keypoint = PointT(feat.x, feat.y, feat.z);
+            // using swapped correspondences: query index is object!
+            const PointT &keypoint = object_keypoints->at(corr.index_query);
             cluster_keypoints->push_back(keypoint);
+            const PointT &keypoint_scene = scene_keypoints->at(corr.index_match);
+            cluster_keypoints_scene->push_back(keypoint_scene);
         }
-        pcl::transformPointCloud(*cluster_keypoints, *transformed_object, transformations[i]);
-        instances.push_back(transformed_object);
+        pcl::PointCloud<PointT>::Ptr transformed_keypoints(new pcl::PointCloud<PointT>());
+        pcl::transformPointCloud(*cluster_keypoints, *transformed_keypoints, transformations[i]);
+        // instances has the keypoints from the object transformed to the keypoints of the codebook ("object")
+        instances.push_back(transformed_keypoints);
+        instances_scene.push_back(cluster_keypoints_scene);
     }
 }
 
@@ -692,7 +674,7 @@ void generateCloudsFromTransformations(
 void alignCloudsWithICP(
         const float icp_max_iterations,
         const float icp_correspondence_distance,
-        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances_scene,
         const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances,
         std::vector<Eigen::Matrix4f> &final_transformations)
@@ -702,8 +684,9 @@ void alignCloudsWithICP(
         pcl::IterativeClosestPoint<PointT, PointT> icp;
         icp.setMaximumIterations(icp_max_iterations);
         icp.setMaxCorrespondenceDistance(icp_correspondence_distance);
-        icp.setInputSource(instances[i]);
-        icp.setInputTarget(scene_keypoints); // scene keypoints slightly better than scene cloud
+        icp.setInputSource(instances[i]); // instances: coarsly transformed from object to scene
+        icp.setInputTarget(instances_scene[i]); // corresponding scene keypoints
+        std::cout<< " num points source: " << instances[i]->size() << "   scene: " << instances_scene[i]->size() << std::endl;
         pcl::PointCloud<PointT>::Ptr registered (new pcl::PointCloud<PointT>);
         icp.align(*registered);
 //        registered_instances.push_back(registered);
@@ -739,7 +722,7 @@ void runGlobalHV(
 {
     pcl::GlobalHypothesesVerification<PointT, PointT> GoHv;
     GoHv.setSceneCloud(scene_cloud);  // Scene Cloud
-    GoHv.addModels(registered_instances, true);  //Models to verify
+    GoHv.addModels(registered_instances, false);  //Models to verify
     GoHv.setInlierThreshold(inlier_threshold);
     GoHv.setOcclusionThreshold(occlusion_threshold);
     GoHv.setRegularizer(regularizer);

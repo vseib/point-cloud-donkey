@@ -76,7 +76,6 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
-        const bool single_voting_space,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances);
@@ -127,13 +126,15 @@ void findPositionFromTransformedObjectKeypoints(
 void generateCloudsFromTransformations(
         const std::vector<pcl::Correspondences> clustered_corrs,
         const std::vector<Eigen::Matrix4f> transformations,
-        const pcl::PointCloud<ISMFeature>::Ptr object_features,
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances);
+        const pcl::PointCloud<PointT>::Ptr object_keypoints,
+        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
+        std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances_scene);
 
 void alignCloudsWithICP(
         const float icp_max_iterations,
         const float icp_correspondence_distance,
-        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
+        const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances_scene,
         const std::vector<pcl::PointCloud<PointT>::ConstPtr> &instances,
         std::vector<pcl::PointCloud<PointT>::ConstPtr> &registered_instances,
         std::vector<Eigen::Matrix4f> &final_transformations);

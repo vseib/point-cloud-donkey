@@ -70,29 +70,15 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
         m_bin_size = bin;
         m_corr_threshold = -th;
         fp::normal_radius = 0.005;
-        fp::reference_frame_radius = 0.05;
-        fp::feature_radius = 0.05;
+        fp::reference_frame_radius = 0.04;
+        fp::feature_radius = 0.04;
         fp::keypoint_sampling_radius = 0.02;
-
-        // TODO VS: for eval:
-        // bin_size and corr_threshold:     wieder über schleife evaluiert!
-        // eval chen vs. tombari:           zuerst chen!
-        // with weighted_votes or not:      zuerst ohne
-        // matching_threshold:              zuerst ohne
-        // m_corr_threshold:                zuerst standardwert
-
-        // eval use_aligned_cloud or cluster for position   zuerst aligned cloud
-        // eval all global hv params                        zuerst mit defaults
-
-        // TODO also eval this params: NOTE set below in the pipeline!!!!
-//        m_icp_max_iter = 100; // use default
-//        m_icp_corr_distance = bin; // default was 0.05, also check 2*bin later
 
         m_count = count; // TODO VS temp
 
         if(dataset == "dataset1")
         {
-            fp::normal_method = 1;
+            fp::normal_method = 2;
             fp::feature_type = "SHOT";
 //            m_corr_threshold = -0.01; // TODO VS include after eval
 //            m_bin_size = Eigen::Vector3d(0.01, 0.01, 0.01);
@@ -348,11 +334,11 @@ void GlobalHV::classifyObject(
     std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> rototranslations;
     bool use_distance_weight = false;
     bool recognize = false; // false for classification
-    // NOTE: if hough is used, m_corr_threshold is the relative hough threshold,
+    // NOTE: if hough is used, m_corr_threshold is the relative hough threshold (negative value),
     // otherwise it is the min. number of votes to form a maximum
     if(!use_hough)
     {
-        m_corr_threshold = 3; // does not really matter for classification
+        m_corr_threshold = fabs(m_corr_threshold); // does not really matter for classification
     }
     clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
                            scene_lrf, object_lrf, use_distance_weight, m_bin_size,
@@ -379,9 +365,7 @@ void GlobalHV::findObjects(
         std::vector<Eigen::Vector3f> &positions)
 {
     // get model-scene correspondences
-    // !!!
-    // query/source index is codebook ("object"), match/target index is scene
-    // !!!
+    // query/source index is scene, match/target index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
@@ -398,23 +382,28 @@ void GlobalHV::findObjects(
     remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
             object_keypoints, object_features, object_center_vectors, object_lrf);
 
+    // swapping query and match indices for the following PCL algorithms (and to avoid confusion)
+    pcl::CorrespondencesPtr corrs_swapped(new pcl::Correspondences());
+    for(const pcl::Correspondence &corr : *object_scene_corrs)
+    {
+        pcl::Correspondence corr_swapped(corr.index_match, corr.index_query, corr.distance);
+        corrs_swapped->emplace_back(std::move(corr_swapped));
+    }
+
     // Actual Clustering
-    std::vector<pcl::Correspondences> clustered_corrs;
-    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformations;
-    bool use_distance_weight = false; // only valid if hough is used
+    bool use_distance_weight = true; // only valid if hough is used
     bool recognize = true; // true for detection
     // NOTE: if hough is used, m_corr_threshold is the relative hough threshold,
     // otherwise it is the min. number of votes to form a maximum
     if(!use_hough)
     {
-        m_corr_threshold *= -1; // hough uses negative value as relative threshold, here we have number of votes, must be positive
+        // hough uses negative value as relative threshold, here we have number of votes, must be positive
+        m_corr_threshold = fabs(m_corr_threshold);
     }
-
-    // TODO VS ab hier weiter params suchen
-
-
-    // TODO VS try passing the whole scene cloud instead of only scene keypoints: makes it slightly worse in first try
-    clusterCorrespondences(object_scene_corrs, scene_keypoints, object_keypoints,
+    std::vector<pcl::Correspondences> clustered_corrs;
+    // transformations for each cluster: from object/codebook to scene (because swapped corrs are used)
+    std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformations;
+    clusterCorrespondences(corrs_swapped, scene_keypoints, object_keypoints,
                            scene_lrf, object_lrf, use_distance_weight, m_bin_size,
                            m_corr_threshold, fp::reference_frame_radius, use_hough,
                            recognize, clustered_corrs, transformations);
@@ -429,113 +418,42 @@ void GlobalHV::findObjects(
     else
     {
         std::cout << "Resulting clusters: " << transformations.size() << std::endl;
-//        sleep(1);
+        sleep(1);
     }
 
-
-        // convert to get rid of explicit Eigen alignment-type
-        std::vector<Eigen::Matrix4f> transformations_temp;
-        for(auto &tr : transformations)
-        {
-            transformations_temp.push_back(std::move(tr));
-        }
-        // Generate clouds for each instance found
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> instances;
-        generateCloudsFromTransformations(clustered_corrs, transformations_temp, object_features, instances);
-
-        // ICP
-        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
-        float icp_max_iterations = 100;
-        float icp_correspondence_distance = 0.01;
-        std::vector<Eigen::Matrix4f> final_transformations;
-        // TODO VS try passing the whole scene cloud instead of only scene keypoints: makes it very slow and worse
-        alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
-                           scene_keypoints, instances, registered_instances, final_transformations);
-
-        std::cout << "Registered instances: " << registered_instances.size() << std::endl;
-
-//        std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances2; // NOTE TODO VS debug: crashes if this is used
-//        for(auto inst : registered_instances)
-//        {
-//            if(inst->size() > 9)
-//                registered_instances2.push_back(inst);
-//            //std::cout << "         num points: " << inst->size() << std::endl;
-//        }
-
-
-    if(false) // aldoma global hypotheses verification
+    // convert to get rid of explicit Eigen alignment-type
+    std::vector<Eigen::Matrix4f> transformations_temp;
+    for(auto &tr : transformations)
     {
+        transformations_temp.push_back(std::move(tr));
+    }
+    // Generate clouds for each instance found
+    std::vector<pcl::PointCloud<PointT>::ConstPtr> instances_scene;  // scene keypoints per cluster
+    std::vector<pcl::PointCloud<PointT>::ConstPtr> instances_object; // object keypoints per cluster, transformed
+    generateCloudsFromTransformations(clustered_corrs, transformations_temp, object_keypoints,
+                                      scene_keypoints, instances_object, instances_scene);
 
+    // ICP
+    std::vector<pcl::PointCloud<PointT>::ConstPtr> registered_instances;
+    float icp_max_iterations = 100;
+    float icp_correspondence_distance = 0.05;
+    std::vector<Eigen::Matrix4f> final_transformations;
+    alignCloudsWithICP(icp_max_iterations, icp_correspondence_distance,
+                       instances_scene, instances_object, registered_instances, final_transformations);
+
+    std::cout << "Registered instances: " << registered_instances.size() << std::endl;
+
+    if(use_global_hv) // aldoma global hypotheses verification
+    {
         // Hypothesis Verification
         std::vector<bool> hypotheses_mask;  // Mask Vector to identify positive hypotheses
         // TODO VS kommentare zeigen erste ergebnisse
         float inlier_threshold = 0.01; // 0.01;   // gut wenn, ca. hälfte von occlusion_th (z.b. 0.01 und 0.02 oder jeweils halbiert)
         float occlusion_threshold = 0.02; // 0.02
-        float radius_clutter = 0.25; // 0.25;           // gut wenn, 0.1 oder 0.05
+        float radius_clutter = 0.1; // 0.25;           // gut wenn, 0.1 oder 0.05
         bool detect_clutter = true;                     // besser mit true
         float regularizer = 1.0;            // besser so lassen
         float clutter_regularizer = 5.0;    // besser so lassen
-
-//        if(m_count == 1)
-//        {
-//            inlier_threshold = 0.01;
-//            occlusion_threshold = 0.02;
-//            radius_clutter = 0.15;
-//        }
-//        if(m_count == 2)
-//        {
-//            inlier_threshold = 0.01;
-//            occlusion_threshold = 0.02;
-//            radius_clutter = 0.10;
-//        }
-//        if(m_count == 3)
-//        {
-//            inlier_threshold = 0.01;
-//            occlusion_threshold = 0.02;
-//            radius_clutter = 0.05;
-//        }
-//        if(m_count == 4)
-//        {
-//            inlier_threshold = 0.01;
-//            occlusion_threshold = 0.02;
-//            radius_clutter = 0.02;
-//        }
-//        if(m_count == 5)
-//        {
-//            inlier_threshold = 0.005;
-//            occlusion_threshold = 0.01;
-//            radius_clutter = 0.15;
-//        }
-//        if(m_count == 6)
-//        {
-//            inlier_threshold = 0.005;
-//            occlusion_threshold = 0.01;
-//            radius_clutter = 0.10;
-//        }
-//        if(m_count == 7)
-//        {
-//            inlier_threshold = 0.005;
-//            occlusion_threshold = 0.01;
-//            radius_clutter = 0.05;
-//        }
-//        if(m_count == 8)
-//        {
-//            inlier_threshold = 0.005;
-//            occlusion_threshold = 0.01;
-//            radius_clutter = 0.02;
-//        }
-//        if(m_count == 9)
-//        {
-//            inlier_threshold = 0.02;
-//            occlusion_threshold = 0.04;
-//            radius_clutter = 0.1;
-//        }
-//        if(m_count == 10)
-//        {
-//            inlier_threshold = 0.005;
-//            occlusion_threshold = 0.01;
-//            radius_clutter = 0.05;
-//        }
 
         runGlobalHV(scene_cloud, registered_instances, inlier_threshold, occlusion_threshold,
                     regularizer, clutter_regularizer, radius_clutter, detect_clutter,
@@ -584,21 +502,6 @@ void GlobalHV::findObjects(
     //       tombari pipeline (i.e. executable "eval_pipeline_tombari_detection")
     else
     {
-        // this is for tombari
-//        for (size_t j = 0; j < clustered_corrs.size (); ++j) // loop over all maxima/clusters
-//        {
-//            pcl::Correspondences filtered_corrs = clustered_corrs[j];
-//            unsigned res_class;
-//            int res_num_votes;
-//            Eigen::Vector3f res_position;
-//            findClassAndPositionFromCluster(filtered_corrs, object_features, scene_features,
-//                                            object_center_vectors, m_number_of_classes,
-//                                            res_class, res_num_votes, res_position);
-//            results.push_back({res_class, res_num_votes});
-//            positions.push_back(res_position);
-//        }
-
-
         // fallback without HV for paper
        for (size_t i = 0; i < clustered_corrs.size (); ++i) // loop over all maxima/clusters
        {
@@ -626,7 +529,6 @@ void GlobalHV::findObjects(
             // store results
             results.push_back({res_class, res_num_votes});
             positions.push_back(Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z()));
-
         }
     }
 }

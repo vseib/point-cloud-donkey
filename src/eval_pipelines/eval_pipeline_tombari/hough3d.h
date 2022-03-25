@@ -31,7 +31,7 @@ public:
 
     std::vector<std::pair<unsigned, float>> classify(const std::string &filename, bool useSingleVotingSpace);
 
-    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification, bool useSingleVotingSpace);
+    std::vector<ism3d::VotingMaximum> detect(const std::string &filename, bool useHypothesisVerification);
 
     bool loadModel(std::string &filename);
 
@@ -77,14 +77,7 @@ private:
             const pcl::PointCloud<ISMFeature>::Ptr scene_features,
             std::vector<std::pair<unsigned, float>> &results);
 
-    void findObjectsWithSingleVotingSpace(
-            const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
-            const pcl::PointCloud<PointT>::Ptr scene_keypoints,
-            const bool use_hv,
-            std::vector<std::pair<unsigned, float>> &results,
-            std::vector<Eigen::Vector3f> &positions);
-
-    void findObjectsWithSeparateVotingSpaces(
+    void findObjects(
             const pcl::PointCloud<ISMFeature>::Ptr& scene_features,
             const pcl::PointCloud<PointT>::Ptr scene_keypoints,
             const bool use_hv,
@@ -114,6 +107,7 @@ private:
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
+    pcl::PointCloud<PointT>::Ptr m_keypoints;
     std::vector<Eigen::Vector3f> m_center_vectors;
     std::map<unsigned, float> m_class_radii;
     flann::Index<flann::L2<float>> m_flann_index;

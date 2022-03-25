@@ -217,8 +217,7 @@ int main (int argc, char** argv)
                 std::cout << "Processing file " << pointCloud << std::endl;
 
                 bool useHypothesisVerification = true;
-                bool useSingleVotingSpace = true;
-                maxima = hough3d->detect(pointCloud, useHypothesisVerification, useSingleVotingSpace);
+                maxima = hough3d->detect(pointCloud, useHypothesisVerification);
 
                 // collect all gt objects
                 std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
