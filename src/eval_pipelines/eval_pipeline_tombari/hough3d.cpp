@@ -67,13 +67,13 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
         fp::normal_radius = 0.005;
-        fp::reference_frame_radius = 0.05;
-        fp::feature_radius = 0.05;
+        fp::reference_frame_radius = 0.04;
+        fp::feature_radius = 0.04;
         fp::keypoint_sampling_radius = 0.02;
 
         if(dataset == "dataset1")
         {
-            fp::normal_method = 1;
+            fp::normal_method = 2;
             fp::feature_type = "SHOT";
             m_th = -th;// -0.01;
             m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.01, 0.01, 0.01);
@@ -430,9 +430,7 @@ void Hough3d::findObjectsWithSeparateVotingSpaces(
         std::vector<Eigen::Vector3f> &positions)
 {
     // get model-scene correspondences
-    // !!!
-    // query/source index is codebook ("object"), match/target index is scene
-    // !!!
+    // query/source index is scene, match/target index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
@@ -456,7 +454,7 @@ void Hough3d::findObjectsWithSeparateVotingSpaces(
     for(unsigned i = 0; i < all_votes.size(); i++)
     {
         Eigen::Vector3f vote = all_votes.at(i);
-        unsigned object_idx = object_scene_corrs->at(i).index_query;
+        unsigned object_idx = object_scene_corrs->at(i).index_match;
         unsigned class_id = object_features->at(object_idx).classId;
         if(class_votes.find(class_id) != class_votes.end())
         {
@@ -500,9 +498,9 @@ void Hough3d::findObjectsWithSeparateVotingSpaces(
     {
         std::vector<Eigen::Matrix4f> transformations;
         std::vector<pcl::Correspondences> model_instances;
-        bool refine_model = false; // helps improve the results sometimes
-        float inlier_threshold = m_bin_size(0);
-        bool separate_voting_spaces = true;
+        bool refine_model = int(m_count2)%2 == 0;
+        float inlier_threshold = m_count;
+        bool separate_voting_spaces = false;
         generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
                                                   inlier_threshold, refine_model, separate_voting_spaces, use_hv,
                                                   transformations, model_instances);
@@ -552,9 +550,7 @@ void Hough3d::findObjectsWithSingleVotingSpace(
         std::vector<Eigen::Vector3f> &positions)
 {
     // get model-scene correspondences
-    // !!!
-    // query/source index is codebook ("object"), match/target index is scene
-    // !!!
+    // query/source index is scene, match/target index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, with 0.75 or without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
@@ -593,9 +589,9 @@ void Hough3d::findObjectsWithSingleVotingSpace(
     std::vector<pcl::Correspondences> model_instances;
     bool refine_model = int(m_count2)%2 == 0;
     float inlier_threshold = m_count;
-    bool separate_voting_spaces = false; // TODO VS eval this param
+    bool single_voting_space = true;
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints, object_keypoints,
-                                              inlier_threshold, refine_model, separate_voting_spaces, use_hv,
+                                              inlier_threshold, refine_model, single_voting_space, use_hv,
                                               transformations, model_instances);
 
     std::cout << "Remaining hypotheses after RANSAC: " << model_instances.size() << std::endl;

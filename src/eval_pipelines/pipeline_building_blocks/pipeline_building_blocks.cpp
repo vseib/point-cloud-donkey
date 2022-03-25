@@ -35,13 +35,6 @@ pcl::CorrespondencesPtr findNnCorrespondences(
 
         if(distances[0][0] < matching_threshold)
         {
-            // for all following PCL algorithms to work correctly, we need to swap query and match
-            // this is because all PCL algorithms handle the object as source (query) and the scene as target (match)
-            // (e.g. for registration, ransac, ...), but until here we have the scene as query and the object as match
-            // !!!
-            // now swapping: query/source index is codebook ("object"), match/target index is scene
-            // !!!
-//            pcl::Correspondence corr(indices[0][0], fe, distances[0][0]);
             pcl::Correspondence corr(fe, indices[0][0], distances[0][0]);
             #pragma omp critical
             {
@@ -264,7 +257,7 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
-        const bool separate_voting_spaces,
+        const bool single_voting_space,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances)
@@ -274,7 +267,7 @@ void generateHypothesesWithAbsoluteOrientation(
     corr_rejector.setInlierThreshold(inlier_threshold);
     corr_rejector.setRefineModel(refine_model);
     corr_rejector.setSaveInliers(true);
-    if(!separate_voting_spaces) // just use common clouds
+    if(single_voting_space) // just use common clouds
     {
         corr_rejector.setInputSource(scene_keypoints);
         corr_rejector.setInputTarget(object_keypoints);
@@ -293,7 +286,7 @@ void generateHypothesesWithAbsoluteOrientation(
         std::vector<int> mapping_object;
         std::vector<int> mapping_scene;
 
-        if(separate_voting_spaces) // create clouds for each maximum and remap indices
+        if(!single_voting_space) // create clouds for each maximum and remap indices
         {
             // will be filled with points of current maximum
             pcl::PointCloud<PointT>::Ptr max_scene_keypoints(new pcl::PointCloud<PointT>());
@@ -331,7 +324,7 @@ void generateHypothesesWithAbsoluteOrientation(
             {
                 // keep transformation and correspondences if RANSAC was run successfully
                 transformations.push_back(best_transform);
-                if(separate_voting_spaces) // remap indices back to common clouds
+                if(!single_voting_space) // remap indices back to common clouds
                 {
                     // remap indices from local maximum cloud to input clouds
                     for(int i = 0; i < filtered_corrs.size(); i++)
@@ -346,7 +339,7 @@ void generateHypothesesWithAbsoluteOrientation(
         }
         else
         {
-            if(separate_voting_spaces) // remap indices back to common clouds
+            if(!single_voting_space) // remap indices back to common clouds
             {
                 // remap indices from local maximum cloud to input clouds
                 for(int i = 0; i < temp_corrs.size(); i++)

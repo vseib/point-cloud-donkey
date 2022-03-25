@@ -76,7 +76,7 @@ void generateHypothesesWithAbsoluteOrientation(
         const pcl::PointCloud<PointT>::Ptr object_keypoints,
         const float inlier_threshold,
         const bool refine_model,
-        const bool separate_voting_spaces,
+        const bool single_voting_space,
         const bool use_hv,
         std::vector<Eigen::Matrix4f> &transformations,
         std::vector<pcl::Correspondences> &model_instances);
