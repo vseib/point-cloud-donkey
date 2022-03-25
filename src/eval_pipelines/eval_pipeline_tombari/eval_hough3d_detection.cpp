@@ -238,8 +238,7 @@ int main (int argc, char** argv)
             mc.resizeVectors();
 
             // max. allowed distance to ground truth position to count the detection as correct
-            // TODO VS depends on dataset/cloud resolution --> make param?
-            float dist_threshold = 0.05;
+            std::map<unsigned, float> class_radii = hough3d->getDetectionThresholds();
 
             std::string command = "mkdir " + outputname;
             std::ignore = std::system(command.c_str());
@@ -254,7 +253,7 @@ int main (int argc, char** argv)
             {
                 std::string class_label = item.first;
                 unsigned class_id = class_labels_map[class_label];
-                // TODO VS dist threshold
+                float dist_threshold = class_radii[class_id];
                 std::vector<DetectionObject> class_objects_gt = item.second;
 
                 filelog::computeAndWriteNextClassSummary(summaryFile, mc, class_label, class_id,
