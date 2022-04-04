@@ -240,7 +240,6 @@ namespace ism3d
                 if(m_filter_method_color == "colordistance")
                 {
                     float color_score = computeColorScore(point_idxs, points_with_normals, reference_point, cc);
-                    LOG_INFO("----temp debug color score: " << color_score);
                     color_scores[idx] = color_score;
                 }
             }
@@ -390,7 +389,6 @@ namespace ism3d
             float L, a, b;
             cc.RgbToCieLabNormalized(red, green, blue, L, a, b);
             float distance = cc.getColorDistance(L, a, b, LRef, aRef, bRef);
-            std::cout << " ------temp debug resulting distance: " << distance << std::endl;
             if(distance > threshold)
             {
                 num_distant_color++;
