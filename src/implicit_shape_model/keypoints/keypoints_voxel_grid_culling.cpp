@@ -265,7 +265,7 @@ namespace ism3d
         // sort to determine cutoff threshold
         std::sort(geo_scores.begin(), geo_scores.end());
         std::sort(color_scores.begin(), color_scores.end());
-        LOG_INFO(" ----- temp debug   color scores min max: " << color_scores.begin() << "  " << color_scores.back());
+        LOG_INFO(" ----- temp debug   color scores min max: " << color_scores.front() << "  " << color_scores.back());
 
         // automatically determine cutoff index
         if(m_filter_method_geometry != "none" && m_filter_type_geometry == "auto")
