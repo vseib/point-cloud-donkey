@@ -35,7 +35,7 @@ namespace ism3d
         addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
 
         addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
-        addParameter(m_require_both_filters, "RequireBothFilterTypes", true);// TODO VS: this param is not yes in config files
+        addParameter(m_require_both_filters, "RequireBothFilterTypes", true);// TODO VS: this param is not yet in config files
 
         addParameter(m_refine_position, "RefineKeypointPosition", false);
 
@@ -240,6 +240,7 @@ namespace ism3d
                 if(m_filter_method_color == "colordistance")
                 {
                     float color_score = computeColorScore(point_idxs, points_with_normals, reference_point, cc);
+                    LOG_INFO("----temp debug color score: " << color_score);
                     color_scores[idx] = color_score;
                 }
             }
@@ -264,6 +265,7 @@ namespace ism3d
         // sort to determine cutoff threshold
         std::sort(geo_scores.begin(), geo_scores.end());
         std::sort(color_scores.begin(), color_scores.end());
+        LOG_INFO(" ----- temp debug   color scores min max: " << color_scores.begin() << "  " << color_scores.back());
 
         // automatically determine cutoff index
         if(m_filter_method_geometry != "none" && m_filter_type_geometry == "auto")
