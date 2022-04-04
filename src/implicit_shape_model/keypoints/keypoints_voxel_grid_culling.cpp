@@ -375,6 +375,7 @@ namespace ism3d
         unsigned char redRef   = ref.r;
         unsigned char greenRef = ref.g;
         unsigned char blueRef  = ref.b;
+        LOG_INFO("    temp debug: input ref rgb: " << redRef << " " << greenRef << " " << blueRef)
         float LRef, aRef, bRef;
         cc.RgbToCieLabNormalized(redRef, greenRef, blueRef, LRef, aRef, bRef);
 

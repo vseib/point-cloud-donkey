@@ -85,6 +85,7 @@ namespace ism3d
     float ColorConversion::getColorDistance(const float L, const float a, const float b,
                                             const float LRef, const float aRef, const float bRef) const
     {
+        LOG_INFO("--- temp debug getColorDist: " << LRef << " " << L << " " << aRef << " " << a << " " << bRef << " "<< b);
         double color_distance = (fabs (LRef - L) + ((fabs (aRef - a) + fabs (bRef - b)) / 2)) /3;
         if (color_distance > 1.0)
             color_distance = 1.0;
