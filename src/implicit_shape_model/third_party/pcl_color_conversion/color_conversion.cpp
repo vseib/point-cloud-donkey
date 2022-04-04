@@ -10,7 +10,6 @@
 
 #include "color_conversion.h"
 #include <math.h>
-#include <iostream>
 
 ism3d::ColorConversion ism3d::ColorConversionStatic::color_conversion;
 
@@ -86,7 +85,6 @@ namespace ism3d
     float ColorConversion::getColorDistance(const float L, const float a, const float b,
                                             const float LRef, const float aRef, const float bRef) const
     {
-        std::cout << "--- temp debug getColorDist: " << LRef << " " << L << " " << aRef << " " << a << " " << bRef << " "<< b << std::endl;
         double color_distance = (fabs (LRef - L) + ((fabs (aRef - a) + fabs (bRef - b)) / 2)) /3;
         if (color_distance > 1.0)
             color_distance = 1.0;

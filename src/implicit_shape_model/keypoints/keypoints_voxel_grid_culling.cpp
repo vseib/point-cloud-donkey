@@ -375,7 +375,6 @@ namespace ism3d
         unsigned char redRef   = ref.r;
         unsigned char greenRef = ref.g;
         unsigned char blueRef  = ref.b;
-        LOG_INFO("    temp debug: input ref rgb: " << redRef << " " << greenRef << " " << blueRef)
         float LRef, aRef, bRef;
         cc.RgbToCieLabNormalized(redRef, greenRef, blueRef, LRef, aRef, bRef);
 
@@ -391,6 +390,7 @@ namespace ism3d
             float L, a, b;
             cc.RgbToCieLabNormalized(red, green, blue, L, a, b);
             float distance = cc.getColorDistance(L, a, b, LRef, aRef, bRef);
+            std::cout << " ------temp debug resulting distance: " << distance << std::endl;
             if(distance > threshold)
             {
                 num_distant_color++;
