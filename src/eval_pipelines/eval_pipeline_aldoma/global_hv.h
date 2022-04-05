@@ -105,6 +105,8 @@ private:
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features;
+    pcl::PointCloud<PointT>::Ptr m_keypoints;
+    pcl::PointCloud<pcl::ReferenceFrame>::Ptr m_lrf;
     std::vector<Eigen::Vector3f> m_center_vectors;
     std::map<unsigned, float> m_class_radii;
     flann::Index<flann::L2<float>> m_flann_index;

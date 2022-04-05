@@ -33,8 +33,8 @@
 
 
 GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
-    m_features(new pcl::PointCloud<ISMFeature>()),
-    m_flann_index(flann::KDTreeIndexParams(4))
+    m_features(new pcl::PointCloud<ISMFeature>()), m_keypoints(new pcl::PointCloud<PointT>()),
+    m_lrf(new pcl::PointCloud<pcl::ReferenceFrame>()), m_flann_index(flann::KDTreeIndexParams(4))
 {
     std::cout << "-------- loading parameters for " << dataset << " dataset --------" << std::endl;
 
@@ -364,31 +364,11 @@ void GlobalHV::findObjects(
         std::vector<std::pair<unsigned, float>> &results,
         std::vector<Eigen::Vector3f> &positions)
 {
-    // get model-scene correspondences
-    // query/source index is scene, match/target index is codebook ("object")
     // PCL implementation has a threshold of 0.25, however, without a threshold we get better results
     float matching_threshold = std::numeric_limits<float>::max();
+    // get model-scene correspondences
     pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, matching_threshold, m_flann_index));
-    //pcl::CorrespondencesPtr object_scene_corrs = std::move(findNnCorrespondences(scene_features, m_features, m_flann_index));
-
     std::cout << "Found " << object_scene_corrs->size() << " correspondences" << std::endl;
-
-    // object keypoints are simply the matched keypoints from the codebook
-    // however in order not to pass the whole codebook, we need to adjust the index mapping
-    pcl::PointCloud<PointT>::Ptr object_keypoints(new pcl::PointCloud<PointT>());
-    pcl::PointCloud<ISMFeature>::Ptr object_features(new pcl::PointCloud<ISMFeature>());
-    std::vector<Eigen::Vector3f> object_center_vectors;
-    pcl::PointCloud<pcl::ReferenceFrame>::Ptr object_lrf(new pcl::PointCloud<pcl::ReferenceFrame>());
-    remapIndicesToLocalCloud(object_scene_corrs, m_features, m_center_vectors,
-            object_keypoints, object_features, object_center_vectors, object_lrf);
-
-    // swapping query and match indices for the following PCL algorithms (and to avoid confusion)
-    pcl::CorrespondencesPtr corrs_swapped(new pcl::Correspondences());
-    for(const pcl::Correspondence &corr : *object_scene_corrs)
-    {
-        pcl::Correspondence corr_swapped(corr.index_match, corr.index_query, corr.distance);
-        corrs_swapped->emplace_back(std::move(corr_swapped));
-    }
 
     // Actual Clustering
     bool use_distance_weight = true; // only valid if hough is used
@@ -403,8 +383,8 @@ void GlobalHV::findObjects(
     std::vector<pcl::Correspondences> clustered_corrs;
     // transformations for each cluster: from object/codebook to scene (because swapped corrs are used)
     std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> transformations;
-    clusterCorrespondences(corrs_swapped, scene_keypoints, object_keypoints,
-                           scene_lrf, object_lrf, use_distance_weight, m_bin_size,
+    clusterCorrespondences(object_scene_corrs, scene_keypoints, m_keypoints,
+                           scene_lrf, m_lrf, use_distance_weight, m_bin_size,
                            m_corr_threshold, fp::reference_frame_radius, use_hough,
                            recognize, clustered_corrs, transformations);
 
@@ -418,7 +398,6 @@ void GlobalHV::findObjects(
     else
     {
         std::cout << "Resulting clusters: " << transformations.size() << std::endl;
-        sleep(1);
     }
 
     // convert to get rid of explicit Eigen alignment-type
@@ -430,7 +409,7 @@ void GlobalHV::findObjects(
     // Generate clouds for each instance found
     std::vector<pcl::PointCloud<PointT>::ConstPtr> instances_scene;  // scene keypoints per cluster
     std::vector<pcl::PointCloud<PointT>::ConstPtr> instances_object; // object keypoints per cluster, transformed
-    generateCloudsFromTransformations(clustered_corrs, transformations_temp, object_keypoints,
+    generateCloudsFromTransformations(clustered_corrs, transformations_temp, m_keypoints,
                                       scene_keypoints, instances_object, instances_scene);
 
     // ICP
@@ -470,7 +449,7 @@ void GlobalHV::findObjects(
                 unsigned res_class;
                 int res_num_votes;
                 pcl::PointCloud<PointT>::Ptr scene_points(new pcl::PointCloud<PointT>());
-                findClassAndPointsFromCorrespondences(filtered_corrs, object_features, scene_features,
+                findClassAndPointsFromCorrespondences(filtered_corrs, m_features, scene_features,
                                                       res_class, res_num_votes, scene_points);
                 // find aligned position
                 bool use_object_points = false; // use object points or the corresponding keypoints from the scene
@@ -509,7 +488,7 @@ void GlobalHV::findObjects(
             unsigned res_class;
             int res_num_votes;
             pcl::PointCloud<PointT>::Ptr scene_points(new pcl::PointCloud<PointT>());
-            findClassAndPointsFromCorrespondences(filtered_corrs, object_features, scene_features,
+            findClassAndPointsFromCorrespondences(filtered_corrs, m_features, scene_features,
                                                   res_class, res_num_votes, scene_points);
             // find aligned position
             bool use_object_points = false; // use object points or the corresponding keypoints from the scene
@@ -709,6 +688,8 @@ bool GlobalHV::loadModelFromFile(std::string& filename)
 
         // read features
         m_features->clear();
+        m_keypoints->clear();
+        m_lrf->clear();
         for (unsigned int feat_i = 0; feat_i < number_of_features; feat_i++)
         {
             ISMFeature feature;
@@ -736,6 +717,12 @@ bool GlobalHV::loadModelFromFile(std::string& filename)
             }
             feature.classId = m_class_lookup.at(feat_i);
             m_features->push_back(feature);
+            PointT point;
+            point.x = feature.x;
+            point.y = feature.y;
+            point.z = feature.z;
+            m_keypoints->push_back(point);
+            m_lrf->push_back(feature.referenceFrame);
         }
 
         // read all vectors

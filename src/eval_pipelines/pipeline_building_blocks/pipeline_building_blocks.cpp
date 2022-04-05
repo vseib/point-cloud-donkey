@@ -331,64 +331,6 @@ void generateHypothesesWithAbsoluteOrientation(
 }
 
 
-//void generateHypothesesWithAbsoluteOrientation(
-//        const pcl::CorrespondencesPtr object_scene_corrs,
-//        const std::vector<std::vector<int>> &vote_indices,
-//        const pcl::PointCloud<PointT>::Ptr scene_keypoints,
-//        const pcl::PointCloud<PointT>::Ptr object_keypoints,
-//        const float inlier_threshold,
-//        const bool refine_model,
-//        const bool separate_voting_spaces,
-//        const bool use_hv,
-//        std::vector<Eigen::Matrix4f> &transformations,
-//        std::vector<pcl::Correspondences> &model_instances)
-//{
-//    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> corr_rejector;
-//    corr_rejector.setMaximumIterations(10000);
-//    corr_rejector.setInlierThreshold(inlier_threshold);
-//    corr_rejector.setRefineModel(refine_model);
-//    corr_rejector.setSaveInliers(true);
-//    corr_rejector.setInputSource(scene_keypoints);
-//    corr_rejector.setInputTarget(object_keypoints);
-
-//    // correspondences were grouped by hough voting
-//    for(size_t j = 0; j < vote_indices.size (); ++j) // iterate over each maximum
-//    {
-//        // skip maxima with view votes, mostly FP
-//        if(vote_indices[j].size() < 3)
-//        {
-//            continue;
-//        }
-
-//        pcl::Correspondences temp_corrs, filtered_corrs;
-
-//        for (size_t i = 0; i < vote_indices[j].size(); ++i) // iterate over each vote of maximum
-//        {
-//            pcl::Correspondence corr = object_scene_corrs->at(vote_indices[j][i]);
-//            temp_corrs.push_back(corr);
-//        }
-
-//        if(use_hv)
-//        {
-//            // correspondence rejection with ransac
-//            corr_rejector.getRemainingCorrespondences(temp_corrs, filtered_corrs);
-//            Eigen::Matrix4f best_transform = corr_rejector.getBestTransformation();
-//            // save transformations for recognition
-//            if(!best_transform.isIdentity(0.0001))
-//            {
-//                // keep transformation and correspondences if RANSAC was run successfully
-//                transformations.push_back(best_transform);
-//                model_instances.push_back(filtered_corrs);
-//            }
-//        }
-//        else
-//        {
-//            model_instances.push_back(temp_corrs);
-//        }
-//    }
-//}
-
-
 void findClassAndPositionFromCluster(
         const pcl::Correspondences &filtered_corrs,
         const pcl::PointCloud<ISMFeature>::Ptr object_features,
