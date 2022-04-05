@@ -42,14 +42,15 @@ namespace ism3d
                                                             pcl::PointCloud<pcl::Normal>::Ptr normalsWithoutNaN,
                                                             pcl::search::Search<PointT>::Ptr search);
 
-        std::tuple<std::vector<float>, std::vector<float>> getScoresForKeypoints(
+        std::tuple<std::vector<float>, std::vector<float>, std::vector<float>> getScoresForKeypoints(
                 const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
                 const pcl::PointCloud<PointNormalT>::Ptr keypoints_with_normals,
                 const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures);
 
-        std::tuple<float, float> computeThresholds(
+        std::tuple<float, float, float> computeThresholds(
                 const std::vector<float> &geo_scores,
-                const std::vector<float> &color_scores);
+                const std::vector<float> &color_scores,
+                const std::vector<float> &combined_scores_orig);
 
         float computeKPQ(const std::vector<int> &pointIdxs,
                          pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principle_curvatures) const;

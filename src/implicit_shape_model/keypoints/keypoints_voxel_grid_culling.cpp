@@ -141,8 +141,8 @@ namespace ism3d
 
             LOG_INFO("Number of keypoints before filtering: " << keypoints_without_normals->size());
 
-            auto[geo_scores, color_scores] = getScoresForKeypoints(points_with_normals, keypoints_with_normals, principal_curvatures);
-            auto[threshold_geo, threshold_color] = computeThresholds(geo_scores, color_scores);
+            auto[geo_scores, color_scores, combined_scores] = getScoresForKeypoints(points_with_normals, keypoints_with_normals, principal_curvatures);
+            auto[threshold_geo, threshold_color, threshold_combined] = computeThresholds(geo_scores, color_scores, combined_scores);
             m_filter_threshold_geometry = threshold_geo;
             m_filter_threshold_color = threshold_color;
 
@@ -195,7 +195,7 @@ namespace ism3d
     }
 
 
-    std::tuple<std::vector<float>, std::vector<float>> KeypointsVoxelGridCulling::getScoresForKeypoints(
+    std::tuple<std::vector<float>, std::vector<float>, std::vector<float>> KeypointsVoxelGridCulling::getScoresForKeypoints(
             const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
             const pcl::PointCloud<PointNormalT>::Ptr keypoints_with_normals,
             const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures)
@@ -211,6 +211,7 @@ namespace ism3d
 
         ColorConversion& cc = ColorConversionStatic::getColorConversion();
 
+        // compute geo and color scores individually
         for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
         {
             // PCL curvature
@@ -245,25 +246,42 @@ namespace ism3d
             }
         }
 
-        return std::make_tuple(geo_scores, color_scores);
+        // compute combined scores
+        const auto [gmin, gmax] = std::minmax_element(geo_scores.begin(),geo_scores.end());
+        const auto [cmin, cmax] = std::minmax_element(color_scores.begin(),color_scores.end());
+        std::vector<float> combined_scores(keypoints_with_normals->size(), 0.0f);
+        for(unsigned idx = 0; idx < keypoints_with_normals->size(); idx++)
+        {
+            float geo_norm = (geo_scores[idx] - *gmin) / *gmax;
+            float color_norm = (color_scores[idx] - *cmin) / *cmax;
+            combined_scores.at(idx) = geo_norm + color_norm;
+        }
+
+
+        return std::make_tuple(geo_scores, color_scores, combined_scores);
     }
 
-    std::tuple<float, float> KeypointsVoxelGridCulling::computeThresholds(
+    std::tuple<float, float, float> KeypointsVoxelGridCulling::computeThresholds(
             const std::vector<float> &geo_scores_orig,
-            const std::vector<float> &color_scores_orig)
+            const std::vector<float> &color_scores_orig,
+            const std::vector<float> &combined_scores_orig)
     {
         float threshold_geo = std::numeric_limits<float>::min();
         float threshold_color = std::numeric_limits<float>::min();
+        float threshold_combined = std::numeric_limits<float>::min();
 
         // copy original lists for sorting
         std::vector<float> geo_scores;
         std::copy(geo_scores_orig.begin(), geo_scores_orig.end(), std::back_inserter(geo_scores));
         std::vector<float> color_scores;
         std::copy(color_scores_orig.begin(), color_scores_orig.end(), std::back_inserter(color_scores));
+        std::vector<float> combined_scores;
+        std::copy(combined_scores_orig.begin(), combined_scores_orig.end(), std::back_inserter(combined_scores));
 
         // sort to determine cutoff threshold
         std::sort(geo_scores.begin(), geo_scores.end());
         std::sort(color_scores.begin(), color_scores.end());
+        std::sort(combined_scores.begin(), combined_scores.end());
 
         // automatically determine cutoff index
         if(m_filter_method_geometry != "none" && m_filter_type_geometry == "auto")
@@ -311,6 +329,13 @@ namespace ism3d
             threshold_color = color_scores.at(cutoff_index);
         }
 
+        if(m_filter_method_geometry != "none" && m_filter_method_color != "none"
+                && m_filter_type_geometry == "cutoff" && m_filter_type_color == "cutoff")
+        {
+            unsigned cutoff_index = unsigned(m_filter_cutoff_ratio * combined_scores.size());
+            threshold_combined = combined_scores.at(cutoff_index);
+        }
+
         // don't change the thresholds if they are user specified
         if(m_filter_method_geometry != "none" && m_filter_type_geometry == "threshold")
         {
@@ -321,7 +346,7 @@ namespace ism3d
             threshold_color = m_filter_threshold_color;
         }
 
-        return std::make_tuple(threshold_geo, threshold_color);
+        return std::make_tuple(threshold_geo, threshold_color, threshold_combined);
     }
 
 
