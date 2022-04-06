@@ -33,11 +33,11 @@ namespace ism3d
         addParameter(m_filter_type_color, "FilterTypeColor", std::string("CutOff"));
         addParameter(m_filter_threshold_color, "FilterThresholdColor", 0.02f);
 
-        addParameter(m_max_similar_color_distance, "MaxSimilarColorDistance", 0.05f);
+        addParameter(m_max_similar_color_distance, "MaxSimilarColorDistance", 0.01f);
         addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
 
         addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
-        addParameter(m_require_both_filters, "RequireBothFilterTypes", true);// TODO VS: this param is not yet in config files
+        addParameter(m_combine_filters, "CombineFilters", std::string("RequireCombinedList"));
 
         addParameter(m_refine_position, "RefineKeypointPosition", false);
 
@@ -186,39 +186,65 @@ namespace ism3d
 
             auto[geo_scores, color_scores, combined_scores] = getScoresForKeypoints(points_with_normals, keypoints_with_normals, principal_curvatures);
             auto[threshold_geo, threshold_color, threshold_combined] = computeThresholds(geo_scores, color_scores, combined_scores);
-            m_filter_threshold_geometry = threshold_geo;
-            m_filter_threshold_color = threshold_color;
 
             // prepare resulting keypoints cloud
             pcl::PointCloud<PointT>::Ptr keypoints(new pcl::PointCloud<PointT>());
             for(unsigned idx = 0; idx < keypoints_without_normals->size(); idx++)
             {
-                // assign true if both required: if active will be checked, otherwise is already true
-                // if only one required: set to false in ordner not to break the other one if this is not active
-                // e.g. only color active and only one required: automatically setting this to true would overwrite color result
-                bool geo_passed = m_require_both_filters ? true : false;
+                // check geometric quality measure
+                bool geo_passed = true;
                 if(m_filter_method_geometry != "none")
                 {
-                    if(geo_scores[idx] < m_filter_threshold_geometry)
+                    if(geo_scores[idx] < threshold_geo)
                     {
                         geo_passed = false;
                     }
                 }
 
-                // assign true if both required: if active will be checked, otherwise is already true
-                // if only one required: set to false in ordner not to break the other one if this is not active
-                // e.g. only geo active and only one required: automatically setting this to true would overwrite geo result
-                bool color_passed = m_require_both_filters ? true : false;
+                // check color quality measure
+                bool color_passed = true;
                 if(m_filter_method_color != "none")
                 {
-                    if(color_scores[idx] < m_filter_threshold_color)
+                    if(color_scores[idx] < threshold_color)
                     {
                         color_passed = false;
                     }
                 }
 
-                if((m_require_both_filters && geo_passed && color_passed) ||
-                   (!m_require_both_filters && (geo_passed || color_passed)))
+                // check combined list of geometric and color quality measure
+                bool combined_passed = true;
+                if(m_filter_method_geometry != "none" && m_filter_method_color != "none")
+                {
+                    if(combined_scores[idx] < threshold_combined)
+                    {
+                        combined_passed = false;
+                    }
+                }
+
+                // in case of two quality measures selected, decide if keypoint can be accepted
+                bool accept_keypoint = false;
+                if(m_filter_method_geometry != "none" && m_filter_method_color != "none")
+                {
+                    if(m_combine_filters == "RequireOne")
+                    {
+                        accept_keypoint = geo_passed || color_passed;
+                    }
+                    else if(m_combine_filters == "RequireBoth")
+                    {
+                        accept_keypoint = geo_passed && color_passed;
+                    }
+                    if(m_combine_filters == "RequireCombinedList")
+                    {
+                        accept_keypoint = combined_passed;
+                    }
+                }
+                else
+                {
+                    // in case of one quality measures selected: use && since initialization was with true
+                    accept_keypoint = geo_passed && color_passed;
+                }
+
+                if(accept_keypoint)
                 {
                     if(m_refine_position) // TODO VS: part 2 of chapter 18 - change code!!!
                     {

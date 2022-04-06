@@ -78,9 +78,9 @@ namespace ism3d
         std::string m_filter_type_geometry;
         std::string m_filter_method_color;
         std::string m_filter_type_color;
+        std::string m_combine_filters;
         bool m_disable_filter_in_training;
         bool m_refine_position;
-        bool m_require_both_filters;
     };
 }
 
