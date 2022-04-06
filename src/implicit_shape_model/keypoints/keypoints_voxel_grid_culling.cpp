@@ -16,6 +16,8 @@
 #include <pcl/filters/extract_indices.h>
 #include <fstream>
 #include <boost/algorithm/string.hpp>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/features/integral_image_normal.h>
 
 namespace ism3d
 {
@@ -137,6 +139,47 @@ namespace ism3d
                 // densely estimate principle curvatures - very slow
                 curv_est.setInputCloud(pointsWithoutNaNNormals);
                 curv_est.compute(*principal_curvatures);
+            }
+            // NOTE: the next block is for computing curvature with the same radius as the grid size
+            // alternatively curvature can be taken from the already computed normals (usually with lower grid size)
+            else if(m_filter_method_geometry == "curvature")
+            {
+                // need to run new voxel grid to create keypoints without normals (pcl point type)
+                pcl::VoxelGrid<PointT> voxel_grid;
+                voxel_grid.setInputCloud(pointsWithoutNaNNormals);
+                voxel_grid.setLeafSize(m_leafSize, m_leafSize, m_leafSize);
+                pcl::PointCloud<PointT>::Ptr temp_keypoints(new pcl::PointCloud<PointT>());
+                voxel_grid.filter(*temp_keypoints);
+
+                pcl::PointCloud<pcl::Normal>::Ptr keypoint_normals(new pcl::PointCloud<pcl::Normal>());
+                if (pointsWithoutNaNNormals->isOrganized())
+                {
+                    pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
+                    normalEst.setInputCloud(temp_keypoints);
+                    normalEst.setSearchSurface(pointsWithoutNaNNormals);
+                    normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
+                    normalEst.setRadiusSearch(m_leafSize);
+                    normalEst.setMaxDepthChangeFactor(0.02f);
+                    normalEst.setNormalSmoothingSize(10.0f);
+                    normalEst.useSensorOriginAsViewPoint(); // flip normals toward scene viewpoint
+                    normalEst.compute(*keypoint_normals);
+                }
+                else
+                {
+                    pcl::NormalEstimationOMP<PointT, pcl::Normal> normalEst;
+                    normalEst.setInputCloud(temp_keypoints);
+                    normalEst.setSearchSurface(pointsWithoutNaNNormals);
+                    normalEst.setRadiusSearch(m_leafSize);
+                    normalEst.setNumberOfThreads(0);
+                    normalEst.setViewPoint(0,0,0);
+                    normalEst.compute(*keypoint_normals);
+                }
+
+                // assign the curvature computed with grid size to the previously computed normals
+                for(unsigned nidx = 0; nidx < keypoint_normals->size(); nidx++)
+                {
+                    keypoints_with_normals->at(nidx).curvature = keypoint_normals->at(nidx).curvature;
+                }
             }
 
             LOG_INFO("Number of keypoints before filtering: " << keypoints_without_normals->size());
