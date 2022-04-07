@@ -509,8 +509,6 @@ namespace ism3d
         std::vector<float> point_dists;
         keypoints_tree.radiusSearch(keypoint, m_leafSize*1.5, point_idxs, point_dists);
 
-        std::cout << "-------temp debug------- found num neighbors: " << point_idxs.size() << std::endl;
-
         int best_index_geo = -1;
         int best_index_color = -1;
         int best_index_combined = -1;
