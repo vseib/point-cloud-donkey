@@ -233,7 +233,7 @@ namespace ism3d
                     {
                         accept_keypoint = geo_passed && color_passed;
                     }
-                    if(m_combine_filters == "RequireCombinedList")
+                    else if(m_combine_filters == "RequireCombinedList")
                     {
                         accept_keypoint = combined_passed;
                     }
@@ -248,8 +248,9 @@ namespace ism3d
                 {
                     if(m_refine_position) // TODO VS: part 2 of chapter 18 - change code!!!
                     {
-                        PointT keypoint = refineKeypointPosition(geo_scores[idx], color_scores[idx], keypoints_without_normals->at(idx),
-                                                                 points_with_normals, principal_curvatures);
+                        PointT keypoint = refineKeypointPosition(geo_scores, color_scores, combined_scores,
+                                                                 keypoints_without_normals->at(idx), keypoints_without_normals,
+                                                                 geo_passed, color_passed);
                         keypoints->push_back(keypoint);
                     }
                     else
@@ -494,149 +495,104 @@ namespace ism3d
 
 
     PointT KeypointsVoxelGridCulling::refineKeypointPosition(
-            const float geo_score,
-            const float color_score,
+            const std::vector<float> &geo_scores,
+            const std::vector<float> &color_scores,
+            const std::vector<float> &combined_scores,
             const PointT &keypoint,
-            const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
-            const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures)
+            const pcl::PointCloud<PointT>::Ptr &all_keypoints,
+            const bool geo_passed,
+            const bool color_passed)
     {
-        pcl::KdTreeFLANN<PointNormalT> pts_with_normals_tree;
-        pts_with_normals_tree.setInputCloud(points_with_normals);
-        std::vector<int> point_idxs;
+        pcl::KdTreeFLANN<PointT> keypoints_tree;
+        keypoints_tree.setInputCloud(all_keypoints);
+        std::vector<int> point_idxs; // NOTE: result will also contain the keypoint itself
         std::vector<float> point_dists;
-        PointNormalT keyp_normal;
-        keyp_normal.x = keypoint.x;
-        keyp_normal.y = keypoint.y;
-        keyp_normal.z = keypoint.z;
-        pts_with_normals_tree.radiusSearch(keyp_normal, m_leafSize*0.5, point_idxs, point_dists);
+        keypoints_tree.radiusSearch(keypoint, m_leafSize*1.5, point_idxs, point_dists);
 
-        float best_geo = geo_score;
-        float best_color = color_score;
-        int best_index = -1;
-        //std::cout << "-------------- found num neighbors: " << point_idxs.size() << std::endl;
+        std::cout << "-------temp debug------- found num neighbors: " << point_idxs.size() << std::endl;
 
-        pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr local_principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures>());
-        if(m_filter_method_geometry == "gaussian")
-        {
-            // extract neighbor indices into point cloud
-            pcl::PointCloud<PointNormalT>::Ptr nn_cloud_with_normals(new pcl::PointCloud<PointNormalT>());
-            pcl::copyPointCloud(*points_with_normals, point_idxs, *nn_cloud_with_normals);
-            pcl::PointCloud<PointT>::Ptr nn_cloud_without_normals(new pcl::PointCloud<PointT>());
-            pcl::copyPointCloud(*nn_cloud_with_normals, *nn_cloud_without_normals);
-
-            // separate points and normals
-            pcl::PointCloud<PointT>::Ptr points_without_normals(new pcl::PointCloud<PointT>());
-            pcl::copyPointCloud(*points_with_normals, *points_without_normals);
-            pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>());
-            pcl::copyPointCloud(*points_with_normals, *normals);
-
-            // estimate principle curvatures
-            pcl::PrincipalCurvaturesEstimation<PointT, pcl::Normal, pcl::PrincipalCurvatures> curv_est;
-            curv_est.setSearchSurface(points_without_normals);
-            curv_est.setInputNormals(normals);
-            curv_est.setRadiusSearch(m_leafSize);
-            curv_est.setInputCloud(nn_cloud_without_normals);
-            curv_est.compute(*local_principal_curvatures);
-        }
-        if(m_filter_method_geometry == "kpq")
-        {
-            local_principal_curvatures = dense_principal_curvatures;
-        }
-
-        ColorConversion& cc = ColorConversionStatic::getColorConversion();
+        int best_index_geo = -1;
+        int best_index_color = -1;
+        int best_index_combined = -1;
+        float best_score_geo = -1;
+        float best_score_color = -1;
+        float best_score_combined = -1;
 
         // check scores of all neighboring points
-        for(unsigned idx = 0; idx < point_idxs.size(); idx++)
+        for(int idx : point_idxs)
         {
-            const PointNormalT &nn_point = points_with_normals->at(idx);
-            int best_index_geo = -1;
-            int best_index_color = -1;
-            float last_geo_score = -1;
-            float last_color_score = -1;
-
-            if(m_filter_method_geometry == "curvature")
+            if(m_filter_method_geometry != "none")
             {
-                if(nn_point.curvature > best_geo)
+                if(geo_scores[idx] > best_score_geo)
                 {
-                    best_index_geo = int(idx);
-                    last_geo_score = best_geo;
-                    best_geo = nn_point.curvature;
+                    best_index_geo = idx;
+                    best_score_geo = geo_scores[idx];
                 }
             }
-            if(m_filter_method_geometry == "gaussian")
+            if(m_filter_method_color != "none")
             {
-                const pcl::PrincipalCurvatures &pc_point = local_principal_curvatures->at(idx);
-                if(pc_point.pc1 * pc_point.pc2 > best_geo)
+                if(color_scores[idx] > best_score_color)
                 {
-                    best_index_geo = int(idx);
-                    last_geo_score = best_geo;
-                    best_geo = pc_point.pc1 * pc_point.pc2;
+                    best_index_color = idx;
+                    best_score_color = color_scores[idx];
                 }
-            }
-            // group these methods as they need an additional nearest neighbor search
-            if(m_filter_method_geometry == "kpq" || m_filter_method_color == "colordistance")
-            {
-                std::vector<int> point_idxs_kpq;
-                std::vector<float> point_dists_kpq;
-                pts_with_normals_tree.radiusSearch(nn_point, m_leafSize, point_idxs_kpq, point_dists_kpq);
-                if(m_filter_method_geometry == "kpq")
-                {
-                    float kpqval = computeKPQ(point_idxs, local_principal_curvatures);
-                    if(kpqval > best_geo)
-                    {
-                        best_index_geo = int(idx);
-                        last_geo_score = best_geo;
-                        best_geo = kpqval;
-                    }
-                }
-                if(m_filter_method_color == "colordistance")
-                {
-                    float color_score = computeColorScore(point_idxs_kpq, points_with_normals, nn_point, cc);
-                    if(color_score > best_color)
-                    {
-                        best_index_color = int(idx);
-                        last_color_score = best_color;
-                        best_color = color_score;
-                    }
-                }
-            }
-            // consolidate found indices
-            if(m_filter_method_geometry != "none" && m_filter_method_color == "none")
-            {
-                best_index = best_index_geo;
-            }
-            if(m_filter_method_geometry == "none" && m_filter_method_color != "none")
-            {
-                best_index = best_index_color;
             }
             if(m_filter_method_geometry != "none" && m_filter_method_color != "none")
             {
-                if(best_index_geo != -1 && best_index_color != -1)
+                if(combined_scores[idx] > best_score_combined)
                 {
-                    // both, geometric and color filtering yielded the same index - accept it
-                    best_index = int(idx);
+                    best_index_combined = idx;
+                    best_score_combined = combined_scores[idx];
                 }
-                else
+            }
+        }
+
+        int best_index = -1;
+        // consolidate found indices
+        if(m_filter_method_geometry == "none")
+        {
+            best_index = best_index_color;
+        }
+        else if(m_filter_method_color == "none")
+        {
+            best_index = best_index_geo;
+        }
+        else // both are not "none"
+        {
+            // use both metric, init with combined index
+            // also used as fallback for the case that geo and color indices are different
+            best_index = best_index_combined; // case: m_combine_filters == "RequireCombinedList"
+
+            if(geo_passed && !color_passed)   // case: m_combine_filters == "RequireOne"
+                best_index = best_index_geo;
+            if(color_passed && !geo_passed)   // case: m_combine_filters == "RequireOne"
+                best_index = best_index_color;
+            if(color_passed && geo_passed)    // case: m_combine_filters == "RequireBoth"
+            {
+                if(best_index_geo == best_index_color)
                 {
-                    // geometric and color filtering did not agree on an indes - restore previous best scores
-                    if(last_geo_score != -1) best_geo = last_geo_score;
-                    if(last_color_score != -1) best_color = last_color_score;
+                    best_index = best_index_geo;
                 }
             }
         }
 
         if(best_index == -1)
         {
+            LOG_WARN("Could not refine keypoint location!");
             return keypoint;
         }
         else
         {
-            const PointNormalT& kp = points_with_normals->at(best_index);
-            PointT res(kp.r, kp.g, kp.b);
-            res.x = kp.x;
-            res.y = kp.y;
-            res.z = kp.z;
-            return res;
+            const PointT& kp = all_keypoints->at(best_index);
+
+            PointT result;
+            result.x = 0.5 * (kp.x + keypoint.x);
+            result.y = 0.5 * (kp.y + keypoint.y);
+            result.z = 0.5 * (kp.z + keypoint.z);
+            result.r = int(0.5 * (kp.r + keypoint.r));
+            result.g = int(0.5 * (kp.g + keypoint.g));
+            result.b = int(0.5 * (kp.b + keypoint.b));
+            return result;
         }
     }
 

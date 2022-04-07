@@ -60,13 +60,13 @@ namespace ism3d
                                 const PointNormalT &ref,
                                 const ColorConversion &cc) const;
 
-        PointT refineKeypointPosition(
-                const float geo_score,
-                const float color_score,
-                const PointT &keypoint,
-                const pcl::PointCloud<PointNormalT>::Ptr points_with_normals,
-                const pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr dense_principal_curvatures);
-
+        PointT refineKeypointPosition(const std::vector<float> &geo_scores,
+                                      const std::vector<float> &color_scores,
+                                      const std::vector<float> &combined_scores,
+                                      const PointT &keypoint,
+                                      const pcl::PointCloud<PointT>::Ptr &all_keypoints,
+                                      const bool geo_passed,
+                                      const bool color_passed);
 
     private:
         float m_leafSize;
