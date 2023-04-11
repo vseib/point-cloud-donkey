@@ -168,7 +168,10 @@ pcl::PointCloud<pcl::ReferenceFrame>::ConstPtr Features::computeReferenceFrames(
         return computeFLAREReferenceFrames(points, normals, pointsWithoutNaNNormals, normalsWithoutNaN, keypoints, search);
 #endif
     else if (m_referenceFrameType == "SHOT")
+    {
+        // TODO VS why is this signature different from the rest
         return computeSHOTReferenceFrames(pointsWithoutNaNNormals, keypoints, search);
+    }
     else if (m_referenceFrameType == "SHOTNA")
         return computeSHOTNAReferenceFrames(points, normals, pointsWithoutNaNNormals, normalsWithoutNaN, keypoints, search);
     else

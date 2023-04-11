@@ -25,6 +25,7 @@
 #include "features_short_cshot.h"
 #include "features_rift.h"
 #include "features_esf.h"
+#include "features_cospair.h"
 #include "features_3dsc.h"
 #include "features_usc.h"
 #include "features_rsd.h"
@@ -80,6 +81,8 @@ namespace ism3d
             return new FeaturesRSD();
         else if (type == FeaturesESFLocal::getTypeStatic())
             return new FeaturesESFLocal();
+        else if (type == FeaturesCospair::getTypeStatic())
+            return new FeaturesCospair();
         else if (type == FeaturesGRSD::getTypeStatic())
             return new FeaturesGRSD(); // global feature!
         else if (type == FeaturesESF::getTypeStatic())

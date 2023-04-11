@@ -380,7 +380,6 @@ int main(int argc, char **argv)
                     int cumul_fp_dataset = 0;
 
                     std::map<unsigned, float> dist_thresholds = ism.getDetectionThreshold();
-
                     for(auto item : mc.gt_class_map)
                     {
                         std::string class_label = item.first;

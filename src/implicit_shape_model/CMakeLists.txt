@@ -105,6 +105,7 @@ add_library(implicit_shape_model
     features/features_dummy.cpp
     features/features_cgf.cpp
     features/features_gasd.cpp
+    features/features_cospair.cpp
     feature_ranking/feature_ranking.cpp
     feature_ranking/ranking_uniform.cpp
     feature_ranking/ranking_naive_bayes.cpp
@@ -161,6 +162,7 @@ add_library(implicit_shape_model
     third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_with_eigenvalues.cpp
     third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_omp_with_eigenvalues.hpp
     third_party/pcl_normal_3d_omp_with_eigenvalues/normal_3d_omp_with_eigenvalues.h
+    third_party/cospair/cospair.cpp
 )
 
 # link library with dependencies

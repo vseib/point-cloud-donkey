@@ -161,10 +161,23 @@ computePrecisionRecallForPlotting(
         for(unsigned i = 0; i < detection_list.size(); i++)
         {
             DetectionObject& obj = detection_list.at(i);
-            int tp = tps_per_class[class_id].at(i);
-            int fp = fps_per_class[class_id].at(i);
+            int tp, fp;
+            float confidence;
+            // handling a class that is available in training set, but not in testing set
+            if(tps_per_class[class_id].size() == 0 && fps_per_class[class_id].size() == 0)
+            {
+                tp = 0;
+                fp = 0;
+                confidence = 0.0;
+            }
+            else
+            {
+                tp = tps_per_class[class_id].at(i);
+                fp = fps_per_class[class_id].at(i);
+                confidence = obj.confidence;
+            }
 
-            all_detections.push_back({obj.confidence, tp, fp});
+            all_detections.push_back({confidence, tp, fp});
         }
     }
 
@@ -180,6 +193,7 @@ computePrecisionRecallForPlotting(
     float ap = 0.0f;
     std::vector<float> precisions;
     std::vector<float> recalls;
+
     for(DetectionSummary &det : all_detections)
     {
         tp_sum += det.tp;
