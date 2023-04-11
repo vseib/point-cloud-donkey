@@ -158,6 +158,11 @@ namespace ism3d
                 return false;
             }
         }
+        else if(!training)
+        {
+            LOG_ERROR("Config file " << file << " has only parameters, but no trained object data!");
+            return false;
+        }
 
         LOG_INFO("reading successful");
 
