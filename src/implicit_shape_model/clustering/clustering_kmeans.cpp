@@ -43,7 +43,7 @@ namespace ism3d
         if (getDistance().getType() == DistanceEuclidean::getTypeStatic())
             cluster<DistanceEuclidean::DistanceType>(features);
         else {
-            LOG_WARN("The k-means algorithm is only defined on euclidean distance. Using other distance metrices may lead to unexpected results.");
+            LOG_WARN("The k-means algorithm is only defined on euclidean distance. Using other distance metrics may lead to unexpected results.");
             if (getDistance().getType() == DistanceChiSquared::getTypeStatic())
                 cluster<DistanceChiSquared::DistanceType>(features);
             else
