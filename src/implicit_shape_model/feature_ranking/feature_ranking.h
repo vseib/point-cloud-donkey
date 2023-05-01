@@ -99,7 +99,8 @@ namespace ism3d
         int m_num_kd_trees;
         bool m_flann_exact_match;
 
-        std::string m_extractList;
+        std::string m_extract_list;
+        float m_extract_offset;
 
         template<typename T>
         std::vector<float> accumulateClassDistances(const pcl::PointCloud<ISMFeature>::Ptr& features,

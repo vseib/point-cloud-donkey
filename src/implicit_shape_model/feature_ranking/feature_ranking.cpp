@@ -24,7 +24,8 @@ FeatureRanking::FeatureRanking()
     addParameter(m_k_search, "KSearch", 10);
     addParameter(m_dist_thresh, "DistanceThreshold", 0.1f);
     addParameter(m_factor, "Factor", 0.75f);
-    addParameter(m_extractList, "ExtractFromList", std::string("front"));
+    addParameter(m_extract_list, "ExtractFromList", std::string("invalid"));
+    addParameter(m_extract_offset, "ExtractOffset", 0.0f);
 }
 
 FeatureRanking::~FeatureRanking()
@@ -129,13 +130,29 @@ std::map<unsigned, std::vector<std::pair<int, float>>> FeatureRanking::rankFeatu
             index_score_map.at(i).push_back({j,score});
         }
     }
+
+    if(m_extract_list != "invalid")
+    {
+        LOG_WARN("Config parameter \"ExtractFromList\" is deprecated. Use \"ExtractOffset\" instead!");
+        LOG_WARN("For now, the given value for \"ExtractFromList\" will be automatically converted.");
+
+        // NOTE: m_extract_list specifies where the ranked features should be extracted from the scored list
+        // now using m_extract_offset to use a fine-grained extraction
+        if(m_extract_list == "front")
+            m_extract_offset = 0.0f;
+        if(m_extract_list == "center" || m_extract_list == "middle")
+            m_extract_offset = 0.5 * (1-m_factor);
+        if(m_extract_list == "back")
+            m_extract_offset = 1.0 - m_factor;
+    }
+
     // sort count index map
     for(auto &i : index_score_map)
     {
-        if(m_extractList == "front")
+        //if(m_extract_list == "front")
             std::sort(i.second.begin(), i.second.end(), [](const std::pair<int,float> &a, const std::pair<int,float> &b){return a.second < b.second;});
-        else
-            std::sort(i.second.begin(), i.second.end(), [](const std::pair<int,float> &a, const std::pair<int,float> &b){return a.second > b.second;});
+        //else
+        //    std::sort(i.second.begin(), i.second.end(), [](const std::pair<int,float> &a, const std::pair<int,float> &b){return a.second > b.second;});
     }
     return index_score_map;
 }
@@ -155,18 +172,15 @@ std::map<unsigned, std::vector<float>> FeatureRanking::extractSubsetFromRankedLi
     // assign scores subset
     for(int class_idx = 0; class_idx < index_score_map.size(); class_idx++)
     {
-        float min_index, max_index;
-        if(m_extractList == "center" || m_extractList == "middle")
-        {
-            float start = 0.5 * (1-m_factor);
-            min_index = index_score_map.at(class_idx).size() * start;
-            max_index = index_score_map.at(class_idx).size() * (m_factor+start);
-        }
-        else
-        {
+        float min_index; // inclusive
+        float max_index; // exclusive
+        min_index = index_score_map.at(class_idx).size() * m_extract_offset;
+        max_index = index_score_map.at(class_idx).size() * (m_factor + m_extract_offset);
+        // sanitize values
+        if(min_index < 0)
             min_index = 0;
-            max_index = index_score_map.at(class_idx).size() * m_factor;
-        }
+        if(max_index > index_score_map.at(class_idx).size())
+            max_index = index_score_map.at(class_idx).size();
 
         for(int j = 0; j < index_score_map.at(class_idx).size(); j++)
         {
