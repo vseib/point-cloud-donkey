@@ -164,6 +164,15 @@ void VotingMeanShift::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
         std::vector<Vote> cluster_votes;
         float density = estimateDensityAndReweightVotes(maximum_positions[i], votes, cluster_votes, search);
 
+        // TODO VS: (in chapter 15) test this as replacement for the following
+        //       "TODO VS: get rid of this when refactoring"
+//        std::vector<unsigned> clusterInstances;
+//        for(auto elem : cluster_votes)
+//        {
+//            clusterInstances.push_back(elem.instanceId);
+//        }
+//        instanceIdsPerCluster.push_back(clusterInstances);
+
         votes_per_cluster.push_back(std::move(cluster_votes));
         maximum_weights.push_back(std::move(density));
     }
