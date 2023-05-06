@@ -32,9 +32,9 @@ namespace ism3d
 
     void VotingHough3D::iFindMaxima(pcl::PointCloud<PointT>::ConstPtr &points,
                                     std::vector<Vote>& votes,
-                                    std::vector<Eigen::Vector3f>& clusters,
+                                    std::vector<Eigen::Vector3f>& maximum_positions,
                                     std::vector<double>& maxima,
-                                    std::vector<std::vector<unsigned>>& instanceIds,
+                                    std::vector<std::vector<unsigned>>& instanceIdsPerCluster,
                                     std::vector<std::vector<Vote>>& cluster_votes,
                                     unsigned classId)
     {
@@ -66,14 +66,14 @@ namespace ism3d
         // find maxima
         std::vector<std::vector<int>> voteIndices;
         m_houghSpace->findMaxima(-m_relThreshold, maxima, voteIndices);
-
         cluster_votes.resize(maxima.size());
 
         // iterate through all found maxima and create a weighted cluster center
         for (int i = 0; i < (int)voteIndices.size(); i++)
         {
             const std::vector<int>& clusterVoteIndices = voteIndices[i];
-            std::vector<unsigned>& clusterInstances = instanceIds[i];
+
+            std::vector<unsigned> clusterInstances;
             clusterInstances.resize(clusterVoteIndices.size());
 
             Eigen::Vector3f clusterCenter(0, 0, 0);
@@ -89,10 +89,10 @@ namespace ism3d
             }
 
             clusterCenter /= weight;
-            clusters.push_back(clusterCenter);
+            maximum_positions.push_back(clusterCenter);
+            instanceIdsPerCluster.push_back(clusterInstances);
         }
     }
-
     void VotingHough3D::clear()
     {
         m_houghSpace->reset();
