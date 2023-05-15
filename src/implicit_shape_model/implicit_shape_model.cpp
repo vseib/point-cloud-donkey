@@ -285,47 +285,43 @@ void ImplicitShapeModel::train()
 
 
             // TODO VS: remove this completely
-            if(m_set_color_to_zero)
-            {
-                LOG_INFO("Setting color to 0 in loaded point cloud");
-                for(int i = 0; i < point_cloud->size(); i++)
-                {
-                    point_cloud->at(i).r = 0;
-                    point_cloud->at(i).g = 0;
-                    point_cloud->at(i).b = 0;
-                }
-            }
-            bool normal_xyz_color_transform = false;
-            if(normal_xyz_color_transform)
-            {
-                LOG_INFO("Setting color to normal's XYZ in loaded point cloud");
-                for(int i = 0; i < point_cloud->size(); i++)
-                {
-                    const PointNormalT point = point_cloud->at(i);
-                    point_cloud->at(i).r = point.normal_z * 255.0f;
-                    point_cloud->at(i).g = point.normal_y * 255.0f;
-                    point_cloud->at(i).b = point.normal_x * 255.0f;
-                }
-            }
-            bool jet_color_transform = false;
-            if(jet_color_transform)
-            {
-                LOG_INFO("Setting color to JET color scheme in loaded point cloud");
-                for(int i = 0; i < point_cloud->size(); i++)
-                {
-                    // note: assuming x,y,z are in [-1|1]
-                    point_cloud->at(i).r = 127.5f + (point_cloud->at(i).x * 127.5f);
-                    point_cloud->at(i).g = 127.5f + (point_cloud->at(i).y * 127.5f);
-                    point_cloud->at(i).b = 127.5f + (point_cloud->at(i).z * 127.5f);
-                }
-//                std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
-//                LOG_INFO("now saving, name is: "+ name);
-//                pcl::io::savePCDFileASCII(name, *point_cloud);
-            }
-
-
-
-
+//            if(m_set_color_to_zero)
+//            {
+//                LOG_INFO("Setting color to 0 in loaded point cloud");
+//                for(int i = 0; i < point_cloud->size(); i++)
+//                {
+//                    point_cloud->at(i).r = 0;
+//                    point_cloud->at(i).g = 0;
+//                    point_cloud->at(i).b = 0;
+//                }
+//            }
+//            bool normal_xyz_color_transform = false;
+//            if(normal_xyz_color_transform)
+//            {
+//                LOG_INFO("Setting color to normal's XYZ in loaded point cloud");
+//                for(int i = 0; i < point_cloud->size(); i++)
+//                {
+//                    const PointNormalT point = point_cloud->at(i);
+//                    point_cloud->at(i).r = point.normal_z * 255.0f;
+//                    point_cloud->at(i).g = point.normal_y * 255.0f;
+//                    point_cloud->at(i).b = point.normal_x * 255.0f;
+//                }
+//            }
+//            bool jet_color_transform = false;
+//            if(jet_color_transform)
+//            {
+//                LOG_INFO("Setting color to JET color scheme in loaded point cloud");
+//                for(int i = 0; i < point_cloud->size(); i++)
+//                {
+//                    // note: assuming x,y,z are in [-1|1]
+//                    point_cloud->at(i).r = 127.5f + (point_cloud->at(i).x * 127.5f);
+//                    point_cloud->at(i).g = 127.5f + (point_cloud->at(i).y * 127.5f);
+//                    point_cloud->at(i).b = 127.5f + (point_cloud->at(i).z * 127.5f);
+//                }
+////                std::string name = "/home/vseib/Desktop/"+cloud_filenames[j];
+////                LOG_INFO("now saving, name is: "+ name);
+////                pcl::io::savePCDFileASCII(name, *point_cloud);
+//            }
 
             // compute bounding box
             Utils::BoundingBox bounding_box;
