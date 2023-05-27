@@ -65,7 +65,8 @@ namespace ism3d
 
         std::map<unsigned, std::vector<float>> extractSubsetFromRankedList(
                 const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map,
-                const std::map<unsigned, std::vector<float>> &scores);
+                const std::map<unsigned, std::vector<float>> &scores,
+                const bool invert_selection = false);
 
         std::map<unsigned, std::vector<std::vector<float>>> unflatten_list(
                 std::map<unsigned, std::vector<float>> &scores_flat_list,

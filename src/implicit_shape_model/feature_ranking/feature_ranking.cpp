@@ -57,7 +57,8 @@ FeatureRanking::operator()(std::map<unsigned, std::vector<pcl::PointCloud<ISMFea
     {
         // rank with scores
         index_score_map = rankFeaturesWithScores(scores);
-        scores = extractSubsetFromRankedList(index_score_map, scores);
+        bool invert_selection = false;
+        scores = extractSubsetFromRankedList(index_score_map, scores, invert_selection);
 
         // debug output: enable / disable inside method
         DebugUtils::writeOutForDebug(index_score_map, getType());
@@ -160,7 +161,8 @@ std::map<unsigned, std::vector<std::pair<int, float>>> FeatureRanking::rankFeatu
 
 std::map<unsigned, std::vector<float>> FeatureRanking::extractSubsetFromRankedList(
                                            const std::map<unsigned, std::vector<std::pair<int, float>>> &index_score_map,
-                                           const std::map<unsigned, std::vector<float>> &scores)
+                                           const std::map<unsigned, std::vector<float>> &scores,
+                                           const bool invert_selection)
 {
     // init scores map
     std::map<unsigned, std::vector<float>> scores_clean; // this will hold a subset of the ranked scores
@@ -185,7 +187,13 @@ std::map<unsigned, std::vector<float>> FeatureRanking::extractSubsetFromRankedLi
         for(int j = 0; j < index_score_map.at(class_idx).size(); j++)
         {
             std::pair<int, float> temp = index_score_map.at(class_idx).at(j);
-            if(j >= min_index && j < max_index)
+            // if-clase is the normal use case
+            if(!invert_selection && j >= min_index && j < max_index)
+            {
+                scores_clean.at(class_idx).at(temp.first) = 1;
+            }
+            // else clause if for validation that ranking works (i.e. this case should produce worse results)
+            else if(invert_selection && (j < min_index || j >= max_index))
             {
                 scores_clean.at(class_idx).at(temp.first) = 1;
             }
