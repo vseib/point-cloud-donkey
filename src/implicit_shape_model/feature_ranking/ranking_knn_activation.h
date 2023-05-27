@@ -13,6 +13,7 @@
 
 #include "feature_ranking.h"
 
+// TODO VS rename in activation ranking (omit the knn in the name)
 namespace ism3d
 {
     /**

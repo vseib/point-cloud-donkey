@@ -14,8 +14,8 @@ namespace ism3d
 {
 RankingSimilarity::RankingSimilarity()
 {
-    addParameter(m_update_type, "UpdateType", std::string("score"));
-    addParameter(m_intra_pos, "IntraPosition", std::string("front"));
+    addParameter(m_update_type, "UpdateType", std::string("score")); // TODO VS remove variable, make score the unchangeable default
+    addParameter(m_intra_pos, "IntraPosition", std::string("center"));
     addParameter(m_inter_pos, "InterPosition", std::string("front"));
 }
 
@@ -97,8 +97,8 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
                 std::vector<int> indices = indices_raw.at(0);
                 std::vector<float> distances = distances_raw.at(0);
 
-                best_distance_own_class = distances[1]; // index 0 is the query itself
-                query_idx = indices[0];
+                best_distance_own_class = distances[1]; // index 0 is the query itself // TODO VS: variable not used - remove
+                query_idx = indices[0]; // TODO VS: variable not used - remove
 
                 // upweight neighbors that have higher distances to the query
                 for(int idx = 0; idx < indices.size(); idx++)
@@ -177,8 +177,6 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
             std::vector<float> list = intra_class_scores[class_id];
             std::sort(list.begin(), list.end());
             float min = list.front();
-            float max = list.back();
-            float median = list.at(std::floor(list.size()/2));
 
             // in case some features have zero score so far, remap zero to "best" value
             // (only necessary for "score" and "dist" types
@@ -188,6 +186,7 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
                 {
                     if(intra_class_scores[class_id][i] == 0)
                     {
+                        // NOTE: all values are negative
                         intra_class_scores[class_id][i] = min * 1.1f; // TODO VS: tune this value? --> must be smaller than min, but how much "advantage" to give?
                     }
                 }
@@ -195,26 +194,24 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
             list = intra_class_scores[class_id];
             std::sort(list.begin(), list.end());
             min = list.front();
-            max = list.back();
-            median = list.at(std::floor(list.size()/2));
-
+            float max = list.back();
 
             // transform scores
             for(unsigned i = 0; i < intra_class_scores[class_id].size(); i++)
             {
-                if(m_intra_pos == "front" || m_intra_pos == "back")
+                // normalile to range 0 to 1
+                // this already covers the case "front"
+                if(min < 0)
                 {
-                    // favors the front of the list
-                    if(min < 0)
-                    {
-                        intra_class_scores[class_id][i] =
-                                (intra_class_scores[class_id][i]+std::fabs(min)) / (max+std::fabs(min));
-                    }
-                    else
-                    {
-                        intra_class_scores[class_id][i] = intra_class_scores[class_id][i]/max;
-                    }
+                    intra_class_scores[class_id][i] =
+                            (intra_class_scores[class_id][i]+std::fabs(min)) / (std::fabs(max)+std::fabs(min));
                 }
+                else
+                {
+                    intra_class_scores[class_id][i] =
+                            (intra_class_scores[class_id][i]-std::fabs(min)) / (std::fabs(max)-std::fabs(min));
+                }
+
                 if(m_intra_pos == "back") // this second step is needed for "back"
                 {
                     // favors the back
@@ -223,22 +220,12 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
 
                 if(m_intra_pos == "center")
                 {
-                // favors the center of the list
-                // with median: slightly shifted to the back
-                // with 0.5: more centered
-                //median = median > 0 ? 0.5f : -0.5f;
-                    intra_class_scores[class_id][i] = std::fabs((intra_class_scores[class_id][i]-median) / (max-median));
+                    std::vector<float> list = intra_class_scores[class_id];
+                    std::sort(list.begin(), list.end());
+                    float median = list.at(std::floor(list.size()/2));
+                    // favors the center of the list
+                    intra_class_scores[class_id][i] = std::fabs(intra_class_scores[class_id][i]-median);
                 }
-
-                if(m_intra_pos == "center2")
-                {
-                // favors the center of the list
-                // with median: slightly shifted to the back
-                // with 0.5: more centered
-                    median = median > 0 ? 0.5f : -0.5f;
-                    intra_class_scores[class_id][i] = std::fabs((intra_class_scores[class_id][i]-median) / (max-median));
-                }
-
             }
         }
 
@@ -249,8 +236,6 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
             std::vector<float> list = inter_class_scores[class_id];
             std::sort(list.begin(), list.end());
             float min = list.front();
-            float max = list.back();
-            float median = list.at(std::floor(list.size()/2));
 
             // in case some features have zero score so far, remap zero to "best" value
             // (only necessary for "score" and "dist" types
@@ -267,25 +252,24 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
             list = inter_class_scores[class_id];
             std::sort(list.begin(), list.end());
             min = list.front();
-            max = list.back();
-            median = list.at(std::floor(list.size()/2));
+            float max = list.back();
 
             // transform scores
             for(unsigned i = 0; i < inter_class_scores[class_id].size(); i++)
             {
-                if(m_inter_pos == "front" || m_inter_pos == "back")
+                // normalile to range 0 to 1
+                // this already covers the case "front"
+                if(min < 0)
                 {
-                    // favors the front of the list
-                    if(min < 0)
-                    {
-                        inter_class_scores[class_id][i] =
-                                (inter_class_scores[class_id][i]+std::fabs(min)) / (max+std::fabs(min));
-                    }
-                    else
-                    {
-                        inter_class_scores[class_id][i] = inter_class_scores[class_id][i]/max;
-                    }
+                    inter_class_scores[class_id][i] =
+                            (inter_class_scores[class_id][i]+std::fabs(min)) / (std::fabs(max)+std::fabs(min));
                 }
+                else
+                {
+                    inter_class_scores[class_id][i] =
+                            (inter_class_scores[class_id][i]-std::fabs(min)) / (std::fabs(max)-std::fabs(min));
+                }
+
                 if(m_inter_pos == "back") // this second step is needed for "back"
                 {
                     // favors the back
@@ -294,20 +278,10 @@ std::map<unsigned, std::vector<float> > RankingSimilarity::iComputeScores(
 
                 if(m_inter_pos == "center")
                 {
-                // favors the center of the list
-                // with median: slightly shifted to the back
-                // with 0.5: more centered
-                //median = median > 0 ? 0.5f : -0.5f;
-                    inter_class_scores[class_id][i] = std::fabs((inter_class_scores[class_id][i]-median) / (max-median));
-                }
-
-                if(m_inter_pos == "center2")
-                {
-                // favors the center of the list
-                // with median: slightly shifted to the back
-                // with 0.5: more centered
-                    median = median > 0 ? 0.5f : -0.5f;
-                    inter_class_scores[class_id][i] = std::fabs((inter_class_scores[class_id][i]-median) / (max-median));
+                    std::vector<float> list = inter_class_scores[class_id];
+                    float median = list.at(std::floor(list.size()/2));
+                    // favors the center of the list
+                    inter_class_scores[class_id][i] = std::fabs((inter_class_scores[class_id][i]-median));
                 }
             }
         }
