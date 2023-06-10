@@ -38,11 +38,6 @@ namespace ism3d
         m_output_file_name = file.substr(0, pos);
     }
 
-    void JSONObject::setInputFilename(std::string file)
-    {
-        m_input_config_file = file;
-    }
-
     bool JSONObject::writeObject(std::string file)
     {
         boost::filesystem::path filePath(file);
@@ -102,6 +97,7 @@ namespace ism3d
     bool JSONObject::readObject(std::string file, bool training)
     {
         LOG_INFO("reading object configuration from file: " << file);
+        m_input_config_file = file;
 
         // read configuration
         Json::Value configJson = read(file);

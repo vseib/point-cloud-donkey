@@ -1177,6 +1177,7 @@ bool ImplicitShapeModel::iLoadData(boost::archive::binary_iarchive &ia)
     // this is necessary since objects are created before config is read in json_object.cpp
     // forward svm path as it might have been manually changed in config
     m_voting->setSVMPath(m_svm_path);
+    m_voting->setInputConfigPath(m_input_config_file);
 
     unsigned size;
     ia >> size;

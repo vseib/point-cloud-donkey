@@ -117,6 +117,11 @@ namespace ism3d
             m_svm_path = path;
         }
 
+        void setInputConfigPath(std::string path)
+        {
+            m_input_config_file = path;
+        }
+
         bool isUsingGlobalFeatures()
         {
             return m_use_global_features;
@@ -176,6 +181,7 @@ namespace ism3d
         int m_k_global_features;
         std::string m_global_feature_method;
         std::string m_svm_path; // path in config to svm models
+        std::string m_input_config_file;
         Features* m_global_feature_descriptor;
         // ... when maxima are detected
         int m_merge_function;

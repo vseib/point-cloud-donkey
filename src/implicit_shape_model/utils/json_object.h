@@ -72,7 +72,6 @@ namespace ism3d
         bool loadData(boost::archive::binary_iarchive &ia);
 
         void setOutputFilename(std::string file);
-        void setInputFilename(std::string file);
 
     protected:
         template <typename T>
