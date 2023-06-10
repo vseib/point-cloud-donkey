@@ -18,8 +18,8 @@
 
 CustomSVM::CustomSVM(std::string output_file_name)
 {    
-    // omit the path, keep only the file name
-    m_output_file_name = output_file_name.substr(output_file_name.find_last_of('/')+1);
+    // this is the path that the resulting svm is saved to
+    m_output_file_name = output_file_name;
 }
 
 CustomSVM::~CustomSVM()

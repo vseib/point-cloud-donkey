@@ -65,11 +65,19 @@ namespace ism3d
         configJson["ObjectData"] = fileDataNoPath; //relative.string();
         if(m_use_svm)
         {
+            // TODO VS fix svm path
+            std::size_t pos = m_output_file_name.find_last_of('/');
+            std::string svm_output_path = m_output_file_name;
+            // remove the path (if provided), leave the file name
+            if(pos != std::string::npos)
+            {
+                svm_output_path = svm_output_path.substr(pos+1);
+            }
             // this is to be easily accessible in the config file
             if(m_svm_1_vs_all_train)
-                configJson["ObjectDataSVM"] = Json::Value(m_output_file_name+".svm.tar.gz");
+                configJson["ObjectDataSVM"] = Json::Value(svm_output_path+".svm.tar.gz");
             else
-                configJson["ObjectDataSVM"] = Json::Value(m_output_file_name+".svm");
+                configJson["ObjectDataSVM"] = Json::Value(svm_output_path+".svm");
             // NOTE: in case this name is changed in config, it needs to be forwarded to data while loading
         }
 
