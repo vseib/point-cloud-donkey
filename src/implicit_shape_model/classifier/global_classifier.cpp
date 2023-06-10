@@ -78,15 +78,13 @@ namespace ism3d
             boost::filesystem::path path(svm_path);
             boost::filesystem::path p_comp = boost::filesystem::complete(path);
 
-            std::cout << "svm path: " << svm_path << std::endl;
-            std::cout << p_comp.c_str() << std::endl;
-            sleep(5);
             if(boost::filesystem::exists(p_comp) && boost::filesystem::is_regular_file(p_comp))
             {
                 m_svm_files.clear();
                 // check if multiple svm files are available (i.e. 1 vs all svm)
                 if(svm_path.find("tar") != std::string::npos)
                 {
+                    LOG_INFO("Found 1 vs all SVM (binary)");
                     // show the content of the tar file
                     std::string result = exec(("tar -tf " + p_comp.string()).c_str());
                     // split the string and add to list
@@ -105,6 +103,7 @@ namespace ism3d
                 }
                 else
                 {
+                    LOG_INFO("Found pairwise 1 vs 1 SVM (multiclass)");
                     // only one file: standard OpenCV SVM (i.e. pairwise 1 vs 1 svm)
                     m_svm_files.push_back(p_comp.string());
                 }
