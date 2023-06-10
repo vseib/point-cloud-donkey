@@ -609,8 +609,6 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
 
 bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
 {
-    std::cout << "loading voting" << std::endl;
-
     // read bounding box data
     m_dimensions_map.clear();
     m_variance_map.clear();
@@ -719,7 +717,7 @@ bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
         m_global_classifier->setLoadedFeatures(global_features_cloud);
 //        m_global_classifier->computeAverageRadii(global_features_map);
         m_global_classifier->setGlobalRadii(global_radii);
-        m_global_classifier->loadSVMModels(m_input_config_file_name, m_svm_path);
+        m_global_classifier->loadSVMModels(m_input_config_file, m_svm_path);
 
         if(m_single_object_mode)
         {

@@ -115,6 +115,7 @@ int main(int argc, char **argv)
                 ism3d::ImplicitShapeModel ism;
                 ism.setLogging(log_info);
                 ism.setSignalsState(false); // disable signals since we are using command line, no GUI
+                ism.setInputFilename(ismFile);
 
                 if(!ism.readObject(ismFile, true))
                 {
@@ -256,7 +257,6 @@ int main(int argc, char **argv)
                 ism3d::ImplicitShapeModel ism;
                 ism.setLogging(log_info);
                 ism.setSignalsState(false); // disable signals since we are using command line, no GUI
-                std::cout << "created ism object" << std::endl;
 
                 if (!ism.readObject(ismFile))
                 {
