@@ -65,7 +65,6 @@ namespace ism3d
         configJson["ObjectData"] = fileDataNoPath; //relative.string();
         if(m_use_svm)
         {
-            // TODO VS fix svm path
             std::size_t pos = m_output_file_name.find_last_of('/');
             std::string svm_output_path = m_output_file_name;
             // remove the path (if provided), leave the file name
@@ -97,8 +96,8 @@ namespace ism3d
 
     bool JSONObject::readObject(std::string file, bool training)
     {
-        LOG_INFO("reading object configuration from file: " << file);
         m_input_config_file_name = file;
+        LOG_INFO("reading object configuration from file: " << m_input_config_file_name);
 
         // read configuration
         Json::Value configJson = read(file);
