@@ -96,8 +96,8 @@ namespace ism3d
 
     bool JSONObject::readObject(std::string file, bool training)
     {
+        LOG_INFO("reading object configuration from file: " << file);
         m_input_config_file_name = file;
-        LOG_INFO("reading object configuration from file: " << m_input_config_file_name);
 
         // read configuration
         Json::Value configJson = read(file);

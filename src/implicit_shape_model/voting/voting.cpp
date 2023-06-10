@@ -609,6 +609,8 @@ void Voting::iSaveData(boost::archive::binary_oarchive &oa) const
 
 bool Voting::iLoadData(boost::archive::binary_iarchive &ia)
 {
+    std::cout << "loading voting" << std::endl;
+
     // read bounding box data
     m_dimensions_map.clear();
     m_variance_map.clear();
