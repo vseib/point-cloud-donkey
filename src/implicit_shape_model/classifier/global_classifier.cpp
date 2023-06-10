@@ -74,20 +74,13 @@ namespace ism3d
         // load SVM for global features
         if(svm_path != "")
         {
-            std::cout << "input config path: " << input_config_path << std::endl;
-            std::cout << "old svm path: " << svm_path << std::endl;
-
             // in case ism is not loaded from current working directory, construct the real path
             std::size_t pos = input_config_path.find_last_of('/');
             // replace config file name by svm file name
             if(pos != std::string::npos)
             {
                 svm_path = input_config_path.substr(0, pos+1) + svm_path;
-                std::cout << "new svm path: " << svm_path << std::endl;
             }
-
-            std::cout << "svm path: " << svm_path << std::endl;
-            sleep(3);
 
             // get path and check for errors
             boost::filesystem::path path(svm_path);
