@@ -78,6 +78,9 @@ namespace ism3d
             boost::filesystem::path path(svm_path);
             boost::filesystem::path p_comp = boost::filesystem::complete(path);
 
+            std::cout << "svm path: " << svm_path << std::endl;
+            std::cout << p_comp.c_str() << std::endl;
+            sleep(5);
             if(boost::filesystem::exists(p_comp) && boost::filesystem::is_regular_file(p_comp))
             {
                 m_svm_files.clear();
