@@ -91,7 +91,7 @@ namespace ism3d
 
         void computeAverageRadii(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &global_features);
 
-        void loadSVMModels(std::string &svm_path);
+        void loadSVMModels(std::string &input_config_path, std::string &svm_path);
 
         void setMergeParams(const float min_svm_score, const float rate_limit, const float weight_factor)
         {

@@ -69,11 +69,22 @@ namespace ism3d
     }
 
 
-    void GlobalClassifier::loadSVMModels(std::string &svm_path)
+    void GlobalClassifier::loadSVMModels(std::string &input_config_path, std::string &svm_path)
     {
         // load SVM for global features
         if(svm_path != "")
         {
+            // in case ism is not loaded from current working directory, construct the real path
+            std::size_t pos = input_config_path.find_last_of('/');
+            // replace config file name by svm file name
+            if(pos != std::string::npos)
+            {
+                svm_path = input_config_path.substr(0, pos+1) + svm_path;
+            }
+
+            std::cout << "svm path: " << svm_path << std::endl;
+            sleep(3);
+
             // get path and check for errors
             boost::filesystem::path path(svm_path);
             boost::filesystem::path p_comp = boost::filesystem::complete(path);

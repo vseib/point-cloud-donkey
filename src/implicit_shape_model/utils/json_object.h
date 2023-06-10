@@ -91,6 +91,7 @@ namespace ism3d
         bool m_svm_1_vs_all_train;
         std::string m_svm_path;
         std::string m_output_file_name;
+        std::string m_input_config_file_name;
 
     private:
         bool write(const Json::Value&, const std::string&, bool) const;
