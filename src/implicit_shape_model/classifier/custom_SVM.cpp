@@ -309,7 +309,8 @@ CustomSVM::SVMResponse CustomSVM::predictUnifyScore(cv::Mat test_data, std::vect
         // switch sign and normalize to [0|1] to make score compatible with other score
         for(float &sc : response.all_scores)
         {
-            sc = (sc * (-1) + 1) * 0.5;
+            //sc = (sc * (-1) + 1) * 0.5;
+            sc = sigmoid(sc);
         }
         response.score = response.all_scores[response.label];
     }

@@ -276,7 +276,8 @@ namespace ism3d
                 // insert result
                 ISMFeature temp = m_global_features->at(indices[0].at(i));
                 float dist_squared = distances[0].at(i);
-                float score = std::exp(-sqrt(dist_squared));
+//                float score = std::exp(-sqrt(dist_squared));
+                float score = 1.0 / (1.0 + std::exp(-sqrt(dist_squared)));
                 insertGlobalResult(max_global_voting, temp.classId, temp.instanceId, score);
             }
         }
