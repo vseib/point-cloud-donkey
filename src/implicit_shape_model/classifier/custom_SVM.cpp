@@ -388,21 +388,41 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
     int num_sv = support_vectors.rows;
     float gamma = -1 * svm->getGamma();
 
-    // calc RBF-kernel result vector
     std::vector<float> kernel_vector(num_sv, 0); // holds weights for each support vector
 
+//    // calc RBF-kernel result vector
+//    for(int i = 0; i < num_sv; i++)
+//    {
+//        float s = 0;
+//        cv::Mat sv = support_vectors.row(i);
+
+//        for(int j = 0; j < feature_dim; j++)
+//        {
+//            float t = sv.at<float>(j) - test_data.at<float>(0,j);
+//            s += t*t;
+//        }
+//        kernel_vector.at(i) = std::exp(s * gamma);
+//    }
+
+    // calc CHI2-kernel result vector
     for(int i = 0; i < num_sv; i++)
     {
-        float s = 0;
+        float chi2 = 0;
         cv::Mat sv = support_vectors.row(i);
 
         for(int j = 0; j < feature_dim; j++)
         {
-            float t = sv.at<float>(j) - test_data.at<float>(0,j);
-            s += t*t;
+            float d = sv.at<float>(j) - test_data.at<float>(0,j);
+            float devisor = sv.at<float>(j) + test_data.at<float>(0,j);
+            if(devisor != 0)
+            {
+                chi2 += d*d/devisor;
+            }
         }
-        kernel_vector.at(i) = std::exp(s * gamma);
+        kernel_vector.at(i) = std::exp(chi2 * gamma);
     }
+
+
 
     // calc votes and distances
     std::vector<int> class_votes(m_num_classes, 0);
