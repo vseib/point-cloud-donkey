@@ -268,22 +268,23 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
     // add global features to result classification
     if(m_use_global_features)
     {
+        // NOTE: merge_function 5 needs raw weights that are not normalized
+        if(m_merge_function != 5)
+        {
+            // turn weights to probabilities
+            normalizeWeights(maxima);
+        }
+
         m_global_classifier->setMergeParams(m_min_svm_score, m_rate_limit, m_weight_factor);
         m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
         // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
+
         // find first maximum with weight = 0
-//        unsigned zero_idx = 0;
-//        for(; zero_idx < maxima.size(); zero_idx++)
-//        {
-//            if(maxima.at(zero_idx).weight == 0)
-//                break;
-//        }
         auto it = std::find_if(maxima.begin(), maxima.end(), [](const VotingMaximum &max){
             return max.weight == 0;
         });
         // delete maxima with zero weight
-        //maxima.erase(maxima.begin()+zero_idx, maxima.end());
         maxima.erase(it, maxima.end());
     }
 
