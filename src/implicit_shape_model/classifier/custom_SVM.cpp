@@ -125,7 +125,7 @@ void CustomSVM::trainSimple(double param_gamma, double param_c, bool one_vs_all)
         // Set up SVM's parameters
         cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
         svm->setType(cv::ml::SVM::C_SVC);
-        svm->setKernel(cv::ml::SVM::CHI2);
+        svm->setKernel(cv::ml::SVM::CHI2); // TODO VS make kernel selection a param
         svm->setGamma(param_gamma);
         svm->setC(param_c);
         svm->setDegree(1);
@@ -187,7 +187,7 @@ void CustomSVM::trainAutomatically(double param_gamma, double param_c, int k_fol
         // Set up SVM's parameters
         cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
         svm->setType(cv::ml::SVM::C_SVC);
-        svm->setKernel(cv::ml::SVM::CHI2);
+        svm->setKernel(cv::ml::SVM::CHI2);// TODO VS make kernel selection a param
         svm->setGamma(param_gamma);
         svm->setC(param_c);
         svm->setDegree(1);
@@ -309,8 +309,9 @@ CustomSVM::SVMResponse CustomSVM::predictUnifyScore(cv::Mat test_data, std::vect
         // switch sign and normalize to [0|1] to make score compatible with other score
         for(float &sc : response.all_scores)
         {
-            //sc = (sc * (-1) + 1) * 0.5;
-            sc = sigmoid(sc);
+            // TODO VS which score is better?
+            sc = (sc * (-1) + 1) * 0.5;
+            //sc = sigmoid(sc);
         }
         response.score = response.all_scores[response.label];
     }
@@ -390,6 +391,7 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
 
     std::vector<float> kernel_vector(num_sv, 0); // holds weights for each support vector
 
+    // TODO VS make kernel selection a param
 //    // calc RBF-kernel result vector
 //    for(int i = 0; i < num_sv; i++)
 //    {
