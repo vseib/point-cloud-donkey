@@ -125,7 +125,8 @@ void CustomSVM::trainSimple(double param_gamma, double param_c, bool one_vs_all)
         // Set up SVM's parameters
         cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
         svm->setType(cv::ml::SVM::C_SVC);
-        svm->setKernel(cv::ml::SVM::CHI2); // TODO VS make kernel selection a param
+//        svm->setKernel(cv::ml::SVM::CHI2); // TODO VS make kernel selection a param
+        svm->setKernel(cv::ml::SVM::RBF);
         svm->setGamma(param_gamma);
         svm->setC(param_c);
         svm->setDegree(1);
@@ -187,7 +188,8 @@ void CustomSVM::trainAutomatically(double param_gamma, double param_c, int k_fol
         // Set up SVM's parameters
         cv::Ptr<cv::ml::SVM> svm = cv::ml::SVM::create();
         svm->setType(cv::ml::SVM::C_SVC);
-        svm->setKernel(cv::ml::SVM::CHI2);// TODO VS make kernel selection a param
+//        svm->setKernel(cv::ml::SVM::CHI2); // TODO VS make kernel selection a param
+        svm->setKernel(cv::ml::SVM::RBF);
         svm->setGamma(param_gamma);
         svm->setC(param_c);
         svm->setDegree(1);
@@ -392,37 +394,37 @@ CustomSVM::SVMResponse CustomSVM::predictWithScore(cv::Mat test_data, std::strin
     std::vector<float> kernel_vector(num_sv, 0); // holds weights for each support vector
 
     // TODO VS make kernel selection a param
-//    // calc RBF-kernel result vector
-//    for(int i = 0; i < num_sv; i++)
-//    {
-//        float s = 0;
-//        cv::Mat sv = support_vectors.row(i);
-
-//        for(int j = 0; j < feature_dim; j++)
-//        {
-//            float t = sv.at<float>(j) - test_data.at<float>(0,j);
-//            s += t*t;
-//        }
-//        kernel_vector.at(i) = std::exp(s * gamma);
-//    }
-
-    // calc CHI2-kernel result vector
+    // calc RBF-kernel result vector
     for(int i = 0; i < num_sv; i++)
     {
-        float chi2 = 0;
+        float s = 0;
         cv::Mat sv = support_vectors.row(i);
 
         for(int j = 0; j < feature_dim; j++)
         {
-            float d = sv.at<float>(j) - test_data.at<float>(0,j);
-            float devisor = sv.at<float>(j) + test_data.at<float>(0,j);
-            if(devisor != 0)
-            {
-                chi2 += d*d/devisor;
-            }
+            float t = sv.at<float>(j) - test_data.at<float>(0,j);
+            s += t*t;
         }
-        kernel_vector.at(i) = std::exp(chi2 * gamma);
+        kernel_vector.at(i) = std::exp(s * gamma);
     }
+
+//    // calc CHI2-kernel result vector
+//    for(int i = 0; i < num_sv; i++)
+//    {
+//        float chi2 = 0;
+//        cv::Mat sv = support_vectors.row(i);
+
+//        for(int j = 0; j < feature_dim; j++)
+//        {
+//            float d = sv.at<float>(j) - test_data.at<float>(0,j);
+//            float devisor = sv.at<float>(j) + test_data.at<float>(0,j);
+//            if(devisor != 0)
+//            {
+//                chi2 += d*d/devisor;
+//            }
+//        }
+//        kernel_vector.at(i) = std::exp(chi2 * gamma);
+//    }
 
 
 
