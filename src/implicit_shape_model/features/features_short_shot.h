@@ -63,6 +63,8 @@ namespace ism3d
 
         double m_radius;
         double m_min_radius;
+        double m_min_radius_relative; // config value
+        bool m_use_min_radius;
         bool m_log_radius;
         int m_feature_dims;
         int m_r_bins;

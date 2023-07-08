@@ -21,7 +21,8 @@ namespace ism3d
     FeaturesSHORTSHOT::FeaturesSHORTSHOT()
     {
         addParameter(m_radius, "Radius", 0.1);
-        addParameter(m_min_radius, "ShortShotMinRadius", m_radius*0.25);
+        addParameter(m_use_min_radius, "UseMinRadius", false);
+        addParameter(m_min_radius_relative, "ShortShotMinRadius", 0.0);
         addParameter(m_feature_dims, "ShortShotDims", 32);
         addParameter(m_log_radius, "ShortShotLogRadius", false);
         addParameter(m_r_bins, "ShortShotRBins", 2);
@@ -84,6 +85,11 @@ namespace ism3d
         pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>());
         tree->setInputCloud(cloud);
 
+        if(m_use_min_radius)
+            m_min_radius = m_radius * m_min_radius_relative;
+        else
+            m_min_radius = 0.0;
+
         double ln_rmin = log(m_min_radius);
         double ln_rmax_rmin = log(m_radius/m_min_radius);
 
@@ -114,6 +120,7 @@ namespace ism3d
                     double z_l = (double)v.dot(current_frame_z);
 
                     double r = sqrt(x_l*x_l + y_l*y_l + z_l*z_l);
+                    if(r < m_min_radius) continue;
                     double theta = pcl::rad2deg(acos(z_l / r));
                     double phi = pcl::rad2deg(atan2(y_l, x_l));
 
