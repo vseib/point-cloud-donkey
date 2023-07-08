@@ -90,8 +90,8 @@ namespace ism3d
         else
             m_min_radius = 0.0;
 
-        double ln_rmin = log(m_min_radius);
-        double ln_rmax_rmin = log(m_radius/m_min_radius);
+        double ln_rmin = m_min_radius == 0 ? 0 : log(m_min_radius);
+        double ln_rmax_rmin = m_min_radius == 0 ? 0 : log(m_radius/m_min_radius);
 
         #pragma omp parallel for num_threads(m_numThreads)
         for(int i = 0; i < keypoints->points.size(); i++)
