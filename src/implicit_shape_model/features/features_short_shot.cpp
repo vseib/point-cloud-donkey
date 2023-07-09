@@ -86,13 +86,24 @@ namespace ism3d
         tree->setInputCloud(cloud);
 
         if(m_use_min_radius)
+        {
             m_min_radius = m_radius * m_min_radius_relative;
+        }
         else
-            m_min_radius = 0.0;
+        {
+            if(m_log_radius) // if log radius is enable, min radius MUST be used
+            {
+                // if we are here this means no min radius is enabled, use default relative value
+                m_min_radius = m_radius * 0.1f;
+            }
+            else
+            {
+                m_min_radius = 0.0;
+            }
+        }
 
-        // TODO VS log radius does not work -->
         double ln_rmin = m_min_radius == 0 ? 0 : log(m_min_radius);
-        double ln_rmax_rmin = m_min_radius == 0 ? 0 : log(m_radius/m_min_radius); // --> maybe m_min_radius must be relative here?
+        double ln_rmax_rmin = m_min_radius == 0 ? 0 : log(m_radius/m_min_radius);
 
         #pragma omp parallel for num_threads(m_numThreads)
         for(int i = 0; i < keypoints->points.size(); i++)
@@ -154,11 +165,8 @@ namespace ism3d
         float raw_r;
         if(m_log_radius)
         {
-            std::cout << "debug: " << m_r_bins << " " << log(r) << " " << ln_rmin << " " << ln_rmax_rmin << std::endl;
             raw_r = (m_r_bins - 1) * (log(r) - ln_rmin) / ln_rmax_rmin + 1;
-            std::cout << "debug: " << raw_r << std::endl;
             bin_r = int(raw_r);
-            std::cout << "debug: " << bin_r << std::endl;
         }
         else
         {
