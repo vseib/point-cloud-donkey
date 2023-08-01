@@ -348,7 +348,7 @@ int main(int argc, char **argv)
                         {
                             // detect
                             std::string pointCloud = pointClouds.at(i);
-                            unsigned trueID = gt_class_ids.at(i);
+                            unsigned trueClassID = gt_class_ids.at(i);
                             unsigned trueInstanceID = gt_instance_ids.at(i);
                             std::vector<ism3d::VotingMaximum> maxima;
 
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
                                         std::ofstream file;
                                         file.open(outFileName.c_str(), std::ios::out);
                                         file << "ISM3D classification log, filename: " << ismFile << ", point cloud: " << pointCloud
-                                             << ", ground truth class: " << trueID << ", ground truth instance: " << trueInstanceID << std::endl;
+                                             << ", ground truth class: " << trueClassID << ", ground truth instance: " << trueInstanceID << std::endl;
                                         file << "number, classID, weight, instanceID, instance weight, num-votes, position X Y Z, bounding box size X Y Z, bounding Box rotation quaternion w x y z" << std::endl;
 
                                         for (int i = 0; i < (int)maxima.size(); i++)
@@ -416,18 +416,17 @@ int main(int argc, char **argv)
                                     {
                                         classId = maxima.at(0).classId;
                                         classIdglobal = maxima.at(0).globalHypothesis.classId;
+                                        instanceId = maxima.at(0).instanceId;
                                         // lookup real class ids if instances were used as primary labels
                                         if(label_usage == LabelUsage::INSTANCE_PRIMARY)
                                         {
                                             classId = instance_to_class_map[classId];
                                             classIdglobal = instance_to_class_map[classIdglobal];
                                         }
-                                        instanceId = maxima.at(0).instanceId;
                                     }
 
                                     // only display additional classifiers if they are different from normal classification
-                                    summaryFile << "file: " << pointCloud << ", ground truth class: " << trueID << ", classified class: " << classId;
-
+                                    summaryFile << "file: " << pointCloud << ", ground truth class: " << trueClassID << ", classified class: " << classId;
                                     if(classId != classIdglobal)
                                     {
                                         summaryFile << ", global class: " << classIdglobal;
@@ -436,34 +435,34 @@ int main(int argc, char **argv)
 
                                     // count correct matches
                                     // normal classifier
-                                    if(((int)trueID) == classId)
+                                    if(((int)trueClassID) == classId)
                                     {
                                         // correct classification
                                         numCorrectClasses++;
-                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
+                                        if(averageAccuracyHelper.find(trueClassID) != averageAccuracyHelper.end())
                                         {
                                             // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
+                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueClassID);
                                             res.first++;
                                             res.second++;
                                         }
                                         else
                                         {
-                                            averageAccuracyHelper.insert({trueID, {1,1}});
+                                            averageAccuracyHelper.insert({trueClassID, {1,1}});
                                         }
                                     }
                                     else
                                     {
                                         // wrong classification
-                                        if(averageAccuracyHelper.find(trueID) != averageAccuracyHelper.end())
+                                        if(averageAccuracyHelper.find(trueClassID) != averageAccuracyHelper.end())
                                         {
                                             // pair <correct, total>
-                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueID);
+                                            std::pair<unsigned, unsigned> &res = averageAccuracyHelper.at(trueClassID);
                                             res.second++;
                                         }
                                         else
                                         {
-                                            averageAccuracyHelper.insert({trueID, {0,1}});
+                                            averageAccuracyHelper.insert({trueClassID, {0,1}});
                                         }
                                     }
                                     // instance recognition
@@ -472,17 +471,17 @@ int main(int argc, char **argv)
                                         numCorrectInstances++;
                                     }
                                     // global classifier
-                                    if(((int)trueID) == classIdglobal)
+                                    if(((int)trueClassID) == classIdglobal)
                                     {
                                         numCorrectGlobal++;
                                     }
                                     // both correct
-                                    if((int)trueID == classId && (int)trueID == classIdglobal)
+                                    if((int)trueClassID == classId && (int)trueClassID == classIdglobal)
                                     {
                                         numBothCorrect++;
                                     }
                                     // global correct, normal wrong
-                                    if((int)trueID != classId && (int)trueID == classIdglobal)
+                                    if((int)trueClassID != classId && (int)trueClassID == classIdglobal)
                                     {
                                         numOnlyGlobalCorrect++;
                                     }
