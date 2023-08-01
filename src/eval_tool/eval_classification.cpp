@@ -420,6 +420,7 @@ int main(int argc, char **argv)
                                         // lookup real class ids if instances were used as primary labels
                                         if(label_usage == LabelUsage::INSTANCE_PRIMARY)
                                         {
+                                            instanceId = classId;
                                             classId = instance_to_class_map[classId];
                                             classIdglobal = instance_to_class_map[classIdglobal];
                                         }
