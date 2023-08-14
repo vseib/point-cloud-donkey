@@ -515,9 +515,8 @@ void Voting::forwardBoxesAndRadii(const std::map<unsigned, std::vector<Utils::Bo
                 }
             }
 
-            // use "radius" of bb dimensions, i.e. half of the sizes
-            median_box_dim += med/2;
-            median_box_dim_squared += ((med/2)*(med/2));
+            median_box_dim += med;
+            median_box_dim_squared += (med*med);
         }
 
         assert(object_radii[classId].size() == it.second.size());
