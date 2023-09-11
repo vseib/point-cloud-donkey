@@ -50,15 +50,16 @@ struct DetectionObject
     float confidence;           // only for detection, not in ground truth
     // using path because some datasets use repeating names in subfolders
     std::string filepath;       // filename of gt annotations, not the point cloud
+    std::string cloud_filepath; // path of corresponding point cloud: only matters in training (e.g. sun-rgbd dataset)
 
     DetectionObject(std::string class_label, std::string instance_label, std::string global_class_label, Eigen::Vector3f position,
-                    float occlusion_ratio, float confidence, std::string filepath)
+                    float occlusion_ratio, float confidence, std::string filepath, std::string cloud_path)
         : class_label(class_label), instance_label(instance_label), global_class_label(global_class_label), position(position),
-          occlusion_ratio(occlusion_ratio), confidence(confidence), filepath(filepath) {}
+          occlusion_ratio(occlusion_ratio), confidence(confidence), filepath(filepath), cloud_filepath(cloud_path) {}
 
     void print()
     {
-        LOG_INFO("Object from " << filepath);
+        LOG_INFO("Object from " << filepath << " in cloud " << cloud_filepath);
         LOG_INFO("    class: " << class_label << ", instance: " << instance_label << ", visible: " << occlusion_ratio << " at position: (" <<
                  position.x() << ", " << position.y() << ", " << position.z() << "), confidence: " << confidence);
     }
@@ -422,11 +423,11 @@ DetectionObject convertMaxToObj(const ism3d::VotingMaximum& max, std::string &fi
     float confidence = max.weight;
     Eigen::Vector3f position(max.position[0], max.position[1], max.position[2]);
     // create object
-    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename};
+    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename, "converted-max-to-obj"};
 }
 
 
-std::vector<DetectionObject> parseGtFile(std::string &filename)
+std::vector<DetectionObject> parseAnnotationFile(std::string &filename, std::string cloud_filename = "")
 {
     std::vector<DetectionObject> objects;
 
@@ -468,7 +469,7 @@ std::vector<DetectionObject> parseGtFile(std::string &filename)
             }
 
             // create object
-            objects.emplace_back(class_name, instance_name, class_name, position, occlusion, 1.0f, filename);
+            objects.emplace_back(class_name, instance_name, class_name, position, occlusion, 1.0f, filename, cloud_filename);
         }
         else
         {
@@ -500,13 +501,15 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
     std::string additional_flag;
     std::string additional_flag_2;
     std::string instance_label;
+    std::string annot_file;
     bool using_instances = false;
+    bool training_with_bb = false;
 
     // special treatment of first line: determine mode
     infile >> file;         // in the first line: #
     infile >> class_label;  // in the first line: the mode ("train" or "test")
     infile >> additional_flag; // in the first line mandatory: "detection"
-    infile >> additional_flag_2; // optional: "inst"
+    infile >> additional_flag_2; // optional: "inst" or "boxes" (only for sun-rgbd)
 
     if(file == "#" && (class_label == "train" || class_label == "test"))
     {
@@ -524,10 +527,31 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
         {
             using_instances = true;
         }
+        else if(additional_flag_2 == "boxes")
+        {
+            // in this case the parsing in this method for "train" mode
+            // is the same as for other detection datasets in "test" mode
+            training_with_bb = true;
+        }
     }
 
     // process remaining lines
-    if (using_instances)
+    if (training_with_bb) // NOTE: so far only for sun-rgbd dataset
+    {
+        // the first filename has already been read into variable "additional_flag_2"
+        file = additional_flag_2;
+        filenames.push_back(file);
+        infile >> annot_file;
+        annot_filenames.push_back(annot_file);
+        // read remaining lines
+        while(infile >> file >> annot_file)
+        {
+            if (file[0] == '#') continue; // allows to comment out lines
+            filenames.push_back(file);
+            annot_filenames.push_back(annot_file);
+        }
+    }
+    else if (using_instances)
     {
         // other lines contain a filename, a class label and an instance label
         while(infile >> file >> class_label >> instance_label)

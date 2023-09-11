@@ -322,12 +322,12 @@ int main(int argc, char **argv)
                     for(unsigned i = 0; i < pointClouds.size(); i++)
                     {
                         // detect
-                        std::string pointCloud = pointClouds.at(i);
+                        std::string point_cloud = pointClouds.at(i);
                         std::string gt_file = annot_filenames.at(i);
                         std::vector<ism3d::VotingMaximum> maxima;
 
-                        std::cout << "Processing file: " << pointCloud << std::endl;
-                        if (!ism.detect(pointCloud, maxima, times))
+                        std::cout << "Processing file: " << point_cloud << std::endl;
+                        if (!ism.detect(point_cloud, maxima, times))
                         {
                             std::cerr << "detection failed" << std::endl;
                             return 1;
@@ -338,7 +338,7 @@ int main(int argc, char **argv)
                             if (variables.count("output"))
                             {
                                 // collect all gt objects
-                                std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
+                                std::vector<DetectionObject> gt_objects_from_file = parseAnnotationFile(gt_file, point_cloud);
                                 gt_objects.insert(gt_objects.end(), gt_objects_from_file.begin(), gt_objects_from_file.end());
                                 // collect all detections
                                 for (int i = 0; i < (int)maxima.size(); i++)
@@ -349,7 +349,7 @@ int main(int argc, char **argv)
                                 if(write_log_to_files)
                                 {
                                     std::string out_path = variables["output"].as<std::string>();
-                                    filelog::writeLogPerCloud(pointCloud, ismFile, gt_file, out_path, maxima);
+                                    filelog::writeLogPerCloud(point_cloud, ismFile, gt_file, out_path, maxima);
                                 }
                             }
                         }

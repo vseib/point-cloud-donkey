@@ -210,17 +210,17 @@ int main (int argc, char** argv)
             for(unsigned i = 0; i < filenames.size(); i++)
             {
                 // detect
-                std::string pointCloud = filenames.at(i);
+                std::string point_cloud = filenames.at(i);
                 std::string gt_file = annot_filenames.at(i);
                 std::vector<ism3d::VotingMaximum> maxima;
 
-                std::cout << "Processing file " << pointCloud << std::endl;
+                std::cout << "Processing file " << point_cloud << std::endl;
 
                 bool useHypothesisVerification = true;
-                maxima = hough3d->detect(pointCloud, useHypothesisVerification);
+                maxima = hough3d->detect(point_cloud, useHypothesisVerification);
 
                 // collect all gt objects
-                std::vector<DetectionObject> gt_objects_from_file = parseGtFile(gt_file);
+                std::vector<DetectionObject> gt_objects_from_file = parseAnnotationFile(gt_file, point_cloud);
                 gt_objects.insert(gt_objects.end(), gt_objects_from_file.begin(), gt_objects_from_file.end());
                 // collect all detections
                 for (int i = 0; i < (int)maxima.size(); i++)

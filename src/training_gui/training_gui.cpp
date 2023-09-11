@@ -497,7 +497,7 @@ void TrainingGUI::loadGTInfoForScene()
             if(m_dataset_mapping.find(m_loaded_scene_path) != m_dataset_mapping.end())
             {
                 m_gt_file = m_dataset_mapping[m_loaded_scene_path];
-                m_gt_objects = parseGtFile(m_gt_file);
+                m_gt_objects = parseAnnotationFile(m_gt_file);
                 m_use_gt_info = true;
             }
             else
