@@ -52,10 +52,16 @@ struct DetectionObject
     std::string filepath;       // filename of gt annotations, not the point cloud
     std::string cloud_filepath; // path of corresponding point cloud: only matters in training (e.g. sun-rgbd dataset)
 
+    // bounding box data
+    Eigen::Vector3f bb_extent;
+    Eigen::Quaternionf bb_orientation;
+
     DetectionObject(std::string class_label, std::string instance_label, std::string global_class_label, Eigen::Vector3f position,
-                    float occlusion_ratio, float confidence, std::string filepath, std::string cloud_path)
+                    float occlusion_ratio, float confidence, std::string filepath, std::string cloud_path, Eigen::Vector3f box_extent,
+                    Eigen::Quaternionf box_orient)
         : class_label(class_label), instance_label(instance_label), global_class_label(global_class_label), position(position),
-          occlusion_ratio(occlusion_ratio), confidence(confidence), filepath(filepath), cloud_filepath(cloud_path) {}
+          occlusion_ratio(occlusion_ratio), confidence(confidence), filepath(filepath), cloud_filepath(cloud_path),
+          bb_extent(box_extent), bb_orientation(box_orient){}
 
     void print()
     {
@@ -422,8 +428,10 @@ DetectionObject convertMaxToObj(const ism3d::VotingMaximum& max, std::string &fi
 
     float confidence = max.weight;
     Eigen::Vector3f position(max.position[0], max.position[1], max.position[2]);
+    Eigen::Vector3f box; // dummy box
+    Eigen::Quaternionf quat; // dummy quaternion
     // create object
-    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename, "converted-max-to-obj"};
+    return DetectionObject{class_name, instance_name, global_class, position, -1.0f, confidence, filename, "converted-max-to-obj", box, quat};
 }
 
 
@@ -460,16 +468,17 @@ std::vector<DetectionObject> parseAnnotationFile(std::string &filename, std::str
             occlusion = std::stof(occlusion_str);
 
             Eigen::Vector3f position(std::stof(tokens[2]), std::stof(tokens[3]), std::stof(tokens[4]));
+            Eigen::Vector3f box;
+            Eigen::Quaternionf quat;
 
             if(tokens.size() == 12)
             {
-                // TODO VS add these to eval
-                Eigen::Vector3f box(std::stof(tokens[5]), std::stof(tokens[6]), std::stof(tokens[7]));
-                Eigen::Quaternionf quat(std::stof(tokens[8]), std::stof(tokens[9]), std::stof(tokens[10]), std::stof(tokens[11]));
+                box = Eigen::Vector3f(std::stof(tokens[5]), std::stof(tokens[6]), std::stof(tokens[7]));
+                quat = Eigen::Quaternionf(std::stof(tokens[8]), std::stof(tokens[9]), std::stof(tokens[10]), std::stof(tokens[11]));
             }
 
             // create object
-            objects.emplace_back(class_name, instance_name, class_name, position, occlusion, 1.0f, filename, cloud_filename);
+            objects.emplace_back(class_name, instance_name, class_name, position, occlusion, 1.0f, filename, cloud_filename, box, quat);
         }
         else
         {
