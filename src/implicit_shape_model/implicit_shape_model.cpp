@@ -40,6 +40,7 @@
 #include <pcl/features/integral_image_normal.h>
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/filters/filter.h>
+#include <pcl/filters/passthrough.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/ply_io.h>
 #include <pcl/common/centroid.h>
@@ -97,6 +98,7 @@ ImplicitShapeModel::ImplicitShapeModel() : m_distance(0)
     addParameter(m_ror_radius, "OutlierRemovalRadius", 0.005f);
     addParameter(m_use_voxel_filtering, "UseVoxelFiltering", false);
     addParameter(m_voxel_leaf_size, "VoxelLeafSize", 0.0015f);
+    addParameter(m_cutoff_distance_z, "CutoffDistanceZAxis", 0.0f);
 
     // detection threshold for evaluation
     addParameter(m_distance_detection_thresh, "DistanceThresholdDetection", 0.05f);
@@ -754,6 +756,18 @@ ImplicitShapeModel::computeFeatures(pcl::PointCloud<PointNormalT>::ConstPtr poin
         filtered->is_dense = false;
         m_voxel_filtering.setInputCloud(points);
         m_voxel_filtering.filter(*filtered);
+        points = filtered;
+    }
+    if(m_cutoff_distance_z > 0.0)
+    {
+        pcl::PointCloud<PointNormalT>::Ptr filtered(new pcl::PointCloud<PointNormalT>());
+        filtered->is_dense = false;
+        LOG_INFO("performing pass through filtering");
+        pcl::PassThrough<PointNormalT> pass;
+        pass.setInputCloud(points);
+        pass.setFilterFieldName("z");
+        pass.setFilterLimits(0.0, m_cutoff_distance_z);
+        pass.filter(*filtered);
         points = filtered;
     }
 

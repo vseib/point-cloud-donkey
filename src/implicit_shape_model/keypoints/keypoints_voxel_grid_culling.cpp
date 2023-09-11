@@ -19,6 +19,7 @@
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/features/integral_image_normal.h>
 
+// TODO VS: rename keypoint_culling to keypoint_selection
 namespace ism3d
 {
     KeypointsVoxelGridCulling::KeypointsVoxelGridCulling()
@@ -34,10 +35,11 @@ namespace ism3d
         addParameter(m_filter_threshold_color, "FilterThresholdColor", 0.02f);
 
         addParameter(m_max_similar_color_distance, "MaxSimilarColorDistance", 0.01f);
-        addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f);
+        addParameter(m_filter_cutoff_ratio, "FilterCutoffRatio", 0.5f); // TODO VS: this param is used as "omit this percentage of keypoints"
+                                                                        //    thesis uses it as "keep this percentage of keypoints"  --> change it here
 
         addParameter(m_disable_filter_in_training, "DisableFilterInTraining", true);
-        addParameter(m_combine_filters, "CombineFilters", std::string("RequireCombinedList"));
+        addParameter(m_combine_filters, "CombineFilters", std::string("RequireCombinedList")); // TODO VS use names from thesis (union, intersection etc)
 
         addParameter(m_refine_position, "RefineKeypointPosition", false);
 
@@ -145,6 +147,7 @@ namespace ism3d
             else if(m_filter_method_geometry == "curvature")
             {
                 // need to run new voxel grid to create keypoints without normals (pcl point type)
+                // TODO VS: is this necessary? there is keypoints without normals above
                 pcl::VoxelGrid<PointT> voxel_grid;
                 voxel_grid.setInputCloud(pointsWithoutNaNNormals);
                 voxel_grid.setLeafSize(m_leafSize, m_leafSize, m_leafSize);

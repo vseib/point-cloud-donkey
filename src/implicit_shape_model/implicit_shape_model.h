@@ -327,6 +327,7 @@ namespace ism3d
         float m_ror_radius;
         bool m_use_voxel_filtering;
         float m_voxel_leaf_size;
+        float m_cutoff_distance_z;
 
         float m_distance_detection_thresh;
         std::string m_distance_thresh_type;
@@ -336,7 +337,6 @@ namespace ism3d
         int m_consistent_normals_method;
         int m_num_threads;
         std::string m_bb_type;
-        bool m_set_color_to_zero;
         bool m_enable_voting_analysis;
         std::string m_voting_analysis_output_path;
         bool m_svm_auto_train;
