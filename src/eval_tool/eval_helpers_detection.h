@@ -485,6 +485,7 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
                    std::vector<std::string> &filenames,
                    std::vector<unsigned> &class_labels,
                    std::vector<unsigned> &instance_labels,
+                   std::vector<std::string> &annot_filenames,
                    std::string mode)
 {
     // parse input

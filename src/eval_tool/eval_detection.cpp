@@ -93,7 +93,7 @@ int main(int argc, char **argv)
         try
         {
             std::vector<std::string> filenames;
-            std::vector<std::string> gt_filenames;
+            std::vector<std::string> annot_filenames;
             std::vector<unsigned> class_labels;
             std::vector<unsigned> instance_labels;
 
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
                 {
                     // manually parse input file
                     std::string input_file_name = variables["inputfile"].as<std::string>();
-                    label_usage = parseFileListDetectionTrain(input_file_name, filenames, class_labels, instance_labels, "train");
+                    label_usage = parseFileListDetectionTrain(input_file_name, filenames, class_labels, instance_labels, annot_filenames, "train");
                 }
 
                 std::cout << "starting the training process" << std::endl;
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
                 {
                     // manually parse input file
                     std::string input_file_name = variables["inputfile"].as<std::string>();
-                    parseFileListDetectionTest(input_file_name, filenames, gt_filenames);
+                    parseFileListDetectionTest(input_file_name, filenames, annot_filenames);
                 }
                 else
                 {
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
                     std::cerr << "could not read ism from file, detection stopped: " << ismFile << std::endl;
                     return 1;
                 }
-                else if (filenames.size() > 0 && gt_filenames.size() > 0)  // load pointclouds and groundtruth
+                else if (filenames.size() > 0 && annot_filenames.size() > 0)  // load pointclouds and groundtruth
                 {
                     std::vector<std::string> pointClouds;
                     // load label information from training
@@ -323,7 +323,7 @@ int main(int argc, char **argv)
                     {
                         // detect
                         std::string pointCloud = pointClouds.at(i);
-                        std::string gt_file = gt_filenames.at(i);
+                        std::string gt_file = annot_filenames.at(i);
                         std::vector<ism3d::VotingMaximum> maxima;
 
                         std::cout << "Processing file: " << pointCloud << std::endl;

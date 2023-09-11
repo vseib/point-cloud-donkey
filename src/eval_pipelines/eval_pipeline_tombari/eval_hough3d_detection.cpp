@@ -81,7 +81,7 @@ int main (int argc, char** argv)
 
     // parse input
     std::vector<std::string> filenames;
-    std::vector<std::string> gt_filenames;
+    std::vector<std::string> annot_filenames;
     std::vector<unsigned> class_labels;
     std::vector<unsigned> instance_labels;
     std::string mode;
@@ -120,7 +120,7 @@ int main (int argc, char** argv)
 
     if(mode == "train")
     {
-        label_usage = parseFileListDetectionTrain(dataset, filenames, class_labels, instance_labels, "train");
+        label_usage = parseFileListDetectionTrain(dataset, filenames, class_labels, instance_labels, annot_filenames, "train");
 
         // if both, class and instance labels given, use instances
         // usually, this leads to better accuracy
@@ -149,7 +149,7 @@ int main (int argc, char** argv)
         boost::timer::cpu_timer timer;
         std::cout << "Started testing!" << std::endl;
 
-        parseFileListDetectionTest(dataset, filenames, gt_filenames);
+        parseFileListDetectionTest(dataset, filenames, annot_filenames);
 
         if(hough3d->loadModel(model))
         {
@@ -211,7 +211,7 @@ int main (int argc, char** argv)
             {
                 // detect
                 std::string pointCloud = filenames.at(i);
-                std::string gt_file = gt_filenames.at(i);
+                std::string gt_file = annot_filenames.at(i);
                 std::vector<ism3d::VotingMaximum> maxima;
 
                 std::cout << "Processing file " << pointCloud << std::endl;
