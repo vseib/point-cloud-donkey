@@ -61,6 +61,12 @@ std::map<unsigned, std::string> instance_labels_rmap;
 std::map<unsigned, unsigned> instance_to_class_map;
 LabelUsage label_usage;
 
+unsigned convertLabel(std::string &label, std::map<std::string, unsigned> &labels_map, std::map<unsigned, std::string> &labels_rmap);
+
+unsigned convertClassLabel(std::string& class_label)
+{
+    return convertLabel(class_label, class_labels_map, class_labels_rmap);
+}
 
 unsigned convertLabel(std::string& label,
                       std::map<std::string, unsigned>& labels_map,

@@ -151,7 +151,8 @@ int main(int argc, char **argv)
                 }
 
                 // add the training models to the ism
-                if(filenames.size() > 0 && class_labels.size() > 0)
+                if((filenames.size() > 0 && class_labels.size() > 0)
+                    || (filenames.size() > 0 && annot_filenames.size() > 0))
                 {
                     std::vector<std::string> models;
                     std::vector<unsigned> class_ids;
@@ -184,7 +185,8 @@ int main(int argc, char **argv)
                         }
                     }
 
-                    if (models.size() == class_ids.size())
+                    // standard case where everything is read out from the given file
+                    if (models.size() == class_ids.size() && class_ids.size() > 0)
                     {
                         for (int i = 0; i < (int)models.size(); i++)
                         {
@@ -198,6 +200,35 @@ int main(int argc, char **argv)
                                 std::cerr << "could not add training model: " << filename << ", class " << class_id << std::endl;
                                 return 1;
                             }
+                        }
+                    }
+                    // special case where additional annotation files are used in training
+                    else if(annot_filenames.size() > 0)
+                    {
+                        for(unsigned cloud_file_idx = 0; cloud_file_idx < filenames.size(); cloud_file_idx++)
+                        {
+                            std::string point_cloud = filenames.at(cloud_file_idx);
+                            std::string gt_file = annot_filenames.at(cloud_file_idx);
+                            std::vector<DetectionObject> gt_objects_from_file = parseAnnotationFile(gt_file, point_cloud);
+
+                            // add all objects from the current annotation file
+                            std::vector<unsigned> class_ids;
+                            std::vector<unsigned> instance_ids;
+                            std::vector<std::string> cloud_paths;
+                            std::vector<ism3d::Utils::BoundingBox> boxes;
+                            for(auto gt_obj : gt_objects_from_file)
+                            {
+                                class_ids.push_back(convertClassLabel(gt_obj.class_label));
+                                instance_ids.push_back(convertClassLabel(gt_obj.instance_label));
+                                cloud_paths.push_back(gt_obj.cloud_filepath);
+                                // convert eigen quaternion to boost quaternion
+                                boost::math::quaternion<float> rot_quat = boost::math::quaternion<float>(gt_obj.bb_orientation.w(),
+                                             gt_obj.bb_orientation.x(), gt_obj.bb_orientation.y(), gt_obj.bb_orientation.z());
+                                ism3d::Utils::BoundingBox bounding_box(gt_obj.position, rot_quat, gt_obj.bb_extent);
+                                boxes.push_back(bounding_box);
+                            }
+
+                            //TODO VS: add training model with class id, instance id and bb
                         }
                     }
                     else

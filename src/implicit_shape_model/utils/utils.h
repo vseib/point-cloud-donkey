@@ -55,6 +55,9 @@ namespace ism3d
                 size = Eigen::Vector3f(1, 1, 1);
             }
 
+            BoundingBox(Eigen::Vector3f pos, boost::math::quaternion<float> quat, Eigen::Vector3f extent) :
+                position(pos), rotQuat(quat), size(extent){}
+
             Eigen::Vector3f position;
             boost::math::quaternion<float> rotQuat;
             Eigen::Vector3f size;
