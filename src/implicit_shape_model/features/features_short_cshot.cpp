@@ -21,7 +21,8 @@ namespace ism3d
     FeaturesSHORTCSHOT::FeaturesSHORTCSHOT()
     {
         addParameter(m_radius, "Radius", 0.1);
-        addParameter(m_min_radius, "ShortShotMinRadius", m_radius*0.25);
+        addParameter(m_use_min_radius, "UseMinRadius", false);
+        addParameter(m_min_radius_relative, "ShortShotMinRadius", 0.0);
         addParameter(m_shape_feature_dims, "ShortShotDims", 32);
         addParameter(m_color_feature_dims, "ShortColorShotDims", 32);
         addParameter(m_color_hist_size, "ShortColorShotHistSize", 15);
@@ -110,8 +111,25 @@ namespace ism3d
         pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>());
         tree->setInputCloud(cloud);
 
-        double ln_rmin = log(m_min_radius);
-        double ln_rmax_rmin = log(m_radius/m_min_radius);
+        if(m_use_min_radius)
+        {
+            m_min_radius_relative = m_radius * m_min_radius_relative;
+        }
+        else
+        {
+            if(m_log_radius) // if log radius is enable, min radius MUST be used
+            {
+                // if we are here this means no min radius is enabled, use default relative value
+                m_min_radius_relative = m_radius * 0.1f;
+            }
+            else
+            {
+                m_min_radius_relative = 0.0;
+            }
+        }
+
+        double ln_rmin = m_min_radius_relative == 0 ? 0 : log(m_min_radius_relative);
+        double ln_rmax_rmin = m_min_radius_relative == 0 ? 0 : log(m_radius/m_min_radius_relative);
 
         #pragma omp parallel for num_threads(m_numThreads)
         for(int i = 0; i < keypoints->points.size(); i++)
