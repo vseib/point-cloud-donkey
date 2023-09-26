@@ -174,6 +174,7 @@ namespace ism3d
                     double z_l = (double)v.dot(current_frame_z);
 
                     double r = sqrt(x_l*x_l + y_l*y_l + z_l*z_l);
+                    if(r < m_min_radius) continue;
                     double theta = pcl::rad2deg(acos(z_l / r));
                     double phi = pcl::rad2deg(atan2(y_l, x_l));
 
