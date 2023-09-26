@@ -113,23 +113,23 @@ namespace ism3d
 
         if(m_use_min_radius)
         {
-            m_min_radius_relative = m_radius * m_min_radius_relative;
+            m_min_radius = m_radius * m_min_radius_relative;
         }
         else
         {
             if(m_log_radius) // if log radius is enable, min radius MUST be used
             {
                 // if we are here this means no min radius is enabled, use default relative value
-                m_min_radius_relative = m_radius * 0.1f;
+                m_min_radius = m_radius * 0.1f;
             }
             else
             {
-                m_min_radius_relative = 0.0;
+                m_min_radius = 0.0;
             }
         }
 
-        double ln_rmin = m_min_radius_relative == 0 ? 0 : log(m_min_radius_relative);
-        double ln_rmax_rmin = m_min_radius_relative == 0 ? 0 : log(m_radius/m_min_radius_relative);
+        double ln_rmin = m_min_radius == 0 ? 0 : log(m_min_radius);
+        double ln_rmax_rmin = m_min_radius == 0 ? 0 : log(m_radius/m_min_radius);
 
         #pragma omp parallel for num_threads(m_numThreads)
         for(int i = 0; i < keypoints->points.size(); i++)

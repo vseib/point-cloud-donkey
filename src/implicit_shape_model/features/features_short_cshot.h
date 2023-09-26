@@ -75,6 +75,7 @@ namespace ism3d
         static float sXYZ_LUT[4000];
 
         double m_radius;
+        double m_min_radius;
         double m_min_radius_relative;
         bool m_log_radius;
         bool m_use_min_radius;
