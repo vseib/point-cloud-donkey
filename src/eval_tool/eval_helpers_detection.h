@@ -547,11 +547,6 @@ LabelUsage parseFileListDetectionTrain(std::string &input_file_name,
     // process remaining lines
     if (training_with_bb) // NOTE: so far only for sun-rgbd dataset
     {
-        // the first filename has already been read into variable "additional_flag_2"
-        file = additional_flag_2;
-        filenames.push_back(file);
-        infile >> annot_file;
-        annot_filenames.push_back(annot_file);
         // read remaining lines
         while(infile >> file >> annot_file)
         {
