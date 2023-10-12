@@ -15,6 +15,70 @@
 namespace ism3d
 {
 
+pcl::PointCloud<ism3d::PointNormalT>::Ptr DebugUtils::getBoxCorners(const Utils::BoundingBox &box, int num_intermediate_points)
+{
+    pcl::PointCloud<ism3d::PointNormalT>::Ptr result_cloud(new pcl::PointCloud<ism3d::PointNormalT>());
+
+    // create corners around origin
+    std::vector<Eigen::Vector3f> corners;
+    corners.push_back(Eigen::Vector3f(box.size.x()/2, box.size.y()/2, box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(box.size.x()/2, box.size.y()/2, - box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(box.size.x()/2, - box.size.y()/2, box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(box.size.x()/2, - box.size.y()/2, - box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2, box.size.y()/2, box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2, box.size.y()/2, - box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2, - box.size.y()/2, box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2, - box.size.y()/2, - box.size.z()/2));
+
+    // rotate according to box orientation
+    // NOTE: annoated data uses inverse coordinate system, hence the inverted rotation
+    for(auto &corner : corners)
+    {
+        Utils::quatRotateInv(box.rotQuat, corner);
+    }
+
+    // add rotated corners to result
+    for(const auto &corner : corners)
+    {
+        ism3d::PointNormalT p;
+        p.x = corner.x() + box.position.x();
+        p.y = corner.y() + box.position.y();;
+        p.z = corner.z() + box.position.z();;
+        p.r = 255;
+        result_cloud->push_back(p);
+    }
+
+    // add intermediate points to simulate a box
+    if(num_intermediate_points > 0)
+    {
+        // list of indices of neighboring corners
+        std::vector<std::pair<unsigned, unsigned>> point_pairs = {{0,1}, {0,2}, {1,3}, {2,3}, {4,5}, {4,6}, {5,7}, {6,7}, {0,4}, {1,5}, {2,6}, {3,7}};
+
+        std::vector<Eigen::Vector3f> interm;
+        for(const auto &pair : point_pairs)
+        {
+            Eigen::Vector3f step_size  = (corners[pair.second] - corners[pair.first]) / num_intermediate_points;
+            for(unsigned j = 0; j < num_intermediate_points; j++)
+            {
+                interm.push_back(corners[pair.first] + j * step_size);
+            }
+        }
+
+        for(const auto &interm_p : interm)
+        {
+            ism3d::PointNormalT p;
+            p.x = interm_p.x() + box.position.x();
+            p.y = interm_p.y() + box.position.y();
+            p.z = interm_p.z() + box.position.z();
+            p.r = 255;
+            result_cloud->push_back(p);
+        }
+    }
+
+    return result_cloud;
+}
+
+
 void DebugUtils::writeToFile(std::map<unsigned, std::vector<pcl::PointCloud<ISMFeature>::Ptr>> &features,
                             std::string filename)
 {
