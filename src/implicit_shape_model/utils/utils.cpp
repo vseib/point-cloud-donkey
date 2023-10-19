@@ -505,9 +505,12 @@ namespace ism3d
             euler[2] = atan2(2.0f * (qW * qZ + qX * qY), 1.0f - 2.0f * (qY * qY + qZ * qZ));
         }
 
-        angleX = rad2deg(euler[0]);
-        angleY = rad2deg(euler[1]);
-        angleZ = rad2deg(euler[2]);
+        angleX = euler[0];
+        angleY = euler[1];
+        angleZ = euler[2];
+//        angleX = rad2deg(euler[0]);
+//        angleY = rad2deg(euler[1]);
+//        angleZ = rad2deg(euler[2]);
     }
 
     void Utils::axis2Quat(boost::math::quaternion<float>& quat, const Eigen::Vector3f& axis, float angle)
