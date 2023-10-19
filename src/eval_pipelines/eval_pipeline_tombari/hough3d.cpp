@@ -44,7 +44,21 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         fp::normal_method = 1;
         fp::feature_type = "SHOT";
     }
-    else if(dataset == "washington" || dataset == "bigbird" || dataset == "ycb")
+    else if(dataset == "washington" || dataset == "wash" || dataset == "bigbird")
+    {
+        /// classification
+        m_th = -0.1;
+        m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
+        m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
+        m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.05;
+        fp::feature_radius = 0.06;
+        fp::keypoint_sampling_radius = 0.02;
+        fp::normal_method = 0;
+        fp::feature_type = "CSHOT";
+    }
+    else if(dataset == "wash-p" || dataset == "ycb")
     {
         /// classification
         m_th = -0.1;
