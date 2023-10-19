@@ -21,20 +21,19 @@ pcl::PointCloud<ism3d::PointNormalT>::Ptr DebugUtils::getBoxCorners(const Utils:
 
     // create corners around origin
     std::vector<Eigen::Vector3f> corners;
-    corners.push_back(Eigen::Vector3f(box.size.x()/2, box.size.y()/2, box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(box.size.x()/2, box.size.y()/2, - box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(box.size.x()/2, - box.size.y()/2, box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(box.size.x()/2, - box.size.y()/2, - box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(- box.size.x()/2, box.size.y()/2, box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(- box.size.x()/2, box.size.y()/2, - box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(- box.size.x()/2, - box.size.y()/2, box.size.z()/2));
-    corners.push_back(Eigen::Vector3f(- box.size.x()/2, - box.size.y()/2, - box.size.z()/2));
+    corners.push_back(Eigen::Vector3f(  box.size.x()/2.0f,   box.size.y()/2.0f,   box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(  box.size.x()/2.0f,   box.size.y()/2.0f, - box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(  box.size.x()/2.0f, - box.size.y()/2.0f,   box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(  box.size.x()/2.0f, - box.size.y()/2.0f, - box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2.0f,   box.size.y()/2.0f,   box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2.0f,   box.size.y()/2.0f, - box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2.0f, - box.size.y()/2.0f,   box.size.z()/2.0f));
+    corners.push_back(Eigen::Vector3f(- box.size.x()/2.0f, - box.size.y()/2.0f, - box.size.z()/2.0f));
 
     // rotate according to box orientation
-    // NOTE: annoated data uses inverse coordinate system, hence the inverted rotation
     for(auto &corner : corners)
     {
-        Utils::quatRotateInv(box.rotQuat, corner);
+        Utils::quatRotate(box.rotQuat, corner);
     }
 
     // add rotated corners to result
@@ -42,8 +41,8 @@ pcl::PointCloud<ism3d::PointNormalT>::Ptr DebugUtils::getBoxCorners(const Utils:
     {
         ism3d::PointNormalT p;
         p.x = corner.x() + box.position.x();
-        p.y = corner.y() + box.position.y();;
-        p.z = corner.z() + box.position.z();;
+        p.y = corner.y() + box.position.y();
+        p.z = corner.z() + box.position.z();
         p.r = 255;
         result_cloud->push_back(p);
     }
