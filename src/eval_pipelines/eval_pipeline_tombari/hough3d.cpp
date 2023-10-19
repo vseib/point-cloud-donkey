@@ -52,8 +52,8 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
         m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
         fp::normal_radius = 0.005;
-        fp::reference_frame_radius = 0.05;
-        fp::feature_radius = 0.05;
+        fp::reference_frame_radius = 0.04;
+        fp::feature_radius = 0.06;
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
