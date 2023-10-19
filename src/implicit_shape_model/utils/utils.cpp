@@ -466,6 +466,13 @@ namespace ism3d
         quat /= boost::math::norm(quat);
     }
 
+    boost::math::quaternion<float> Utils::normalizeQuat(const boost::math::quaternion<float> &quat)
+    {
+        Eigen::Vector4f qv(quat.R_component_1(), quat.R_component_2(), quat.R_component_3(), quat.R_component_4());
+        qv.normalize();
+        return boost::math::quaternion<float>(qv[0], qv[1], qv[2], qv[3]);
+    }
+
     Eigen::Vector3f Utils::quat2EulerAsVector(const boost::math::quaternion<float>& quat)
     {
         float x, y, z;
