@@ -89,7 +89,7 @@ int main (int argc, char** argv)
 
     // find dataset name from input file
     std::string datasetname;
-    if(dataset.find_first_of('/') != std::string::npos) // old style train/test files
+    if(dataset.find_first_of('/') == std::string::npos) // old style train/test files
     {
         int pos1 = dataset.find_first_of('_');
         std::string str1 = dataset.substr(0, pos1);
@@ -109,8 +109,8 @@ int main (int argc, char** argv)
     {
         int pos1 = dataset.find_last_of('/');
         std::string part = dataset.substr(pos1 + 1);
-        int pos2 = part.substr(pos1+1).find_first_of('_');
-        datasetname = dataset.substr(pos1+1, pos2);
+        int pos2 = part.find_first_of('_');
+        datasetname = part.substr(0, pos2);
     }
 
     std::shared_ptr<Hough3d> hough3d(new Hough3d(datasetname));
