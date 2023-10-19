@@ -159,7 +159,7 @@ namespace ism3d
 
         // rotate point into coordinate system
         Eigen::Vector3f result(point);
-        quatRotateInv(rotQuat, result);
+        quatRotate(rotQuat, result);
 
         return result;
     }
@@ -172,7 +172,7 @@ namespace ism3d
 
         // rotate point from coordinate system back into world
         Eigen::Vector3f result(point);
-        quatRotate(rotQuat, result);
+        quatRotateInv(rotQuat, result);
 
         return result;
     }
@@ -466,6 +466,13 @@ namespace ism3d
         quat /= boost::math::norm(quat);
     }
 
+    Eigen::Vector3f Utils::quat2EulerAsVector(const boost::math::quaternion<float>& quat)
+    {
+        float x, y, z;
+        quat2Euler(quat, x, y, z);
+        return Eigen::Vector3f(x,y,z);
+    }
+
     void Utils::quat2Euler(const boost::math::quaternion<float>& quat, float& angleX, float& angleY, float& angleZ)
     {
         boost::math::quaternion<float> myQuat = quat;
@@ -540,7 +547,7 @@ namespace ism3d
         }
     }
 
-    void Utils::quatRotate(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point)
+    void Utils::quatRotateInv(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point)
     {
         boost::math::quaternion<float> pointTemp(0, point[0], point[1], point[2]);
         pointTemp = boost::math::conj(quat) * pointTemp * quat;
@@ -548,7 +555,7 @@ namespace ism3d
             pointTemp.R_component_4());
     }
 
-    void Utils::quatRotateInv(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point)
+    void Utils::quatRotate(const boost::math::quaternion<float>& quat, Eigen::Vector3f& point)
     {
         boost::math::quaternion<float> pointTemp(0, point[0], point[1], point[2]);
         pointTemp = quat * pointTemp * boost::math::conj(quat);

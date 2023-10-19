@@ -102,6 +102,9 @@ namespace ism3d
 
         static float computeHingeLoss(const std::vector<float> &class_distances, const unsigned class_id);
 
+        // quaternion adapter
+        static Eigen::Vector3f quat2EulerAsVector(const boost::math::quaternion<float>& quat);
+
         // quaternions
         static void matrix2Quat(const float* rot, float* quat);
         static void matrix2Quat(const Eigen::Matrix3f& rot, boost::math::quaternion<float>& quat);
