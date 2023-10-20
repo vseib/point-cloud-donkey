@@ -50,7 +50,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count
         /// classification
         // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
         m_corr_threshold = -0.1;
-
+        m_use_mvbb = true;
         fp::normal_radius = 0.05;
         fp::reference_frame_radius = 0.3;
         fp::feature_radius = 0.4;
@@ -62,6 +62,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count
     {
         /// classification
         m_corr_threshold = -0.5; // TODO VS check param
+        m_use_mvbb = false;
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.06;
@@ -73,6 +74,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count
     {
         /// classification
         m_corr_threshold = -0.5; // TODO VS check param
+        m_use_mvbb = false;
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.04;
         fp::feature_radius = 0.06;
@@ -87,6 +89,7 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count
         m_temp_2 = -th;
         m_temp_3 = count;
 
+        m_use_mvbb = true;
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
         fp::feature_radius = 0.05;
@@ -157,7 +160,12 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
            std::cerr << "ERROR: loading file " << file << std::endl;
        }
 
-       Utils::BoundingBox bounding_box = Utils::computeAABB<PointT>(cloud);
+       Utils::BoundingBox bounding_box;
+       if(m_use_mvbb)
+           bounding_box = Utils::computeMVBB<PointT>(cloud);
+       else
+            bounding_box = Utils::computeAABB<PointT>(cloud);
+
        all_bounding_boxes[tr_class].push_back(bounding_box);
 
        // all these pointers are initialized within the called method

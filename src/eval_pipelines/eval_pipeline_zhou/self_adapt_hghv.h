@@ -99,6 +99,7 @@ private:
 
     float m_corr_threshold;
 
+    bool m_use_mvbb;
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features;

@@ -102,6 +102,7 @@ private:
     int m_icp_max_iter;
     float m_icp_corr_distance;
 
+    bool m_use_mvbb;
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features;

@@ -104,6 +104,7 @@ private:
     float m_count;
     float m_count2;
 
+    bool m_use_mvbb;
     int m_number_of_classes;
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
