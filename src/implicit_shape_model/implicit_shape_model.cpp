@@ -41,6 +41,7 @@
 #include <pcl/recognition/cg/hough_3d.h>
 #include <pcl/filters/filter.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/crop_box.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/ply_io.h>
 #include <pcl/common/centroid.h>
@@ -65,6 +66,7 @@
 #include "utils/normal_orientation.h"
 #include "utils/factory.h"
 #include "utils/exception.h"
+#include "utils/debug_utils.h"
 
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/consoleappender.h>
@@ -184,8 +186,29 @@ bool ImplicitShapeModel::addTrainingModel(const std::string& filename, unsigned 
     m_training_objects_filenames[class_id].push_back(filename);
     m_training_objects_instance_ids[class_id].push_back(instance_id);
     m_training_objects_has_normals[class_id].push_back(true); // NOTE: optimistic assumption, needs to be checked later
+    m_training_objects_has_bounding_box[class_id].push_back(false);
     return true;
 }
+
+
+bool ImplicitShapeModel::addTrainingModelsWithBoxes(const std::string &filename,
+                                           const std::vector<unsigned> &class_ids,
+                                           const std::vector<unsigned> &instance_ids,
+                                           const std::vector<Utils::BoundingBox> &boxes)
+{
+    LOG_INFO("adding training scene " << filename << " with " << class_ids.size() << " training objects");
+
+    for(unsigned idx = 0; idx < class_ids.size(); idx++)
+    {
+        m_training_objects_filenames[class_ids[idx]].push_back(filename);
+        m_training_objects_instance_ids[class_ids[idx]].push_back(instance_ids[idx]);
+        m_training_objects_bounding_boxes[class_ids[idx]].push_back(boxes[idx]);
+        m_training_objects_has_normals[class_ids[idx]].push_back(true); // NOTE: optimistic assumption, needs to be checked later
+        m_training_objects_has_bounding_box[class_ids[idx]].push_back(true);
+    }
+    return true;
+}
+
 
 pcl::PointCloud<PointNormalT>::Ptr ImplicitShapeModel::loadPointCloud(const std::string& filename)
 {
