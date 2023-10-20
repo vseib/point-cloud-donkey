@@ -163,7 +163,7 @@ int main (int argc, char** argv)
             std::map<unsigned, std::pair<unsigned, unsigned>> averageAccuracyHelper; // maps class id to pair <correct, total>
 
             std::string outputname = model.substr(0, model.find_last_of('.')) + ".txt";
-            std::ofstream outfile("output_"+outputname);
+            std::ofstream outfile("output_zhou_"+outputname);
 
             for(std::string filename : filenames)
             {
