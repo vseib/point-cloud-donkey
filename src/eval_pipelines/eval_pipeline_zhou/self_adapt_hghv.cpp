@@ -157,7 +157,7 @@ void SelfAdaptHGHV::train(const std::vector<std::string> &filenames,
            std::cerr << "ERROR: loading file " << file << std::endl;
        }
 
-       Utils::BoundingBox bounding_box = Utils::computeMVBB<PointT>(cloud);
+       Utils::BoundingBox bounding_box = Utils::computeAABB<PointT>(cloud);
        all_bounding_boxes[tr_class].push_back(bounding_box);
 
        // all these pointers are initialized within the called method
