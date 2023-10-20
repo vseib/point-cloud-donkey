@@ -34,6 +34,7 @@
 #include <boost/program_options.hpp>
 #include <boost/program_options/errors.hpp>
 #include "../implicit_shape_model/implicit_shape_model.h"
+#include "../implicit_shape_model/utils/debug_utils.h"
 #include "eval_helpers_detection.h"
 #include "logging_to_files.h"
 
@@ -92,8 +93,8 @@ int main(int argc, char **argv)
     {
         try
         {
-            std::vector<std::string> filenames;
-            std::vector<std::string> annot_filenames;
+            std::vector<std::string> filenames;       // filenames of point cloud scenes
+            std::vector<std::string> annot_filenames; // annotations for point clouds (objects and poses)
             std::vector<unsigned> class_labels;
             std::vector<unsigned> instance_labels;
 
@@ -207,15 +208,19 @@ int main(int argc, char **argv)
                     {
                         for(unsigned cloud_file_idx = 0; cloud_file_idx < filenames.size(); cloud_file_idx++)
                         {
-                            std::string point_cloud = filenames.at(cloud_file_idx);
+                            std::string point_cloud_filename = filenames.at(cloud_file_idx);
                             std::string gt_file = annot_filenames.at(cloud_file_idx);
-                            std::vector<DetectionObject> gt_objects_from_file = parseAnnotationFile(gt_file, point_cloud);
+                            std::vector<DetectionObject> gt_objects_from_file = parseAnnotationFile(gt_file, point_cloud_filename);
 
                             // add all objects from the current annotation file
                             std::vector<unsigned> class_ids;
                             std::vector<unsigned> instance_ids;
                             std::vector<std::string> cloud_paths;
                             std::vector<ism3d::Utils::BoundingBox> boxes;
+
+                            pcl::PointCloud<ism3d::PointNormalT>::Ptr pc(new pcl::PointCloud<ism3d::PointNormalT>());
+                            pcl::io::loadPCDFile(point_cloud_filename, *pc);
+
                             for(auto gt_obj : gt_objects_from_file)
                             {
                                 class_ids.push_back(convertClassLabel(gt_obj.class_label));
@@ -224,11 +229,22 @@ int main(int argc, char **argv)
                                 // convert eigen quaternion to boost quaternion
                                 boost::math::quaternion<float> rot_quat = boost::math::quaternion<float>(gt_obj.bb_orientation.w(),
                                              gt_obj.bb_orientation.x(), gt_obj.bb_orientation.y(), gt_obj.bb_orientation.z());
-                                ism3d::Utils::BoundingBox bounding_box(gt_obj.position, rot_quat, gt_obj.bb_extent);
+                                ism3d::Utils::BoundingBox bounding_box(gt_obj.position, ism3d::Utils::normalizeQuat(rot_quat), gt_obj.bb_extent);
                                 boxes.push_back(bounding_box);
-                            }
 
-                            //TODO VS: add training model with class id, instance id and bb
+//                                // TODO VS debug tests
+//                                pcl::PointCloud<ism3d::PointNormalT>::Ptr corners = ism3d::DebugUtils::getBoxCorners(bounding_box, 50);
+//                                for(auto & corner : corners->points)
+//                                {
+//                                    pc->push_back(corner);
+//                                }
+                            }
+//                            // TODO VS debug tests
+//                            std::string name = "/home/vseib/Desktop/" + point_cloud_filename;
+//                            pcl::io::savePCDFile(name, *pc);
+
+                            // add all training objects of the scene with class ids, instance ids and boxes
+                            ism.addTrainingModelsWithBoxes(point_cloud_filename, class_ids, instance_ids, boxes);
                         }
                     }
                     else
