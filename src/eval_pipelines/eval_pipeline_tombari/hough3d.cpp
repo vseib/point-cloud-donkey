@@ -44,7 +44,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         fp::normal_method = 1;
         fp::feature_type = "SHOT";
     }
-    else if(dataset == "washington" || dataset == "wash" || dataset == "bigbird")
+    else if(dataset == "washington" || dataset == "wash" || dataset == "bigbird" || dataset == "bigb")
     {
         /// classification
         m_th = -0.1;
