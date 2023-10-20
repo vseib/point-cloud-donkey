@@ -90,18 +90,28 @@ int main (int argc, char** argv)
 
     // find dataset name from input file
     std::string datasetname;
-    int pos1 = dataset.find_first_of('_');
-    std::string str1 = dataset.substr(0, pos1);
-    int pos2 = dataset.substr(pos1+1).find_first_of('_');
-    std::string str2 = dataset.substr(pos1+1, pos2);
+    if(dataset.find_first_of('/') == std::string::npos) // old style train/test files
+    {
+        int pos1 = dataset.find_first_of('_');
+        std::string str1 = dataset.substr(0, pos1);
+        int pos2 = dataset.substr(pos1+1).find_first_of('_');
+        std::string str2 = dataset.substr(pos1+1, pos2);
 
-    if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
-    {
-        datasetname = str2;
+        if(str1 == "train" || str1 == "test" || str1 == "training" || str1 == "testing")
+        {
+            datasetname = str2;
+        }
+        else
+        {
+            datasetname = str1;
+        }
     }
-    else
+    else // new style train/test files from subfolder
     {
-        datasetname = str1;
+        int pos1 = dataset.find_last_of('/');
+        std::string part = dataset.substr(pos1 + 1);
+        int pos2 = part.find_first_of('_');
+        datasetname = part.substr(0, pos2);
     }
 
     std::shared_ptr<SelfAdaptHGHV> sa_hghv(new SelfAdaptHGHV(datasetname));

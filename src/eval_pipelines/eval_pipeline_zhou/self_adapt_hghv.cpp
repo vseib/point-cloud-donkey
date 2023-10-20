@@ -54,18 +54,28 @@ SelfAdaptHGHV::SelfAdaptHGHV(std::string dataset, float bin, float th, int count
         fp::normal_radius = 0.05;
         fp::reference_frame_radius = 0.3;
         fp::feature_radius = 0.4;
-        fp::keypoint_sampling_radius = 0.2;
+        fp::keypoint_sampling_radius = 0.25;
         fp::normal_method = 1;
         fp::feature_type = "SHOT";
     }
-    else if(dataset == "washington" || dataset == "bigbird" || dataset == "ycb")
+    else if(dataset == "washington" || dataset == "wash" || dataset == "bigbird" || dataset == "bigb")
     {
         /// classification
         m_corr_threshold = -0.5; // TODO VS check param
-
         fp::normal_radius = 0.005;
         fp::reference_frame_radius = 0.05;
-        fp::feature_radius = 0.05;
+        fp::feature_radius = 0.06;
+        fp::keypoint_sampling_radius = 0.02;
+        fp::normal_method = 0;
+        fp::feature_type = "CSHOT";
+    }
+    else if(dataset == "wash-p" || dataset == "ycb")
+    {
+        /// classification
+        m_corr_threshold = -0.5; // TODO VS check param
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.04;
+        fp::feature_radius = 0.06;
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
