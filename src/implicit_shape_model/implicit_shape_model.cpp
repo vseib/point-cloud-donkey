@@ -278,7 +278,9 @@ void ImplicitShapeModel::train()
 
         const std::vector<std::string>& cloud_filenames = it->second;
         const std::vector<unsigned>& cloud_instance_ids = m_training_objects_instance_ids[class_id];
+        const std::vector<Utils::BoundingBox> &cloud_boxes = m_training_objects_bounding_boxes[class_id];
         const std::vector<bool>& clouds_have_normals = m_training_objects_has_normals[class_id];
+        const std::vector<bool>& clouds_have_boxes = m_training_objects_has_bounding_box[class_id];
 
         LOG_ASSERT(cloud_filenames.size() == clouds_have_normals.size());
         LOG_ASSERT(cloud_filenames.size() == cloud_instance_ids.size());
@@ -292,6 +294,45 @@ void ImplicitShapeModel::train()
             pcl::PointCloud<PointNormalT>::Ptr point_cloud = loadPointCloud(cloud_filenames[j]);
             point_cloud->is_dense = false; // to prevent errors in some PCL algorithms
             unsigned instance_id = cloud_instance_ids[j];
+
+            pcl::PointCloud<PointNormalT>::Ptr output(new pcl::PointCloud<PointNormalT>);
+            Utils::BoundingBox bounding_box;
+            if(clouds_have_boxes[j])
+            {
+                bounding_box = cloud_boxes[j];
+                pcl::CropBox<PointNormalT> crop_box;
+                crop_box.setInputCloud(point_cloud);
+                crop_box.setKeepOrganized(false);
+                crop_box.setNegative(false); // remove everything outside the box
+                crop_box.setMin(Eigen::Vector4f(-bounding_box.size.x()/2, -bounding_box.size.y()/2, -bounding_box.size.z()/2, 1));
+                crop_box.setMax(Eigen::Vector4f(bounding_box.size.x()/2, bounding_box.size.y()/2, bounding_box.size.z()/2, 1));
+                crop_box.setTranslation(bounding_box.position);
+                crop_box.setRotation(Utils::quat2EulerAsVector(bounding_box.rotQuat));
+                crop_box.filter(*output);
+                output->is_dense = false;
+
+                if(output->size() < 500)
+                {
+                    LOG_ERROR("Segmented box has too few points (" << output->size() << "), skipping ...");
+                    continue;
+                }
+                point_cloud = output;
+            }
+            else
+            {
+                // compute bounding box
+                if (m_bb_type == "MVBB")
+                {
+                    bounding_box = Utils::computeMVBB<PointNormalT>(point_cloud);
+                }
+                else if (m_bb_type == "AABB")
+                {
+                    bounding_box = Utils::computeAABB<PointNormalT>(point_cloud);
+                }
+                else
+                    throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
+            }
+
             float cloud_radius = Utils::computeCloudRadius<PointNormalT>(point_cloud);
 
 //            // temp for debug
