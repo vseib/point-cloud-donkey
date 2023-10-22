@@ -287,7 +287,7 @@ namespace ism3d
         Utils::matrix2Quat(rot, box.rotQuat);
         box.size = size;
         box.position = pos;
-        Utils::quatRotate(box.rotQuat, box.position);
+        Utils::quatRotateInv(box.rotQuat, box.position);
 
         return box;
     }
