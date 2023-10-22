@@ -348,21 +348,6 @@ void ImplicitShapeModel::train()
 //            new_cloud->width = new_cloud->size();
 //            pcl::io::savePCDFile(name, *new_cloud);
 
-
-
-            // compute bounding box
-            Utils::BoundingBox bounding_box;
-            if (m_bb_type == "MVBB")
-            {
-                bounding_box = Utils::computeMVBB<PointNormalT>(point_cloud);
-            }
-            else if (m_bb_type == "AABB")
-            {
-                bounding_box = Utils::computeAABB<PointNormalT>(point_cloud);
-            }
-            else
-                throw BadParamExceptionType<std::string>("invalid bounding box type", m_bb_type);
-
 //            // TODO VS: temp for debug
 //            Eigen::Vector4f centroid4f;
 //            pcl::compute3DCentroid(*point_cloud, centroid4f);
