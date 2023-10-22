@@ -459,6 +459,12 @@ std::vector<DetectionObject> parseAnnotationFile(std::string &filename, std::str
         if(tokens.size() == 5 || tokens.size() == 12)
         {
             std::string class_name = tokens[0];
+            // fix for sun-rgbd: data should contain only the top 10 classes, however, somehow these 3 are also there
+            if(class_name == "book" || class_name == "books" || class_name == "dress")
+            {
+                continue;
+            }
+
             std::string instance_name = class_name; // overwrite later if available
 
 
