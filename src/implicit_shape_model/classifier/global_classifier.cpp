@@ -455,6 +455,8 @@ namespace ism3d
     }
 
     void GlobalClassifier::mergeGlobalAndLocalHypotheses(const int merge_function,
+                                                         const Eigen::Vector3f roi_centroid,
+                                                         const float radius,
                                                          std::vector<VotingMaximum> &maxima)
     {
         if(merge_function >= 1 && merge_function <= 3 && !m_single_object_mode)
@@ -489,19 +491,30 @@ namespace ism3d
             // type 4: upweight consistent results by fixed factor
             for(VotingMaximum &max : maxima)
             {
+                float dist_of_max = (max.position - roi_centroid).norm();
+                bool dont_care = roi_centroid.norm() == 0; // in this case we are in classification not detection
                 if(max.classId == max.globalHypothesis.classId)
                 {
-                    if(max.globalHypothesis.classWeight == 0)
-                        max.weight = 0;
-                    else
-                        max.weight *= m_weight_factor;
+                    // only proceed if maximum position is closer than half of the bandwidth to the centroid
+                    if(dont_care || dist_of_max < radius / 2.0f)
+                    {
+                        if(max.globalHypothesis.classWeight == 0)
+                            max.weight = 0;
+                        else
+                            max.weight *= m_weight_factor;
+                    }
+
                 }
                 if(max.instanceId == max.globalHypothesis.instanceId)
                 {
-                    if(max.globalHypothesis.instanceWeight == 0)
-                        max.instanceWeight = 0;
-                    else
-                        max.instanceWeight *= m_weight_factor;
+                    // only proceed if maximum position is closer than half of the bandwidth to the centroid
+                    if(dont_care || dist_of_max < radius / 2.0f)
+                    {
+                        if(max.globalHypothesis.instanceWeight == 0)
+                            max.instanceWeight = 0;
+                        else
+                            max.instanceWeight *= m_weight_factor;
+                    }
                 }
             }
         }
@@ -510,13 +523,18 @@ namespace ism3d
             // type 5: upweight consistent results depending on weight
             for(VotingMaximum &max : maxima)
             {
-                if(max.classId == max.globalHypothesis.classId)
-                    max.weight *= 1 + max.globalHypothesis.classWeight;
-                if(max.instanceId == max.globalHypothesis.instanceId)
-                    max.instanceWeight *= 1 + max.globalHypothesis.instanceWeight;
+                float dist_of_max = (max.position - roi_centroid).norm();
+                bool dont_care = roi_centroid.norm() == 0; // in this case we are in classification not detection
+                if(dont_care || dist_of_max < radius / 2.0f)
+                {
+                    if(max.classId == max.globalHypothesis.classId)
+                        max.weight *= 1 + max.globalHypothesis.classWeight;
+                    if(max.instanceId == max.globalHypothesis.instanceId)
+                        max.instanceWeight *= 1 + max.globalHypothesis.instanceWeight;
+                }
             }
         }
-        else if(merge_function == 6)
+        else if(merge_function == 6) // TODO VS get rid of this
         {
             // type 6: multiply weights
             for(VotingMaximum &max : maxima)
@@ -534,15 +552,20 @@ namespace ism3d
             {
                 if(max.classId == max.globalHypothesis.classId)
                 {
-                    float w1 = max.weight;
-                    float w2 = max.globalHypothesis.classWeight;
-                    max.weight = w1+w2 - w1*w2;
-
-                    if(max.instanceId == max.globalHypothesis.instanceId)
+                    float dist_of_max = (max.position - roi_centroid).norm();
+                    bool dont_care = roi_centroid.norm() == 0; // in this case we are in classification not detection
+                    if(dont_care || dist_of_max < radius / 2.0f)
                     {
-                        w1 = max.instanceWeight;
-                        w2 = max.globalHypothesis.instanceWeight;
-                        max.instanceWeight = w1+w2 - w1*w2;
+                        float w1 = max.weight;
+                        float w2 = max.globalHypothesis.classWeight;
+                        max.weight = w1+w2 - w1*w2;
+
+                        if(max.instanceId == max.globalHypothesis.instanceId)
+                        {
+                            w1 = max.instanceWeight;
+                            w2 = max.globalHypothesis.instanceWeight;
+                            max.instanceWeight = w1+w2 - w1*w2;
+                        }
                     }
                 }
             }

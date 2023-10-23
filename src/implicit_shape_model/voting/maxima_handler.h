@@ -72,6 +72,11 @@ namespace ism3d
             m_radius = radius;
         }
 
+        static float getRadius()
+        {
+            return m_radius;
+        }
+
         static void setBoundingBoxMaps(const std::map<unsigned, std::pair<float, float>> &dims_map,
                                        const std::map<unsigned, std::pair<float, float>> &vars_map)
         {

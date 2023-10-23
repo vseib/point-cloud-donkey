@@ -101,6 +101,7 @@ namespace ism3d
         }
 
         void mergeGlobalAndLocalHypotheses(const int merge_function,
+                                           const Eigen::Vector3f roi_centroid, const float radius,
                                            std::vector<VotingMaximum> &maxima);
 
         void setFlannHelper(std::shared_ptr<FlannHelper> fh)

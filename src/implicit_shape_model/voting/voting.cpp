@@ -88,6 +88,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         return std::vector<VotingMaximum>();
 
     std::vector<VotingMaximum> maxima;
+    Eigen::Vector3f roi_centroid(0,0,0); // centroid of partial cloud classified with global descriptors
 
     // find votes for each class individually
     // iterate over map that assigns each class id with a list of votes
@@ -221,6 +222,11 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
 
                 m_global_classifier->segmentROI(points, normals, maximum, segmented_points, segmented_normals);
                 m_global_classifier->classify(segmented_points, segmented_normals, m_min_points, maximum);
+
+                // this is needed for correct hypothesis merging with global classifier
+                Eigen::Vector4d centroid;
+                pcl::compute3DCentroid(*segmented_points, centroid);
+                roi_centroid = Eigen::Vector3f(centroid.x(), centroid.y(), centroid.z());
             }
 
             #pragma omp critical
@@ -276,7 +282,7 @@ std::vector<VotingMaximum> Voting::findMaxima(pcl::PointCloud<PointT>::ConstPtr 
         }
 
         m_global_classifier->setMergeParams(m_min_svm_score, m_rate_limit, m_weight_factor);
-        m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, maxima);
+        m_global_classifier->mergeGlobalAndLocalHypotheses(m_merge_function, roi_centroid, MaximaHandler::getRadius(), maxima);
         // global features might have changed weights
         std::sort(maxima.begin(), maxima.end(), Voting::sortMaxima);
 
