@@ -254,6 +254,13 @@ int main(int argc, char **argv)
                     }
                 }
 
+//                // TODO VS debug sun-rgbd
+//                for(const auto & elem : class_labels_rmap)
+//                {
+//                    std::cout << elem.first << " " << elem.second << std::endl;
+//                }
+//                exit(2);
+
                 // train
                 ism.train();
 
