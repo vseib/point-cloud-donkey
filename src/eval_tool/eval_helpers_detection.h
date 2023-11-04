@@ -110,7 +110,6 @@ struct MetricsCollection
     // is called after num_classes is set (externally)
     void resizeVectors()
     {
-        std::cout << "gt class map size: " << num_classes << std::endl;
         ap_per_class = std::vector<float>(num_classes, 0.0);
         precision_per_class = std::vector<float>(num_classes, 0.0);
         recall_per_class = std::vector<float>(num_classes, 0.0);
