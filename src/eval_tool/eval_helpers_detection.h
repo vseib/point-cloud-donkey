@@ -107,6 +107,7 @@ struct MetricsCollection
     // is called after gt_class_map is filled (externally)
     void resizeVectors()
     {
+        std::cout << "gt class map size: " << gt_class_map.size() << std::endl;
         ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
         precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
         recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
@@ -114,6 +115,10 @@ struct MetricsCollection
         global_ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
         global_precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
         global_recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        for(auto it = gt_class_map.begin(); it < gt_class_map.end(); it++)
+        {
+            std::cout << " inhalt: " << it.first << std::endl;
+        }
     }
 };
 
