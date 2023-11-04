@@ -84,6 +84,9 @@ struct DetectionSummary
 // collection of all final and temporary metrics, used to handle only one object instead of each metric separately
 struct MetricsCollection
 {
+    MetricsCollection(int num_classes) : num_classes(num_classes){}
+
+    int num_classes;
     // maps a class label id to list of objects
     std::map<std::string, std::vector<DetectionObject>> gt_class_map;
     std::map<std::string, std::vector<DetectionObject>> det_class_map;
@@ -104,21 +107,17 @@ struct MetricsCollection
     std::vector<float> global_precision_per_class;
     std::vector<float> global_recall_per_class;
 
-    // is called after gt_class_map is filled (externally)
+    // is called after num_classes is set (externally)
     void resizeVectors()
     {
-        std::cout << "gt class map size: " << gt_class_map.size() << std::endl;
-        ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
-        precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
-        recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
+        std::cout << "gt class map size: " << num_classes << std::endl;
+        ap_per_class = std::vector<float>(num_classes, 0.0);
+        precision_per_class = std::vector<float>(num_classes, 0.0);
+        recall_per_class = std::vector<float>(num_classes, 0.0);
         // metrics for the global classifier (if used)
-        global_ap_per_class = std::vector<float>(gt_class_map.size(), 0.0);
-        global_precision_per_class = std::vector<float>(gt_class_map.size(), 0.0);
-        global_recall_per_class = std::vector<float>(gt_class_map.size(), 0.0);
-        for(auto it = gt_class_map.begin(); it != gt_class_map.end(); it++)
-        {
-            std::cout << " inhalt: " << it->first << std::endl;
-        }
+        global_ap_per_class = std::vector<float>(num_classes, 0.0);
+        global_precision_per_class = std::vector<float>(num_classes, 0.0);
+        global_recall_per_class = std::vector<float>(num_classes, 0.0);
     }
 };
 

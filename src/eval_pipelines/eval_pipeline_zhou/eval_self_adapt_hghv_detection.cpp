@@ -224,7 +224,7 @@ int main (int argc, char** argv)
             }
 
             // create common object to manage all metrics
-            MetricsCollection mc;
+            MetricsCollection mc(class_labels_rmap.size());
             rearrangeObjects(gt_objects, mc.gt_class_map);
             rearrangeObjects(detected_objects, mc.det_class_map);
             mc.resizeVectors();
