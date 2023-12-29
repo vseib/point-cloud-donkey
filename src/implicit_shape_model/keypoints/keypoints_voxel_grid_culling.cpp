@@ -68,7 +68,7 @@ namespace ism3d
         if(pointsWithoutNaNNormals->size() == 0)
         {
             m_filter_method_geometry = "none";
-            m_filter_method_color == "none";
+            m_filter_method_color = "none";
             LOG_WARN("Can not filter keypoints! Proceeding without filtering!");
         }
 
