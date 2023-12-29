@@ -64,6 +64,14 @@ namespace ism3d
         boost::algorithm::to_lower(m_filter_type_geometry);
         boost::algorithm::to_lower(m_filter_type_color);
 
+        // TODO VS: find out why this happens
+        if(pointsWithoutNaNNormals->size() == 0)
+        {
+            m_filter_method_geometry = "none";
+            m_filter_method_color == "none";
+            LOG_WARN("Can not filter keypoints! Proceeding without filtering!");
+        }
+
         // disable in training if desired -> becomes normal voxel grid without culling
         if((m_is_training && m_disable_filter_in_training)
                    || (m_filter_method_geometry == "none" && m_filter_method_color == "none"))
