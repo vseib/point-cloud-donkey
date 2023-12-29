@@ -118,6 +118,7 @@ namespace ism3d
             voxel_grid.setLeafSize(m_leafSize, m_leafSize, m_leafSize);
             pcl::PointCloud<PointNormalT>::Ptr keypoints_with_normals(new pcl::PointCloud<PointNormalT>());
             voxel_grid.filter(*keypoints_with_normals);
+            LOG_INFO("Initial number of keypoints with normals: " << keypoints_with_normals->size());
 
             // copy only point information without normals
             pcl::PointCloud<PointT>::Ptr keypoints_without_normals(new pcl::PointCloud<PointT>()); // these keypoints will be filtered here
