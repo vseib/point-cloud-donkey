@@ -945,28 +945,28 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr points
     LOG_ASSERT(normals.get() == 0);
     normals = pcl::PointCloud<pcl::Normal>::Ptr(new pcl::PointCloud<pcl::Normal>());
 
-//    if (points->isOrganized())
-//    {
-//        // TODO VS: check if detection datasets are organized in training and testing !!! if yes: also test with other normals
+    if (points->isOrganized())
+    {
+        // TODO VS: check if detection datasets are organized in training and testing !!! if yes: also test with other normals
 
-//        pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
-//        normalEst.setInputCloud(points);
-//        // TODO VS: test this
-////        normalEst.setNormalEstimationMethod(normalEst.COVARIANCE_MATRIX);
-//        normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
-//        normalEst.setMaxDepthChangeFactor(0.02f);
-//        normalEst.setNormalSmoothingSize(10.0f);
-//        // TODO VS: test this
-////        normalEst.setBorderPolicy(normalEst.BORDER_POLICY_MIRROR);
+        pcl::IntegralImageNormalEstimation<PointT, pcl::Normal> normalEst;
+        normalEst.setInputCloud(points);
+        // TODO VS: test this
+//        normalEst.setNormalEstimationMethod(normalEst.COVARIANCE_MATRIX);
+        normalEst.setNormalEstimationMethod(normalEst.AVERAGE_3D_GRADIENT);
+        normalEst.setMaxDepthChangeFactor(0.02f);
+        normalEst.setNormalSmoothingSize(10.0f);
+        // TODO VS: test this
+//        normalEst.setBorderPolicy(normalEst.BORDER_POLICY_MIRROR);
 
-//        // flip normals toward scene viewpoint
-//        LOG_INFO("orienting normals toward viewpoint");
-//        normalEst.useSensorOriginAsViewPoint();
-//        normalEst.compute(*normals);
-//        // TODO VS check if normals are flipped to viewpoint
-//    }
-//    else
-//    {
+        // flip normals toward scene viewpoint
+        LOG_INFO("orienting normals toward viewpoint");
+        normalEst.useSensorOriginAsViewPoint();
+        normalEst.compute(*normals);
+        // TODO VS check if normals are flipped to viewpoint
+    }
+    else
+    {
         LOG_INFO("computing consistent normal orientation (using method " << m_consistent_normals_method <<")");
 
         // prepare PCL normal estimation object
@@ -1033,7 +1033,7 @@ void ImplicitShapeModel::computeNormals(pcl::PointCloud<PointT>::ConstPtr points
         {
             eigen_values = normalEst.eigen_values_;
         }
-//    }
+    }
 }
 
 
