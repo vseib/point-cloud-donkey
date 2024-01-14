@@ -106,6 +106,8 @@ private:
 
     bool m_use_mvbb;
     int m_number_of_classes;
+    float m_cutoff_distance_z;
+    float m_inlier_th; // ransac inlier threshold
     std::vector<unsigned> m_class_lookup;
     pcl::PointCloud<ISMFeature>::Ptr m_features; // codebook
     pcl::PointCloud<PointT>::Ptr m_keypoints;

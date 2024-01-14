@@ -1,6 +1,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/correspondence.h>
 #include <pcl/registration/transformation_estimation.h>
+#include <pcl/filters/passthrough.h>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
@@ -36,6 +37,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         m_max_coord = Eigen::Vector3d(2.0, 2.0, 2.0);
         m_bin_size = Eigen::Vector3d(0.5, 0.5, 0.5);
         m_use_mvbb = true;
+        m_cutoff_distance_z = 0.0;
 
         // use this for datasets: aim, mcg, psb, shrec-12, mn10, mn40
         fp::normal_radius = 0.05;
@@ -59,6 +61,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
+        m_cutoff_distance_z = 0.0;
     }
     else if(dataset == "wash-p" || dataset == "ycb")
     {
@@ -74,10 +77,12 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
+        m_cutoff_distance_z = 0.0;
     }
-    else if(dataset == "dataset1" || dataset == "dataset5")
+    else if(dataset == "dataset1" || dataset == "dataset5" || dataset == "rav" || dataset == "kin")
     {
-        m_count = count; // TODO VS temp
+        m_inlier_th = 0.03;
+        m_count = count;
         m_count2 = count2;
 
         /// detection
@@ -85,23 +90,48 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
         m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
         m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
         fp::normal_radius = 0.005;
-        fp::reference_frame_radius = 0.04;
-        fp::feature_radius = 0.04;
+        fp::reference_frame_radius = 0.03;
+        fp::feature_radius = 0.06;
         fp::keypoint_sampling_radius = 0.02;
+        m_cutoff_distance_z = 0.0;
 
-        if(dataset == "dataset1")
+        if(dataset == "dataset1" || dataset == "rav")
         {
             fp::normal_method = 2;
             fp::feature_type = "SHOT";
             m_th = -th;// -0.01;
             m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.01, 0.01, 0.01);
         }
-        if(dataset == "dataset5")
+        if(dataset == "dataset5" || dataset == "kin")
         {
             fp::normal_method = 0;
             fp::feature_type = "CSHOT";
             m_th = -th;//-0.80;
             m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.05, 0.05, 0.05);
+        }
+    }
+    else if(dataset == "cha" || dataset == "wil")
+    {
+        m_inlier_th = 0.03;
+
+        /// detection
+        m_use_mvbb = false;
+        m_min_coord = Eigen::Vector3d(-1.0, -1.0, -1.0);
+        m_max_coord = Eigen::Vector3d(1.0, 1.0, 1.0);
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.03;
+        fp::feature_radius = 0.06;
+        fp::keypoint_sampling_radius = 0.02;
+        m_cutoff_distance_z = 0.0;
+
+        fp::normal_method = 0;
+        fp::feature_type = "CSHOT";
+        m_th = -th;//-0.80;
+        m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.05, 0.05, 0.05);
+
+        if(dataset == "wil")
+        {
+            m_cutoff_distance_z = 2.0;
         }
     }
     else
@@ -254,6 +284,19 @@ std::vector<VotingMaximum> Hough3d::detect(const std::string &filename,
     {
       std::cerr << "ERROR: loading file " << filename << std::endl;
       return std::vector<VotingMaximum>();
+    }
+
+    if(m_cutoff_distance_z > 0.0)
+    {
+        pcl::PointCloud<PointT>::Ptr filtered(new pcl::PointCloud<PointT>());
+        filtered->is_dense = false;
+        LOG_INFO("performing pass through filtering");
+        pcl::PassThrough<PointT> pass;
+        pass.setInputCloud(cloud);
+        pass.setFilterFieldName("z");
+        pass.setFilterLimits(0.0, m_cutoff_distance_z);
+        pass.filter(*filtered);
+        cloud = filtered;
     }
 
     // all these pointers are initialized within the called method
@@ -457,7 +500,7 @@ void Hough3d::findObjects(
     std::vector<double> maxima;
     std::vector<std::vector<int>> vote_indices;
     float relative_threshold = m_th; // minimal weight of a maximum in percent of highest maximum to be considered a hypothesis
-    bool use_distance_weight = int(m_count2) >= 2;
+    bool use_distance_weight = false;
     castVotesAndFindMaxima(object_scene_corrs, votelist, relative_threshold, use_distance_weight,
                            maxima, vote_indices, m_hough_space);
 
@@ -470,8 +513,8 @@ void Hough3d::findObjects(
     // generate 6DOF hypotheses with absolute orientation
     std::vector<Eigen::Matrix4f> transformations;
     std::vector<pcl::Correspondences> model_instances;
-    bool refine_model = int(m_count2)%2 == 0;
-    float inlier_threshold = m_count;
+    bool refine_model = true;
+    float inlier_threshold = m_inlier_th;
     generateHypothesesWithAbsoluteOrientation(object_scene_corrs, vote_indices, scene_keypoints,
                                               m_keypoints, inlier_threshold, refine_model,
                                               use_hv, transformations, model_instances);
@@ -498,7 +541,7 @@ void Hough3d::findObjects(
         }
         else
         {
-            // in general worse results // TODO VS eval at the end again, when best params are found
+            // in general worse results
             findClassAndPositionFromTransformedObjectKeypoints(filtered_corrs, transformation, m_features,
                                             m_keypoints, m_center_vectors, m_number_of_classes, res_class,
                                             res_num_votes, res_position);
