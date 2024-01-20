@@ -101,6 +101,7 @@ private:
     float m_bin_size;
     int m_icp_max_iter;
     float m_icp_corr_distance;
+    float m_cutoff_distance_z;
 
     bool m_use_mvbb;
     int m_number_of_classes;

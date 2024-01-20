@@ -82,7 +82,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
     else if(dataset == "dataset1" || dataset == "dataset5" || dataset == "rav" || dataset == "kin")
     {
         m_inlier_th = 0.03;
-        m_count = count;
+        m_count = count; // TODO VS remove temp variables
         m_count2 = count2;
 
         /// detection

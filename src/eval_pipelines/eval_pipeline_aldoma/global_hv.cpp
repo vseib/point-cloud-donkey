@@ -4,6 +4,7 @@
 #include <pcl/correspondence.h>
 #include <pcl/common/centroid.h>
 #include <pcl/common/transforms.h>
+#include <pcl/filters/passthrough.h>
 
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
@@ -52,6 +53,7 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
         fp::keypoint_sampling_radius = 0.25;
         fp::normal_method = 1;
         fp::feature_type = "SHOT";
+        m_cutoff_distance_z = 0.0;
     }
 
     else if(dataset == "washington" || dataset == "wash" || dataset == "bigbird" || dataset == "bigb")
@@ -66,6 +68,7 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
+        m_cutoff_distance_z = 0.0;
     }
     else if(dataset == "wash-p" || dataset == "ycb")
     {
@@ -79,33 +82,49 @@ GlobalHV::GlobalHV(std::string dataset, float bin, float th, int count) :
         fp::keypoint_sampling_radius = 0.02;
         fp::normal_method = 0;
         fp::feature_type = "CSHOT";
+        m_cutoff_distance_z = 0.0;
     }
-    else if(dataset == "dataset1" || dataset == "dataset5")
+    else if(dataset == "dataset1" || dataset == "dataset5" || dataset == "rav" || dataset == "kin")
     {
         /// detection
         m_bin_size = bin;
         m_corr_threshold = -th;
         m_use_mvbb = true;
         fp::normal_radius = 0.005;
-        fp::reference_frame_radius = 0.04;
-        fp::feature_radius = 0.04;
+        fp::reference_frame_radius = 0.03;
+        fp::feature_radius = 0.06;
         fp::keypoint_sampling_radius = 0.02;
-
+        m_cutoff_distance_z = 0.0;
         m_count = count; // TODO VS temp
 
-        if(dataset == "dataset1")
+        if(dataset == "dataset1" || dataset == "rav")
         {
             fp::normal_method = 2;
             fp::feature_type = "SHOT";
-//            m_corr_threshold = -0.01; // TODO VS include after eval
-//            m_bin_size = Eigen::Vector3d(0.01, 0.01, 0.01);
         }
-        if(dataset == "dataset5")
+        if(dataset == "dataset5" || dataset == "kin")
         {
             fp::normal_method = 0;
             fp::feature_type = "CSHOT";
-//            m_corr_threshold = -0.50; // TODO VS include after eval
-//            m_bin_size = Eigen::Vector3d(0.02, 0.02, 0.02);
+        }
+    }
+    else if(dataset == "cha" || dataset == "wil" || dataset == "tuw")
+    {
+        /// detection
+        m_bin_size = bin;
+        m_corr_threshold = -th;
+        m_use_mvbb = false;
+        fp::normal_radius = 0.005;
+        fp::reference_frame_radius = 0.03;
+        fp::feature_radius = 0.06;
+        fp::keypoint_sampling_radius = 0.02;
+        fp::normal_method = 0;
+        fp::feature_type = "CSHOT";
+        m_cutoff_distance_z = 0.0;
+
+        if(dataset == "wil")
+        {
+            m_cutoff_distance_z = 2.0;
         }
     }
     else
@@ -249,6 +268,19 @@ std::vector<VotingMaximum> GlobalHV::detect(const std::string &filename,
     {
       std::cerr << "ERROR: loading file " << filename << std::endl;
       return std::vector<VotingMaximum>();
+    }
+
+    if(m_cutoff_distance_z > 0.0)
+    {
+        pcl::PointCloud<PointT>::Ptr filtered(new pcl::PointCloud<PointT>());
+        filtered->is_dense = false;
+        LOG_INFO("performing pass through filtering");
+        pcl::PassThrough<PointT> pass;
+        pass.setInputCloud(cloud);
+        pass.setFilterFieldName("z");
+        pass.setFilterLimits(0.0, m_cutoff_distance_z);
+        pass.filter(*filtered);
+        cloud = filtered;
     }
 
     // all these pointers are initialized within the called method
