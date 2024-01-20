@@ -110,7 +110,7 @@ Hough3d::Hough3d(std::string dataset, float bin, float th, float count, float co
             m_bin_size = Eigen::Vector3d(bin, bin, bin); //Eigen::Vector3d(0.05, 0.05, 0.05);
         }
     }
-    else if(dataset == "cha" || dataset == "wil")
+    else if(dataset == "cha" || dataset == "wil" || dataset == "tuw")
     {
         m_inlier_th = 0.03;
 
